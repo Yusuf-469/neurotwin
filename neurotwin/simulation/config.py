@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass, fields, replace
+from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -137,6 +137,13 @@ class SimulationConfig:
         with open(path, encoding="utf-8") as fh:
             return cls.from_dict(json.load(fh))
 
+    def to_dict(self) -> dict[str, Any]:
+        """Plain, JSON-serialisable mapping that ``from_dict`` reconstructs exactly."""
+        out = asdict(self)
+        for key in ("beds", "nurses", "patients_per_nurse"):
+            out[key] = dict(getattr(self, key))
+        return out
+
     def with_overrides(self, **overrides: Any) -> "SimulationConfig":
         """Return a copy with some fields replaced (values are coerced and validated)."""
         unknown = set(overrides) - {f.name for f in fields(self)}
@@ -210,13 +217,16 @@ def _coerce(values: Mapping[str, Any]) -> dict[str, Any]:
         if key in out:
             out[key] = tuple(out[key])
     # Profiles are relative shapes; normalise to mean 1 so base rates are true mean rates.
+    # Already-normalised profiles are left bit-for-bit unchanged, so a config that round-trips
+    # through a snapshot reproduces exactly the same arrival rates.
     for key in ("hourly_profile", "weekly_profile"):
         if key in out:
             profile = out[key]
             total = sum(profile)
             if total <= 0:
                 raise ValueError(f"{key} must have a positive sum")
-            out[key] = tuple(len(profile) * v / total for v in profile)
+            if abs(total / len(profile) - 1.0) > 1e-12:
+                out[key] = tuple(len(profile) * v / total for v in profile)
     for key in ("beds", "nurses", "patients_per_nurse"):
         if key in out:
             out[key] = {k: int(v) for k, v in out[key].items()}
