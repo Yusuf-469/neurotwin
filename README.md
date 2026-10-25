@@ -1,3 +1,14 @@
+---
+title: NeuroTwin
+emoji: 🏥
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Hospital digital twin comparing RL, optimisation and rules
+---
+
 # NeuroTwin V2
 
 **A hospital digital twin for evaluating reinforcement-learning bed allocation under operational stress.**
@@ -81,11 +92,34 @@ Seed ranges (training, validation, test) are disjoint and asserted in code (`neu
 
 ## Running the platform
 
+**Docker (same as the hosted version, one URL):**
+```powershell
+docker build -t neurotwin .
+docker run -p 7860:7860 neurotwin            # open http://localhost:7860  (demo: /simulation/?demo=1)
+```
+
+**Development (hot reload):**
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn neurotwin.api.app:app --port 8000   # API
-cd dashboard; npm install; npm run build; npm run start                    # http://localhost:3000
+cd dashboard; npm install; npm run dev                                     # http://localhost:3000
 ```
-PPO in the dashboard needs `results/ppo/final_A/agent_1.pt` (produced by the training step above).
+The five final PPO agents (`results/ppo/final_A/agent_*.pt`, 52 KB each) are committed. The
+dashboard's PPO policy uses agent 1; agent 0 has the documented collapse mode.
+
+## Deploying free on Hugging Face Spaces
+1. Create a free account at huggingface.co and click **New Space**: SDK **Docker**, hardware **CPU basic (free)**, visibility **Public**.
+2. Push this repository to the Space (Hugging Face shows the exact `git remote add` command; use an access token with *write* permission as the password).
+3. The Space builds the `Dockerfile` and serves the app on its URL.
+
+**Optional LLM explanations at zero cost:** the offline template explainer is the default and needs nothing. To use a free-tier LLM instead, add three **secrets** under the Space's *Settings → Variables and secrets*:
+
+| Secret | Example (Google Gemini free tier) | Example (Groq free tier) |
+|---|---|---|
+| `NEUROTWIN_LLM_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` | `https://api.groq.com/openai/v1` |
+| `NEUROTWIN_LLM_MODEL` | a Gemini model name listed in AI Studio | a model name listed in the Groq console |
+| `NEUROTWIN_LLM_API_KEY` | your key from aistudio.google.com | your key from console.groq.com |
+
+Never put keys in code or commit them. Explanations stay fact-checked against the decision log, capped at `NEUROTWIN_LLM_MAX_PER_HOUR` (default 60) and cached. If the provider fails or the cap is reached, the template is used.
 
 ## Documents
 
