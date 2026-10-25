@@ -24,7 +24,8 @@ I wrote the simulator from scratch and validated it against queueing theory. I i
 10. **Making PPO learn:** the low signal-to-noise diagnosis, and the horizon trade-off (about half a day).
 11. **Results:** the Stage 6 cost table and paired CIs; PPO ≈ Load-Balancing; validation optimism.
 12. **Robustness:** agent-0 collapse timeline; robustness index; learned reservation in A vs E.
-13. **Methodology wins:** CRN (12.5× narrower CIs); protocol committed before the test run; disclosed amendment.
+13. **Methodology wins:** CRN (12.5× narrower CIs); protocol committed before the test run; disclosed amendment; ablations (the reward weights matter, single feature groups don't).
+13b. **Constrained PPO:** λ-conditioned policy plus online dual ascent; diversion budget under stress (Stage 7 §6).
 14. **Platform demo:** dashboard, what-if, explanations (facts vs generated text).
 15. **Limitations and future work.**
 
@@ -58,13 +59,23 @@ Every policy faces exactly the same patients and staffing for a given seed, beca
 One thing, and it is disclosed. The NaN guard stopped the analysis because the pre-registered boarding metric ignored patients still waiting at the end. I checked only definedness counts (no performance values), made the metric censoring-inclusive for every policy, and committed the change before recomputing. Git history shows the order (b762841 → 9a1726f → b6047a5).
 
 **"Is the explanation layer an LLM making decisions?"**
-No. Explanations are generated after the fact from the decision log, and the explanation package cannot import the simulator or the policies (a test enforces this). The default explainer is deterministic. The LLM interface checks every number in generated text against the logged facts. No external LLM is connected.
+No. Explanations are generated after the fact from the decision log, and the explanation package cannot import the simulator or the policies (a test enforces this). The default explainer is deterministic. An optional free-tier LLM can be connected through an OpenAI-compatible endpoint, configured by environment secrets only. Its text is fact-checked: any number not found in the logged facts causes a fall back to the template. It is rate-capped, and labelled as generated text with a reliability indicator, not a "confidence".
+
+**"Which parts of your design actually matter?" (ablations, Stage 7 §4)**
+I retrained PPO with one component removed at a time and tested on the same seeds, with Holm correction over 80 comparisons.
+- **The priority-weighted reward matters most.** With uniform weights, cost in the normal scenario is 11% worse, the only significant change.
+- **The off-service penalty does what it says.** Without it, off-service placements rise.
+- **No single observation group is necessary;** the features are partly redundant.
+- **The diversion penalty has no measurable effect.** Diversions are so rare in training that the penalty gives almost no signal. That is why a fixed penalty cannot control diversions under stress, and it motivated the constrained redesign.
+
+**"How would you control diversions explicitly?" (constrained PPO, v2.6)**
+I treat diversions as a constraint: at most 3 per 100 arrivals. A single policy is trained across a range of penalty values λ and sees λ as an input. At run time, a dual-ascent controller raises λ when the last day's diversion rate is over budget and lowers it when under. This is a Lagrangian method whose multiplier keeps adapting during deployment, instead of being frozen after training. The design was pre-registered before any run; the results are in the Stage 7 report, whichever way they came out.
 
 **"Can this be used in a hospital?"**
 No. It is a research simulation with assumed parameters, not validated on real data, and not a medical device. A real study would need real data, calibration, clinical input and governance.
 
 ## 4. Demo checklist
-1. Start the API and dashboard (README "Running the platform").
+1. Open the hosted Hugging Face Space, or run `docker run -p 7860:7860 neurotwin` locally (verified: health, pages, sessions, what-if, explanations). Open `/simulation/?demo=1` for a pre-warmed run.
 2. Simulation page: scenario A, policy `ppo`, seed 3. Step one week (warm-up), then one more week.
 3. Open a few decisions and explain them. Point out facts vs generated text, and the reliability indicator.
 4. Run what-if: Priority vs Load-Balancing vs PPO, arrivals ×1.3, 72 h, 20 futures. Show the paired CIs.
