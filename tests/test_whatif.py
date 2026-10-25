@@ -27,7 +27,7 @@ def test_measurement_window_resets_metrics():
     run_until(sim, PriorityAllocator())
     assert sim.finished and sim.result().measured_hours == 48
     with pytest.raises(ValueError):
-        sim.set_measurement_window(0.0, 10.0)                 # window in the past
+        sim.set_measurement_window(0.0, 10.0)  # window in the past
 
 
 def test_branch_can_switch_operating_conditions():
@@ -44,7 +44,7 @@ def test_branch_can_switch_operating_conditions():
     assert np.mean(surge_counts) > 1.4 * np.mean(normal_counts)
     b = sim.branch(0, scenario=surge)
     assert b.physical_beds[Unit.MED] == round(CFG.beds["MED"] * 0.8)
-    assert sim.physical_beds[Unit.MED] == CFG.beds["MED"]            # original untouched
+    assert sim.physical_beds[Unit.MED] == CFG.beds["MED"]  # original untouched
     restored = HospitalSimulation.from_snapshot(json.loads(json.dumps(b.to_snapshot())))
     assert restored.physical_beds == b.physical_beds and restored.scenario == surge
 
@@ -66,9 +66,11 @@ def test_whatif_is_deterministic_and_uses_common_futures():
 def test_whatif_detects_a_clearly_worse_policy():
     """FCFS without overflow vs Priority under a surge: J differs in a consistent direction."""
     sim = _state(seed=7)
-    engine = WhatIfEngine({"priority": PriorityAllocator,
-                           "fcfs": lambda: FCFSAllocator(off_service_wait_hours=1e9)})
-    res = engine.evaluate(sim, WhatIfRequest(horizon_hours=120, n_futures=12,
-                                             scenario=ScenarioConfig("surge", 1.4)))
+    engine = WhatIfEngine(
+        {"priority": PriorityAllocator, "fcfs": lambda: FCFSAllocator(off_service_wait_hours=1e9)}
+    )
+    res = engine.evaluate(
+        sim, WhatIfRequest(horizon_hours=120, n_futures=12, scenario=ScenarioConfig("surge", 1.4))
+    )
     j = next(c for c in res.comparisons if c["metric"] == "J_per_day")
-    assert j["ci95"][0] > 0                                   # FCFS costlier in every resample
+    assert j["ci95"][0] > 0  # FCFS costlier in every resample

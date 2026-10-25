@@ -27,6 +27,7 @@ SHORT = load_default_config().with_overrides(horizon_hours=400.0, warmup_hours=1
 
 # ---------------------------------------------------------------- actions and features
 
+
 def test_masks_cover_exactly_the_feasible_placements():
     sim = HospitalSimulation(SHORT, SCENARIOS["E"], seed=1)
     seen = set()
@@ -48,13 +49,14 @@ def test_masks_cover_exactly_the_feasible_placements():
             if len(valid) == 0 or rng.random() < 0.2:
                 break
             sim.place(*action_to_placement(sim, int(rng.choice(valid))))
-    assert seen >= {1, 2, 4, 5}                    # common actions were exercised
+    assert seen >= {1, 2, 4, 5}  # common actions were exercised
 
 
 def test_off_service_action_only_when_primary_full():
     from neurotwin.policies import PriorityAllocator
+
     sim = HospitalSimulation(SHORT, SCENARIOS["B"], seed=3)
-    policy, checked = PriorityAllocator(off_service_wait_hours=1e9), 0   # never overflows itself
+    policy, checked = PriorityAllocator(off_service_wait_hours=1e9), 0  # never overflows itself
     while sim.next_epoch():
         while sim.has_feasible_placement():
             p = action_to_placement(sim, Action.ADMIT_OFF_SERVICE)
@@ -85,6 +87,7 @@ def test_features_shape_bounds_and_names():
 
 # ---------------------------------------------------------------- environment semantics
 
+
 def _random_masked_episode(env, seed, rng):
     obs, info = env.reset(seed=seed)
     total, steps, zero_dt_after_place = 0.0, 0, 0
@@ -105,9 +108,13 @@ def test_episode_return_equals_minus_cost():
     env = HospitalAllocationEnv(SHORT, SCENARIOS["B"], reward_scale=0.1)
     total, steps, zero_dt = _random_masked_episode(env, 7, np.random.default_rng(0))
     w, acc = CostWeights.load(), env.sim.acc
-    cost = w.alpha * acc.weighted_request_hours + w.beta * acc.diversions + w.kappa * acc.off_service_placements
+    cost = (
+        w.alpha * acc.weighted_request_hours
+        + w.beta * acc.diversions
+        + w.kappa * acc.off_service_placements
+    )
     assert total == pytest.approx(-0.1 * cost, rel=1e-9)
-    assert steps > 100 and zero_dt > 0           # atomic placements take no time
+    assert steps > 100 and zero_dt > 0  # atomic placements take no time
 
 
 def test_env_is_equivalent_to_direct_simulation():
@@ -149,6 +156,7 @@ def test_masked_action_is_rejected_and_passive_checks_pass():
 def test_warm_mode_rejects_non_training_seeds():
     from neurotwin.digital_twin import WarmStartPool
     from neurotwin.simulation.validation.reduced import GreedyPlacement
+
     pool = WarmStartPool.generate(SHORT, SCENARIOS["A"], [0], GreedyPlacement())
     env = HospitalAllocationEnv(SHORT, start_mode="warm", pool=pool)
     env.reset(seed=1)
@@ -159,17 +167,18 @@ def test_warm_mode_rejects_non_training_seeds():
 
 # ---------------------------------------------------------------- PPO components
 
+
 def test_gae_matches_hand_computation_with_variable_dt():
     gamma, lam = 0.9, 0.8
     dts = np.array([[1.0], [0.0], [2.0]])
-    g = gamma ** dts
+    g = gamma**dts
     r = np.array([[1.0], [0.5], [-1.0]])
     v = np.array([[0.2], [0.4], [0.1]])
     done = np.array([[0.0], [0.0], [0.0]])
     last_v = np.array([0.3])
     adv, ret = compute_gae(r, v, g, done, last_v, lam)
     d2 = -1.0 + 0.81 * 0.3 - 0.1
-    d1 = 0.5 + 1.0 * 0.1 - 0.4                      # dt = 0 -> no discount
+    d1 = 0.5 + 1.0 * 0.1 - 0.4  # dt = 0 -> no discount
     d0 = 1.0 + 0.9 * 0.4 - 0.2
     a2 = d2
     a1 = d1 + 1.0 * lam * a2
@@ -181,26 +190,50 @@ def test_gae_matches_hand_computation_with_variable_dt():
 def test_gae_stops_at_episode_boundary():
     r = np.array([[1.0], [5.0]])
     v = np.zeros((2, 1))
-    adv, _ = compute_gae(r, v, np.full((2, 1), 0.99), np.array([[1.0], [0.0]]), np.array([0.0]), 0.95)
-    assert adv[0, 0] == pytest.approx(1.0)          # nothing leaks across the boundary
+    adv, _ = compute_gae(
+        r, v, np.full((2, 1), 0.99), np.array([[1.0], [0.0]]), np.array([0.0]), 0.95
+    )
+    assert adv[0, 0] == pytest.approx(1.0)  # nothing leaks across the boundary
 
 
 def test_clipped_loss_equals_plain_surrogate_inside_trust_region():
     torch.manual_seed(0)
     old = torch.randn(64)
-    new = old + 0.05 * torch.randn(64).clamp(-1, 1)          # |ratio - 1| < 0.2
+    new = old + 0.05 * torch.randn(64).clamp(-1, 1)  # |ratio - 1| < 0.2
     adv, vals = torch.randn(64), torch.zeros(64)
-    loss, info = ppo_loss(new, old, adv, vals, vals, vals, torch.zeros(64), clip=0.2,
-                          vf_clip=None, ent_coef=0.0, vf_coef=0.0)
+    loss, info = ppo_loss(
+        new,
+        old,
+        adv,
+        vals,
+        vals,
+        vals,
+        torch.zeros(64),
+        clip=0.2,
+        vf_clip=None,
+        ent_coef=0.0,
+        vf_coef=0.0,
+    )
     assert loss.item() == pytest.approx((-adv * (new - old).exp()).mean().item(), rel=1e-6)
     assert info.clip_fraction == 0.0
 
 
 def test_clipping_removes_gradient_beyond_trust_region():
     old = torch.zeros(1)
-    new = torch.tensor([0.5], requires_grad=True)             # ratio e^0.5 > 1.2
-    loss, _ = ppo_loss(new, old, torch.ones(1), torch.zeros(1), torch.zeros(1), torch.zeros(1),
-                       torch.zeros(1), clip=0.2, vf_clip=None, ent_coef=0.0, vf_coef=0.0)
+    new = torch.tensor([0.5], requires_grad=True)  # ratio e^0.5 > 1.2
+    loss, _ = ppo_loss(
+        new,
+        old,
+        torch.ones(1),
+        torch.zeros(1),
+        torch.zeros(1),
+        torch.zeros(1),
+        torch.zeros(1),
+        clip=0.2,
+        vf_clip=None,
+        ent_coef=0.0,
+        vf_coef=0.0,
+    )
     loss.backward()
     assert new.grad.item() == 0.0
 
@@ -241,6 +274,7 @@ def test_agent_save_load_roundtrip(tmp_path):
 
 def test_ppo_policy_makes_only_valid_decisions():
     from neurotwin.policies.ppo_policy import PPOPolicy
+
     agent = PPOAgent(ActorCritic(N_FEATURES, N_ACTIONS), RunningMeanStd((N_FEATURES,)))
 
     class Checked(PPOPolicy):
@@ -258,6 +292,7 @@ def test_ppo_policy_makes_only_valid_decisions():
 def test_training_episode_seeds_stay_in_train_range_and_are_disjoint():
     from neurotwin.experiments.seeds import TRAIN
     from neurotwin.experiments.train_ppo import EPISODE_SEED_BLOCK, episode_seeds
+
     blocks = [set(itertools.islice(episode_seeds(k), EPISODE_SEED_BLOCK)) for k in range(5)]
     assert all(min(b) in TRAIN and max(b) in TRAIN for b in blocks)
     assert all(not (a & b) for a, b in itertools.combinations(blocks, 2))
@@ -265,6 +300,7 @@ def test_training_episode_seeds_stay_in_train_range_and_are_disjoint():
 
 class _TwoHourEnv(gym.Env):
     """Dummy env whose every step lasts dt = 2 hours (truncated after 5 steps)."""
+
     observation_space = gym.spaces.Box(-1.0, 1.0, (3,), np.float32)
     action_space = gym.spaces.Discrete(2)
 
@@ -278,9 +314,10 @@ class _TwoHourEnv(gym.Env):
         return np.zeros(3, np.float32), 1.0, False, self.t >= 5, {"dt_hours": 2.0}
 
 
-@pytest.mark.parametrize("semi_markov,expected", [(True, 0.9 ** 2), (False, 0.9)])
+@pytest.mark.parametrize("semi_markov,expected", [(True, 0.9**2), (False, 0.9)])
 def test_trainer_discounts_by_elapsed_time(monkeypatch, semi_markov, expected):
     import neurotwin.rl.ppo.trainer as trainer_module
+
     captured = {}
     real_gae = trainer_module.compute_gae
 
@@ -289,8 +326,15 @@ def test_trainer_discounts_by_elapsed_time(monkeypatch, semi_markov, expected):
         return real_gae(rewards, values, gammas, dones, last_values, lam)
 
     monkeypatch.setattr(trainer_module, "compute_gae", spy)
-    config = PPOConfig(total_steps=16, n_envs=1, n_steps=16, n_minibatches=2, n_epochs=1,
-                       gamma=0.9, semi_markov=semi_markov)
+    config = PPOConfig(
+        total_steps=16,
+        n_envs=1,
+        n_steps=16,
+        n_minibatches=2,
+        n_epochs=1,
+        gamma=0.9,
+        semi_markov=semi_markov,
+    )
     train([_TwoHourEnv], config, itertools.count(0))
     assert np.allclose(captured["gammas"], expected)
 
@@ -299,8 +343,17 @@ def test_trainer_discounts_by_elapsed_time(monkeypatch, semi_markov, expected):
 def test_ppo_learns_cartpole():
     """Smoke test: the in-house PPO must clearly learn CartPole (full comparison with
     stable-baselines3 is in neurotwin.rl.ppo.validate)."""
-    config = PPOConfig(total_steps=60_000, n_envs=4, n_steps=128, n_epochs=4, n_minibatches=4,
-                       learning_rate=2.5e-4, vf_clip=None, normalize_obs=False, seed=1)
+    config = PPOConfig(
+        total_steps=60_000,
+        n_envs=4,
+        n_steps=128,
+        n_epochs=4,
+        n_minibatches=4,
+        learning_rate=2.5e-4,
+        vf_clip=None,
+        normalize_obs=False,
+        seed=1,
+    )
     seeds = itertools.count(0)
     _, log = train([lambda: gym.make("CartPole-v1")] * 4, config, seeds)
     final = np.mean([r for _, r in log.episode_returns[-20:]])

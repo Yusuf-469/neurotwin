@@ -41,12 +41,15 @@ MIN_TRAINING_POOL = 200
 
 @dataclass
 class WarmStartPool:
+    """Saved end-of-warm-up states used to start RL training episodes."""
+
     states: list[HospitalSimulation]
     source_seeds: list[int]
 
     @classmethod
-    def generate(cls, config: SimulationConfig, scenario: ScenarioConfig, seeds,
-                 policy: PlacementPolicy) -> "WarmStartPool":
+    def generate(
+        cls, config: SimulationConfig, scenario: ScenarioConfig, seeds, policy: PlacementPolicy
+    ) -> "WarmStartPool":
         """Run each seed from empty to the end of the warm-up and keep the state there."""
         seeds = list(seeds)
         require_split(seeds, "train")
@@ -71,8 +74,10 @@ class WarmStartPool:
 
     @classmethod
     def load(cls, directory: str | Path) -> "WarmStartPool":
-        paths = sorted(Path(directory).glob("warm_seed*.json.gz"),
-                       key=lambda p: int(p.name[len("warm_seed"):-len(".json.gz")]))
-        seeds = [int(p.name[len("warm_seed"):-len(".json.gz")]) for p in paths]
+        paths = sorted(
+            Path(directory).glob("warm_seed*.json.gz"),
+            key=lambda p: int(p.name[len("warm_seed") : -len(".json.gz")]),
+        )
+        seeds = [int(p.name[len("warm_seed") : -len(".json.gz")]) for p in paths]
         require_split(seeds, "train")
         return cls([load_snapshot(p) for p in paths], seeds)

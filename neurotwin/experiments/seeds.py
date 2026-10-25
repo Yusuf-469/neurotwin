@@ -6,15 +6,16 @@ than trusted. Ranges are half-open [start, stop).
 
 from __future__ import annotations
 
-TRAIN = range(0, 100_000)              # environment seeds for training (scenario A only)
-VALIDATION = range(100_000, 100_020)   # tuning and early stopping (scenario A only)
-TEST = range(200_000, 200_050)         # final evaluation, A-E
+TRAIN = range(0, 100_000)  # environment seeds for training (scenario A only)
+VALIDATION = range(100_000, 100_020)  # tuning and early stopping (scenario A only)
+TEST = range(200_000, 200_050)  # final evaluation, A-E
 CRN_INDEPENDENT = range(300_000, 300_050)  # §6.24 variance-reduction check only
 
 _ALL = {"train": TRAIN, "validation": VALIDATION, "test": TEST, "crn_independent": CRN_INDEPENDENT}
 
 
 def split_of(seed: int) -> str:
+    """Name of the registered seed range containing ``seed``."""
     for name, rng in _ALL.items():
         if seed in rng:
             return name

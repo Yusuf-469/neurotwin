@@ -5,8 +5,20 @@ generated only from logged decision records (facts available to the policy at de
 plus the decision). Nothing in this package can read or modify a simulation or a policy.
 """
 
-from .explainer import (Explanation, LLMClient, LLMExplainer, TemplateExplainer,
-                        build_prompt, verify_numbers)
+from .explainer import (
+    Explanation,
+    LLMClient,
+    LLMExplainer,
+    TemplateExplainer,
+    build_prompt,
+    verify_numbers,
+)
 
-__all__ = ["Explanation", "TemplateExplainer", "LLMExplainer", "LLMClient", "build_prompt",
-           "verify_numbers"]
+__all__ = [
+    "Explanation",
+    "TemplateExplainer",
+    "LLMExplainer",
+    "LLMClient",
+    "build_prompt",
+    "verify_numbers",
+]

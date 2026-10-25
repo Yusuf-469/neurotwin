@@ -4,13 +4,19 @@ import math
 
 import pytest
 
-from neurotwin.simulation.validation.queueing import (erlang_b, erlang_c, mmc_mean_wait,
-                                                      mmck_blocking, mmck_distribution,
-                                                      mmck_mean_wait, mmck_wait_probability)
+from neurotwin.simulation.validation.queueing import (
+    erlang_b,
+    erlang_c,
+    mmc_mean_wait,
+    mmck_blocking,
+    mmck_distribution,
+    mmck_mean_wait,
+    mmck_wait_probability,
+)
 
 
 def _erlang_b_direct(c: int, a: float) -> float:
-    terms = [a ** k / math.factorial(k) for k in range(c + 1)]
+    terms = [a**k / math.factorial(k) for k in range(c + 1)]
     return terms[-1] / sum(terms)
 
 
@@ -21,7 +27,7 @@ def test_erlang_b_matches_direct_formula(c, a):
 
 def test_known_small_cases():
     assert erlang_b(1, 1.0) == pytest.approx(0.5)
-    assert erlang_c(1, 0.7) == pytest.approx(0.7)                 # M/M/1: P(wait) = rho
+    assert erlang_c(1, 0.7) == pytest.approx(0.7)  # M/M/1: P(wait) = rho
     lam, mu = 0.7, 1.0
     assert mmc_mean_wait(1, lam, mu) == pytest.approx(lam / (mu * (mu - lam)))
 
@@ -44,4 +50,4 @@ def test_mmck_limits(c, lam, mu):
 def test_mmck_distribution_sums_to_one_even_when_overloaded():
     p = mmck_distribution(10, 40, 30.0, 1.0)
     assert sum(p) == pytest.approx(1.0)
-    assert p[-1] > 0.5                                              # heavily overloaded
+    assert p[-1] > 0.5  # heavily overloaded

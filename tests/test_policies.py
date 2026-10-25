@@ -9,12 +9,32 @@ import pytest
 
 from neurotwin.experiments.objective import CostWeights, measured_cost
 from neurotwin.experiments.tuning import tune
-from neurotwin.policies import (DecisionLog, FCFSAllocator, LoadBalancingAllocator, LoggingPolicy,
-                                OptimizationAllocator, PriorityAllocator, TrunkReservationAllocator,
-                                load_baseline_params, make_policy)
-from neurotwin.policies.optimization import UNITS, solve_assignment, solve_hungarian, solve_lp_relaxation
-from neurotwin.simulation import (SCENARIOS, HospitalSimulation, RequestType, RequestView, Unit,
-                                  load_default_config, run_episode)
+from neurotwin.policies import (
+    DecisionLog,
+    FCFSAllocator,
+    LoadBalancingAllocator,
+    LoggingPolicy,
+    OptimizationAllocator,
+    PriorityAllocator,
+    TrunkReservationAllocator,
+    load_baseline_params,
+    make_policy,
+)
+from neurotwin.policies.optimization import (
+    UNITS,
+    solve_assignment,
+    solve_hungarian,
+    solve_lp_relaxation,
+)
+from neurotwin.simulation import (
+    SCENARIOS,
+    HospitalSimulation,
+    RequestType,
+    RequestView,
+    Unit,
+    load_default_config,
+    run_episode,
+)
 
 CFG = load_default_config()
 SHORT = CFG.with_overrides(horizon_hours=500.0, warmup_hours=200.0)
@@ -22,9 +42,11 @@ SHORT = CFG.with_overrides(horizon_hours=500.0, warmup_hours=200.0)
 
 # ---------------------------------------------------------------- a fake engine for rule tests
 
+
 @dataclass
 class FakeSim:
     """Minimal stand-in exposing only the public queries a policy may use."""
+
     now: float
     requests: list[RequestView]
     free: dict[Unit, int]
@@ -57,8 +79,9 @@ def test_fcfs_serves_oldest_and_priority_serves_most_urgent():
 
 
 def test_off_service_only_after_waiting_threshold():
-    sim = FakeSim(now=3.0, requests=[req(1, 3, created=0.0)],
-                  free={Unit.MED: 0, Unit.SURG: 2, Unit.ICU: 0})
+    sim = FakeSim(
+        now=3.0, requests=[req(1, 3, created=0.0)], free={Unit.MED: 0, Unit.SURG: 2, Unit.ICU: 0}
+    )
     assert FCFSAllocator(off_service_wait_hours=4.0).decide(sim) is None
     assert FCFSAllocator(off_service_wait_hours=2.0).decide(sim) == (1, Unit.SURG)
 
@@ -71,8 +94,9 @@ def test_no_head_of_line_blocking_across_units():
 
 
 def test_load_balancing_overflows_when_imbalanced():
-    sim = FakeSim(now=0.0, requests=[req(1, 3, 0.0)],
-                  free={Unit.MED: 1, Unit.SURG: 6, Unit.ICU: 0})      # MED 90%, SURG 40%
+    sim = FakeSim(
+        now=0.0, requests=[req(1, 3, 0.0)], free={Unit.MED: 1, Unit.SURG: 6, Unit.ICU: 0}
+    )  # MED 90%, SURG 40%
     assert LoadBalancingAllocator(imbalance_threshold=0.2).decide(sim) == (1, Unit.SURG)
     assert LoadBalancingAllocator(imbalance_threshold=0.6).decide(sim) == (1, Unit.MED)
 
@@ -80,14 +104,17 @@ def test_load_balancing_overflows_when_imbalanced():
 def test_trunk_reservation_keeps_beds_for_urgent_patients():
     policy = TrunkReservationAllocator(reserve={"MED": 2, "SURG": 2, "ICU": 1})
     low = FakeSim(now=0.0, requests=[req(1, 3, 0.0)], free={Unit.MED: 2, Unit.SURG: 0, Unit.ICU: 0})
-    assert policy.decide(low) is None                                # 2 free, 2 reserved
-    high = FakeSim(now=0.0, requests=[req(1, 2, 0.0)], free={Unit.MED: 1, Unit.SURG: 0, Unit.ICU: 0})
-    assert policy.decide(high) == (1, Unit.MED)                      # urgent may use reserve
+    assert policy.decide(low) is None  # 2 free, 2 reserved
+    high = FakeSim(
+        now=0.0, requests=[req(1, 2, 0.0)], free={Unit.MED: 1, Unit.SURG: 0, Unit.ICU: 0}
+    )
+    assert policy.decide(high) == (1, Unit.MED)  # urgent may use reserve
     ok = FakeSim(now=0.0, requests=[req(1, 5, 0.0)], free={Unit.MED: 3, Unit.SURG: 0, Unit.ICU: 0})
     assert policy.decide(ok) == (1, Unit.MED)
 
 
 # ---------------------------------------------------------------- MIP exactness
+
 
 def _random_instance(rng):
     n = int(rng.integers(1, 25))
@@ -114,7 +141,7 @@ def test_milp_matches_lp_relaxation_and_hungarian_oracles():
         assert obj == pytest.approx(lp_obj, abs=1e-7)
         assert obj == pytest.approx(solve_hungarian(values, caps), abs=1e-7)
         assert np.allclose(x, np.round(x), atol=1e-7)
-        for k in UNITS:                                              # feasibility
+        for k in UNITS:  # feasibility
             assert sum(1 for u in chosen.values() if u is k) <= caps[k]
         assert all(values[i][u] > 0 for i, u in chosen.items())
 
@@ -131,13 +158,17 @@ def test_mip_holds_when_only_a_cheap_off_service_option_exists():
 
 def test_mip_always_fills_free_primary_beds():
     policy = OptimizationAllocator()
-    sim = FakeSim(now=1.0, requests=[req(i, 5, 1.0) for i in range(3)],
-                  free={Unit.MED: 2, Unit.SURG: 0, Unit.ICU: 0})
+    sim = FakeSim(
+        now=1.0,
+        requests=[req(i, 5, 1.0) for i in range(3)],
+        free={Unit.MED: 2, Unit.SURG: 0, Unit.ICU: 0},
+    )
     decision = policy.decide(sim)
     assert decision is not None and decision[1] is Unit.MED
 
 
 # ---------------------------------------------------------------- integration
+
 
 class _Checked:
     def __init__(self, policy):
@@ -192,13 +223,15 @@ def test_decision_logging_is_read_only(tmp_path):
     records = logged_policy.log.records
     assert any(r["action"] == "PLACE" for r in records)
     placed = [r for r in records if r["action"] == "PLACE"]
-    assert all(r["off_service"] == (r["unit"] != r["primary_unit"] and r["unit"] != "ICU")
-               for r in placed)
+    assert all(
+        r["off_service"] == (r["unit"] != r["primary_unit"] and r["unit"] != "ICU") for r in placed
+    )
     logged_policy.log.save_jsonl(tmp_path / "log.jsonl")
     assert len((tmp_path / "log.jsonl").read_text().splitlines()) == len(records)
 
 
 # ---------------------------------------------------------------- objective and tuning
+
 
 def test_measured_cost_matches_its_definition():
     sim = HospitalSimulation(SHORT, SCENARIOS["B"], seed=2)
@@ -206,8 +239,11 @@ def test_measured_cost_matches_its_definition():
     w = CostWeights.load()
     m = sim.measured
     days = (SHORT.horizon_hours - SHORT.warmup_hours) / 24
-    expected = (w.alpha * m.weighted_request_hours + w.beta * m.diversions
-                + w.kappa * m.off_service_placements) / days
+    expected = (
+        w.alpha * m.weighted_request_hours
+        + w.beta * m.diversions
+        + w.kappa * m.off_service_placements
+    ) / days
     assert measured_cost(sim, w) == pytest.approx(expected) and expected > 0
 
 

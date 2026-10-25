@@ -17,6 +17,7 @@ from ..simulation.hospital import HospitalSimulation
 
 
 def save_snapshot(sim: HospitalSimulation, path: str | Path) -> None:
+    """Write the complete simulator state to JSON (gzip if the path ends in .gz)."""
     path = Path(path)
     data = json.dumps(sim.to_snapshot())
     if path.suffix == ".gz":
@@ -27,6 +28,7 @@ def save_snapshot(sim: HospitalSimulation, path: str | Path) -> None:
 
 
 def load_snapshot_dict(path: str | Path) -> dict[str, Any]:
+    """Read a snapshot file into a plain dict."""
     path = Path(path)
     if path.suffix == ".gz":
         with gzip.open(path, "rt", encoding="utf-8") as fh:
@@ -35,4 +37,5 @@ def load_snapshot_dict(path: str | Path) -> dict[str, Any]:
 
 
 def load_snapshot(path: str | Path) -> HospitalSimulation:
+    """Restore a simulation from a snapshot file."""
     return HospitalSimulation.from_snapshot(load_snapshot_dict(path))

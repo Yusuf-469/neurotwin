@@ -8,15 +8,25 @@ from typing import Any
 
 from .base import AllocationPolicy
 from .decision_log import DecisionLog, LoggingPolicy
-from .heuristics import (FCFSAllocator, LoadBalancingAllocator, PriorityAllocator,
-                         TrunkReservationAllocator)
+from .heuristics import (
+    FCFSAllocator,
+    LoadBalancingAllocator,
+    PriorityAllocator,
+    TrunkReservationAllocator,
+)
 from .optimization import OptimizationAllocator
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 
 POLICY_CLASSES: dict[str, type[AllocationPolicy]] = {
-    cls.name: cls for cls in (FCFSAllocator, PriorityAllocator, LoadBalancingAllocator,
-                              TrunkReservationAllocator, OptimizationAllocator)
+    cls.name: cls
+    for cls in (
+        FCFSAllocator,
+        PriorityAllocator,
+        LoadBalancingAllocator,
+        TrunkReservationAllocator,
+        OptimizationAllocator,
+    )
 }
 
 
@@ -39,6 +49,16 @@ def load_baseline_params(tuned: bool = True) -> dict[str, dict[str, Any]]:
     return params
 
 
-__all__ = ["AllocationPolicy", "FCFSAllocator", "PriorityAllocator", "LoadBalancingAllocator",
-           "TrunkReservationAllocator", "OptimizationAllocator", "DecisionLog", "LoggingPolicy",
-           "POLICY_CLASSES", "make_policy", "load_baseline_params"]
+__all__ = [
+    "AllocationPolicy",
+    "FCFSAllocator",
+    "PriorityAllocator",
+    "LoadBalancingAllocator",
+    "TrunkReservationAllocator",
+    "OptimizationAllocator",
+    "DecisionLog",
+    "LoggingPolicy",
+    "POLICY_CLASSES",
+    "make_policy",
+    "load_baseline_params",
+]

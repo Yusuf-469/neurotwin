@@ -19,7 +19,7 @@ def test_default_config_loads_and_profiles_are_normalised():
 
 def test_unknown_key_is_rejected():
     raw = _raw_default()
-    raw["arival_rate"] = 3.0          # typo must not be silently ignored
+    raw["arival_rate"] = 3.0  # typo must not be silently ignored
     with pytest.raises(ValueError, match="unknown"):
         SimulationConfig.from_dict(raw)
 
@@ -37,14 +37,17 @@ def test_comment_keys_are_ignored():
     SimulationConfig.from_dict(raw)
 
 
-@pytest.mark.parametrize("override", [
-    {"priority_probs_emergency": [0.5, 0.5, 0.5, 0.0, 0.0]},
-    {"warmup_hours": 10_000.0},                       # warm-up longer than the horizon
-    {"beds": {"MED": 1, "SURG": 1}},
-    {"ed_capacity": 0},
-    {"general_los": {"dist": "lognormal", "mean": 10.0, "sd": 0.0}},
-    {"escalation_priority": 6},
-])
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"priority_probs_emergency": [0.5, 0.5, 0.5, 0.0, 0.0]},
+        {"warmup_hours": 10_000.0},  # warm-up longer than the horizon
+        {"beds": {"MED": 1, "SURG": 1}},
+        {"ed_capacity": 0},
+        {"general_los": {"dist": "lognormal", "mean": 10.0, "sd": 0.0}},
+        {"escalation_priority": 6},
+    ],
+)
 def test_invalid_values_are_rejected(override):
     with pytest.raises(ValueError):
         load_default_config().with_overrides(**override)
@@ -62,12 +65,13 @@ def test_scenarios_match_research_spec():
 def test_scenarios_hit_their_offered_load_targets():
     """Calibration criteria stated before any policy result (RESEARCH.md §6.22)."""
     from neurotwin.experiments.load import offered_load
+
     cfg = load_default_config()
     rho = {k: offered_load(cfg, s)["rho_general"] for k, s in SCENARIOS.items()}
     assert rho["A"] == pytest.approx(0.93, abs=0.005)
     for k in "BD":
         assert rho[k] == pytest.approx(1.02, abs=0.01)
-    assert rho["C"] == pytest.approx(1.068, abs=0.005)       # closest achievable (integer nurses)
+    assert rho["C"] == pytest.approx(1.068, abs=0.005)  # closest achievable (integer nurses)
     assert rho["E"] == pytest.approx(1.10, abs=0.01)
 
 

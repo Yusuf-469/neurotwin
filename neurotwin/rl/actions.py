@@ -20,6 +20,8 @@ from ..simulation.hospital import HospitalSimulation
 
 
 class Action(IntEnum):
+    """The 7 allocation-level actions of RESEARCH.md §6.3."""
+
     HOLD = 0
     ADMIT_PRIMARY_PRIORITY = 1
     ADMIT_PRIMARY_LONGEST_WAIT = 2
@@ -40,8 +42,9 @@ def _by_wait(r: RequestView) -> tuple:
     return (r.created_at, r.rid)
 
 
-def action_to_placement(sim: HospitalSimulation, action: int,
-                        requests: list[RequestView] | None = None) -> tuple[int, Unit] | None:
+def action_to_placement(
+    sim: HospitalSimulation, action: int, requests: list[RequestView] | None = None
+) -> tuple[int, Unit] | None:
     """Placement selected by ``action``, or None if HOLD or infeasible."""
     action = Action(action)
     if action is Action.HOLD:
@@ -50,16 +53,22 @@ def action_to_placement(sim: HospitalSimulation, action: int,
     free = {u: sim.free_staffed(u) for u in Unit}
 
     if action in (Action.ADMIT_PRIMARY_PRIORITY, Action.ADMIT_PRIMARY_LONGEST_WAIT):
-        cands = [r for r in requests
-                 if r.rtype is RequestType.ADMIT_GENERAL and free[r.primary_unit] > 0]
+        cands = [
+            r for r in requests if r.rtype is RequestType.ADMIT_GENERAL and free[r.primary_unit] > 0
+        ]
         if not cands:
             return None
         key = _by_priority if action is Action.ADMIT_PRIMARY_PRIORITY else _by_wait
         r = min(cands, key=key)
         return r.rid, r.primary_unit
     if action is Action.ADMIT_OFF_SERVICE:
-        cands = [r for r in requests if r.rtype is RequestType.ADMIT_GENERAL
-                 and free[r.primary_unit] == 0 and free[other_ward(r.primary_unit)] > 0]
+        cands = [
+            r
+            for r in requests
+            if r.rtype is RequestType.ADMIT_GENERAL
+            and free[r.primary_unit] == 0
+            and free[other_ward(r.primary_unit)] > 0
+        ]
         if not cands:
             return None
         r = min(cands, key=_by_priority)

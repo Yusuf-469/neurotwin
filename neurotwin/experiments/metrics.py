@@ -26,9 +26,18 @@ from ..simulation.hospital import HospitalSimulation
 from .objective import CostWeights, measured_cost
 
 PRIMARY_METRICS = ("mean_boarding_h", "p90_boarding_h", "diversion_per_100", "off_service_per_100")
-SECONDARY_METRICS = ("J_per_day", "high_priority_boarding_h", "elective_wait_h", "mean_ed_wait_h",
-                     "step_down_delay_h", "escalation_delay_h", "placements_per_day",
-                     "censored_requests", "censored_ed_requests", "mean_boarding_placed_only_h")
+SECONDARY_METRICS = (
+    "J_per_day",
+    "high_priority_boarding_h",
+    "elective_wait_h",
+    "mean_ed_wait_h",
+    "step_down_delay_h",
+    "escalation_delay_h",
+    "placements_per_day",
+    "censored_requests",
+    "censored_ed_requests",
+    "mean_boarding_placed_only_h",
+)
 ALL_METRICS = PRIMARY_METRICS + SECONDARY_METRICS
 
 
@@ -37,6 +46,7 @@ def _mean(x: list[float]) -> float:
 
 
 def episode_metrics(sim: HospitalSimulation, weights: CostWeights) -> dict[str, float]:
+    """Primary and secondary metrics of a finished episode's measurement window."""
     res = sim.result()
     warmup, horizon = sim.config.warmup_hours, sim.config.horizon_hours
     days = res.measured_hours / 24.0
@@ -46,9 +56,10 @@ def episode_metrics(sim: HospitalSimulation, weights: CostWeights) -> dict[str, 
         if r.created_at < warmup:
             continue
         placed = not math.isnan(r.placed_at)
-        wait = (r.placed_at if placed else horizon) - r.created_at    # censored: lower bound
-        is_ed_admission = (r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU)
-                           and r.from_ed)
+        wait = (r.placed_at if placed else horizon) - r.created_at  # censored: lower bound
+        is_ed_admission = (
+            r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU) and r.from_ed
+        )
         if is_ed_admission:
             waits["board"].append(wait)
             censored_ed += not placed

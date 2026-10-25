@@ -30,6 +30,8 @@ N_BOOT = 10_000
 
 @dataclass
 class Comparison:
+    """Result of one PPO-vs-baseline comparison for one scenario and metric."""
+
     scenario: str
     metric: str
     baseline: str
@@ -51,8 +53,9 @@ class Comparison:
         return asdict(self)
 
 
-def hierarchical_paired_bootstrap(ppo: np.ndarray, baseline: np.ndarray, n_boot: int = N_BOOT,
-                                  seed: int = BOOTSTRAP_SEED) -> tuple[float, float, float, float]:
+def hierarchical_paired_bootstrap(
+    ppo: np.ndarray, baseline: np.ndarray, n_boot: int = N_BOOT, seed: int = BOOTSTRAP_SEED
+) -> tuple[float, float, float, float]:
     """ppo: (K agents, n seeds); baseline: (n seeds,). Returns (diff, ci_low, ci_high, p)."""
     ppo = np.asarray(ppo, dtype=float)
     baseline = np.asarray(baseline, dtype=float)
@@ -65,7 +68,7 @@ def hierarchical_paired_bootstrap(ppo: np.ndarray, baseline: np.ndarray, n_boot:
     seed_idx = rng.integers(0, n, size=(n_boot, n))
     boot = np.empty(n_boot)
     for b in range(n_boot):
-        per_seed_ppo = ppo[agent_idx[b]].mean(axis=0)            # resampled agents, all seeds
+        per_seed_ppo = ppo[agent_idx[b]].mean(axis=0)  # resampled agents, all seeds
         s = seed_idx[b]
         boot[b] = np.mean(per_seed_ppo[s] - baseline[s])
     lo, hi = np.percentile(boot, [2.5, 97.5])
@@ -92,13 +95,15 @@ def cliffs_delta(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def d_z(differences: np.ndarray) -> float:
+    """Standardised mean paired difference: mean(d) / sd(d)."""
     d = np.asarray(differences, float)
     sd = d.std(ddof=1)
     return float(d.mean() / sd) if sd > 0 else float("nan")
 
 
-def compare(scenario: str, metric: str, baseline_name: str, ppo: np.ndarray,
-            baseline: np.ndarray) -> Comparison:
+def compare(
+    scenario: str, metric: str, baseline_name: str, ppo: np.ndarray, baseline: np.ndarray
+) -> Comparison:
     """One PPO-vs-baseline comparison. ppo: (K, n); baseline: (n,)."""
     diff, lo, hi, p = hierarchical_paired_bootstrap(ppo, baseline)
     agent_mean = np.asarray(ppo, float).mean(axis=0)
@@ -107,12 +112,26 @@ def compare(scenario: str, metric: str, baseline_name: str, ppo: np.ndarray,
         p_w = float(stats.wilcoxon(d).pvalue) if np.any(d != 0) else 1.0
     except ValueError:
         p_w = float("nan")
-    return Comparison(scenario, metric, baseline_name, len(baseline), ppo.shape[0],
-                      float(agent_mean.mean()), float(np.mean(baseline)), diff, lo, hi, p,
-                      d_z=d_z(d), cliffs_delta=cliffs_delta(agent_mean, baseline), p_wilcoxon=p_w)
+    return Comparison(
+        scenario,
+        metric,
+        baseline_name,
+        len(baseline),
+        ppo.shape[0],
+        float(agent_mean.mean()),
+        float(np.mean(baseline)),
+        diff,
+        lo,
+        hi,
+        p,
+        d_z=d_z(d),
+        cliffs_delta=cliffs_delta(agent_mean, baseline),
+        p_wilcoxon=p_w,
+    )
 
 
 def apply_holm(comparisons: list[Comparison], alpha: float = 0.05) -> None:
+    """Set Holm-adjusted p-values and significance flags on a comparison family."""
     adjusted = holm([c.p_boot for c in comparisons])
     for c, p in zip(comparisons, adjusted):
         c.p_holm = p

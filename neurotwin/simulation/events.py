@@ -18,18 +18,22 @@ from typing import Any, Callable
 
 class EventKind(IntEnum):
     # Lower value = processed first among events at the same time.
-    SHIFT_CHANGE = 0          # staffing changes before anything else at a shift boundary
-    DISCHARGE = 1             # frees a bed
-    ICU_PHASE_END = 2         # ICU stay over -> step-down request
-    DETERIORATION = 3         # general-ward patient -> escalation request
-    ED_TREATMENT_END = 4      # ED treatment over -> admission request
+    """Scheduled event types; the value orders events at equal times."""
+
+    SHIFT_CHANGE = 0  # staffing changes before anything else at a shift boundary
+    DISCHARGE = 1  # frees a bed
+    ICU_PHASE_END = 2  # ICU stay over -> step-down request
+    DETERIORATION = 3  # general-ward patient -> escalation request
+    ED_TREATMENT_END = 4  # ED treatment over -> admission request
     EMERGENCY_ARRIVAL = 5
     ELECTIVE_ARRIVAL = 6
-    PERIODIC_REVIEW = 7       # 4-hourly review (RESEARCH.md §6.2)
-    TRACE = 8                 # observation only (occupancy trace); never a decision trigger
+    PERIODIC_REVIEW = 7  # 4-hourly review (RESEARCH.md §6.2)
+    TRACE = 8  # observation only (occupancy trace); never a decision trigger
 
 
 class EventQueue:
+    """Heap-based future event list with deterministic tie-breaking."""
+
     def __init__(self) -> None:
         self._heap: list[tuple[float, int, int, Any]] = []
         self._next_seq = 0

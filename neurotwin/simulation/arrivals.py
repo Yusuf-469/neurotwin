@@ -66,18 +66,21 @@ def emergency_rate(config: SimulationConfig, scenario: ScenarioConfig) -> Piecew
     hourly = np.asarray(config.hourly_profile)[hours % 24]
     daily = np.asarray(config.weekly_profile)[hours // 24]
     return PiecewiseConstantRate(
-        config.emergency_base_rate * scenario.arrival_multiplier * hourly * daily)
+        config.emergency_base_rate * scenario.arrival_multiplier * hourly * daily
+    )
 
 
 def elective_rate(config: SimulationConfig, scenario: ScenarioConfig) -> PiecewiseConstantRate:
     """Electives arrive only in the elective window; scaled so base_L is the weekly mean rate."""
     hours = np.arange(HOURS_PER_WEEK)
     start, end = config.elective_hours
-    open_mask = (np.isin(hours // 24, config.elective_weekdays)
-                 & (hours % 24 >= start) & (hours % 24 < end))
+    open_mask = (
+        np.isin(hours // 24, config.elective_weekdays) & (hours % 24 >= start) & (hours % 24 < end)
+    )
     n_open = int(open_mask.sum())
     rates = np.zeros(HOURS_PER_WEEK)
     if n_open and config.elective_base_rate > 0:
-        rates[open_mask] = (config.elective_base_rate * scenario.arrival_multiplier
-                            * HOURS_PER_WEEK / n_open)
+        rates[open_mask] = (
+            config.elective_base_rate * scenario.arrival_multiplier * HOURS_PER_WEEK / n_open
+        )
     return PiecewiseConstantRate(rates)

@@ -41,8 +41,11 @@ def run_job(job: tuple[str, int, str, int, str, dict]) -> dict[str, Any]:
     """Worker: one episode. job = (policy, agent, scenario, seed, agent_dir, config overrides)."""
     policy_name, agent, scenario, seed, agent_dir, overrides = job
     import torch
+
     torch.set_num_threads(1)
-    config = load_default_config().with_overrides(**overrides) if overrides else load_default_config()
+    config = (
+        load_default_config().with_overrides(**overrides) if overrides else load_default_config()
+    )
     if policy_name == "ppo":
         policy = PPOPolicy.load(Path(agent_dir) / f"agent_{agent}.pt")
     else:
@@ -50,14 +53,26 @@ def run_job(job: tuple[str, int, str, int, str, dict]) -> dict[str, Any]:
     sim = HospitalSimulation(config, SCENARIOS[scenario], seed=seed)
     t0 = time.perf_counter()
     run_episode(sim, policy)
-    row = {"policy": policy_name, "agent": agent, "scenario": scenario, "seed": seed,
-           "runtime_s": time.perf_counter() - t0}
+    row = {
+        "policy": policy_name,
+        "agent": agent,
+        "scenario": scenario,
+        "seed": seed,
+        "runtime_s": time.perf_counter() - t0,
+    }
     row.update(episode_metrics(sim, CostWeights.load()))
     return row
 
 
-def build_jobs(seeds, scenarios, agents: int, agent_dir: Path, overrides: dict | None = None,
-               policies=("ppo",) + BASELINES) -> list[tuple]:
+def build_jobs(
+    seeds,
+    scenarios,
+    agents: int,
+    agent_dir: Path,
+    overrides: dict | None = None,
+    policies=("ppo",) + BASELINES,
+) -> list[tuple]:
+    """One job per (scenario, seed, policy, agent) for the evaluation matrix."""
     jobs = []
     for scenario in scenarios:
         for seed in seeds:
@@ -68,14 +83,18 @@ def build_jobs(seeds, scenarios, agents: int, agent_dir: Path, overrides: dict |
 
 
 def write_rows(rows: list[dict], path: Path) -> None:
+    """Write episode rows to CSV, sorted for stable diffs."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
         writer.writeheader()
-        writer.writerows(sorted(rows, key=lambda r: (r["scenario"], r["policy"], r["agent"], r["seed"])))
+        writer.writerows(
+            sorted(rows, key=lambda r: (r["scenario"], r["policy"], r["agent"], r["seed"]))
+        )
 
 
 def read_rows(path: Path) -> list[dict]:
+    """Read episode rows from CSV, converting numeric columns to float."""
     with open(path, encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     for r in rows:
@@ -94,16 +113,32 @@ def analyse(rows: list[dict], metrics=PRIMARY_METRICS, baselines=BASELINES) -> l
         seeds = sorted({int(r["seed"]) for r in sub})
         agents = sorted({int(r["agent"]) for r in sub if r["policy"] == "ppo"})
         for metric in metrics:
-            ppo = np.array([[next(r[metric] for r in sub if r["policy"] == "ppo"
-                                  and int(r["agent"]) == a and int(r["seed"]) == s)
-                             for s in seeds] for a in agents])
+            ppo = np.array(
+                [
+                    [
+                        next(
+                            r[metric]
+                            for r in sub
+                            if r["policy"] == "ppo" and int(r["agent"]) == a and int(r["seed"]) == s
+                        )
+                        for s in seeds
+                    ]
+                    for a in agents
+                ]
+            )
             for b in baselines:
-                base = np.array([next(r[metric] for r in sub if r["policy"] == b
-                                      and int(r["seed"]) == s) for s in seeds])
+                base = np.array(
+                    [
+                        next(r[metric] for r in sub if r["policy"] == b and int(r["seed"]) == s)
+                        for s in seeds
+                    ]
+                )
                 culprit = "ppo" if np.isnan(ppo).any() else b if np.isnan(base).any() else None
                 if culprit is not None:
-                    raise ValueError(f"NaN in {metric}/{scenario}/{culprit}; primary metrics "
-                                     "must be defined for every episode")
+                    raise ValueError(
+                        f"NaN in {metric}/{scenario}/{culprit}; primary metrics "
+                        "must be defined for every episode"
+                    )
                 comparisons.append(compare(scenario, metric, b, ppo, base))
     apply_holm(comparisons)
     return comparisons
@@ -112,6 +147,7 @@ def analyse(rows: list[dict], metrics=PRIMARY_METRICS, baselines=BASELINES) -> l
 def summary_table(rows: list[dict], metrics=ALL_METRICS) -> list[dict]:
     """Mean and 95% t-CI over seeds per (scenario, policy); PPO averaged over agents first."""
     from scipy import stats
+
     out = []
     for scenario in sorted({r["scenario"] for r in rows}):
         for policy in ("ppo",) + BASELINES:
@@ -121,20 +157,29 @@ def summary_table(rows: list[dict], metrics=ALL_METRICS) -> list[dict]:
             seeds = sorted({int(r["seed"]) for r in sub})
             entry = {"scenario": scenario, "policy": policy}
             for m in metrics:
-                per_seed = np.array([np.nanmean([r[m] for r in sub if int(r["seed"]) == s])
-                                     for s in seeds])
+                per_seed = np.array(
+                    [np.nanmean([r[m] for r in sub if int(r["seed"]) == s]) for s in seeds]
+                )
                 per_seed = per_seed[~np.isnan(per_seed)]
                 if len(per_seed) < 2:
                     entry[m] = (math.nan, math.nan, math.nan)
                     continue
-                half = stats.t.ppf(0.975, len(per_seed) - 1) * per_seed.std(ddof=1) / math.sqrt(len(per_seed))
-                entry[m] = (float(per_seed.mean()), float(per_seed.mean() - half),
-                            float(per_seed.mean() + half))
+                half = (
+                    stats.t.ppf(0.975, len(per_seed) - 1)
+                    * per_seed.std(ddof=1)
+                    / math.sqrt(len(per_seed))
+                )
+                entry[m] = (
+                    float(per_seed.mean()),
+                    float(per_seed.mean() - half),
+                    float(per_seed.mean() + half),
+                )
             out.append(entry)
     return out
 
 
 def main() -> None:
+    """Command-line entry point: run the matrix on one seed split and analyse it."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--split", choices=["test", "validation"], required=True)
     parser.add_argument("--out", type=Path, required=True)
@@ -155,11 +200,16 @@ def main() -> None:
     write_rows(rows, args.out / "episodes.csv")
     comparisons = analyse(rows)
     (args.out / "comparisons.json").write_text(
-        json.dumps([c.as_dict() for c in comparisons], indent=1), encoding="utf-8")
-    (args.out / "summary.json").write_text(json.dumps(summary_table(rows), indent=1), encoding="utf-8")
-    print(f"{len(rows)} episodes in {time.perf_counter() - t0:.0f} s; "
-          f"{sum(c.significant_holm for c in comparisons)}/{len(comparisons)} comparisons "
-          f"significant after Holm")
+        json.dumps([c.as_dict() for c in comparisons], indent=1), encoding="utf-8"
+    )
+    (args.out / "summary.json").write_text(
+        json.dumps(summary_table(rows), indent=1), encoding="utf-8"
+    )
+    print(
+        f"{len(rows)} episodes in {time.perf_counter() - t0:.0f} s; "
+        f"{sum(c.significant_holm for c in comparisons)}/{len(comparisons)} comparisons "
+        f"significant after Holm"
+    )
 
 
 if __name__ == "__main__":

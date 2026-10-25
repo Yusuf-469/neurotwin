@@ -22,7 +22,7 @@ def test_dropped_features_are_always_zero():
         obs, _, _, trunc, info = env.step(int(rng.choice(np.flatnonzero(info["action_mask"]))))
         if trunc:
             break
-    assert seen_nonzero_kept                                 # other features are untouched
+    assert seen_nonzero_kept  # other features are untouched
     with pytest.raises(ValueError):
         HospitalAllocationEnv(SHORT, drop_features=(21,))
 
@@ -43,8 +43,13 @@ def test_degradation_on_a_known_case():
     for p in POLICIES:
         k = 5 if p == "ppo" else 1
         base = rng.uniform(5, 10, size=(k, 30))
-        m[p] = {s: {metric: base * (1 if s == "A" else 2)
-                    for metric in RELATIVE + ("diversion_per_100",)} for s in ("A",) + STRESS}
+        m[p] = {
+            s: {
+                metric: base * (1 if s == "A" else 2)
+                for metric in RELATIVE + ("diversion_per_100",)
+            }
+            for s in ("A",) + STRESS
+        }
     res = bootstrap_degradation(m, n_boot=500)
     for p in POLICIES:
         assert res["robustness_index"][p]["estimate"] == pytest.approx(100.0)

@@ -21,6 +21,7 @@ from ..simulation.hospital import HospitalSimulation
 
 
 def other_ward(unit: Unit) -> Unit:
+    """The other general ward (MED <-> SURG)."""
     if unit is Unit.MED:
         return Unit.SURG
     if unit is Unit.SURG:
@@ -35,6 +36,8 @@ def staffed_occupancy(sim: HospitalSimulation, unit: Unit) -> float:
 
 
 class AllocationPolicy(ABC):
+    """Base class: decide(sim) returns (request id, unit) or None for HOLD."""
+
     name: str = "policy"
 
     @abstractmethod
@@ -67,15 +70,18 @@ class RuleBasedPolicy(AllocationPolicy):
 
 
 def fifo_key(request: RequestView, now: float) -> tuple:
+    """Sort key: oldest request first."""
     return (request.created_at, request.rid)
 
 
 def priority_key(request: RequestView, now: float) -> tuple:
+    """Sort key: most urgent first, then oldest."""
     return (request.priority, request.created_at, request.rid)
 
 
-def primary_then_off_service_after_wait(request: RequestView, sim: HospitalSimulation,
-                                        off_service_wait_hours: float) -> Unit | None:
+def primary_then_off_service_after_wait(
+    request: RequestView, sim: HospitalSimulation, off_service_wait_hours: float
+) -> Unit | None:
     """Common hospital practice: primary unit if a staffed bed is free; for general requests,
     the other ward once the request has waited at least ``off_service_wait_hours``."""
     if sim.free_staffed(request.primary_unit) > 0:

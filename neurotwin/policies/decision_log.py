@@ -16,6 +16,8 @@ from ..simulation.hospital import HospitalSimulation, PlacementPolicy
 
 
 class DecisionLog:
+    """Ordered list of decision records with JSONL export."""
+
     def __init__(self) -> None:
         self.records: list[dict[str, Any]] = []
 
@@ -33,7 +35,7 @@ class LoggingPolicy:
         self.log = log or DecisionLog()
 
     def decide(self, sim: HospitalSimulation) -> tuple[int, Unit] | None:
-        from ..rl.actions import Action, action_mask   # local import avoids a package cycle
+        from ..rl.actions import Action, action_mask  # local import avoids a package cycle
 
         waiting = sim.waiting_requests()
         feasible = [Action(a).name for a, ok in enumerate(action_mask(sim)) if ok]
@@ -45,8 +47,9 @@ class LoggingPolicy:
             "free_staffed": {u.value: sim.free_staffed(u) for u in Unit},
             "n_waiting": len(waiting),
             "n_waiting_high_priority": sum(r.priority <= 2 for r in waiting),
-            "waiting_by_priority": {str(p): sum(r.priority == p for r in waiting)
-                                    for p in range(1, 6)},
+            "waiting_by_priority": {
+                str(p): sum(r.priority == p for r in waiting) for p in range(1, 6)
+            },
             "oldest_wait_hours": max((sim.now - r.created_at for r in waiting), default=0.0),
             "feasible_actions": feasible,
         }
@@ -58,11 +61,17 @@ class LoggingPolicy:
         else:
             rid, unit = decision
             request = next(r for r in waiting if r.rid == rid)
-            record.update({
-                "action": "PLACE", "rid": rid, "request_type": request.rtype.value,
-                "priority": request.priority, "waited_hours": sim.now - request.created_at,
-                "unit": unit.value, "primary_unit": request.primary_unit.value,
-                "off_service": unit is not Unit.ICU and unit is not request.primary_unit,
-            })
+            record.update(
+                {
+                    "action": "PLACE",
+                    "rid": rid,
+                    "request_type": request.rtype.value,
+                    "priority": request.priority,
+                    "waited_hours": sim.now - request.created_at,
+                    "unit": unit.value,
+                    "primary_unit": request.primary_unit.value,
+                    "off_service": unit is not Unit.ICU and unit is not request.primary_unit,
+                }
+            )
         self.log.records.append(record)
         return decision

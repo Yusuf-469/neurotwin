@@ -40,8 +40,9 @@ class RandomStreams:
         self.namespace = namespace
         spawn_key = () if namespace == 0 else (namespace,)
         children = np.random.SeedSequence(seed, spawn_key=spawn_key).spawn(len(STREAM_NAMES))
-        self._generators = {name: np.random.default_rng(child)
-                            for name, child in zip(STREAM_NAMES, children)}
+        self._generators = {
+            name: np.random.default_rng(child) for name, child in zip(STREAM_NAMES, children)
+        }
 
     def __getitem__(self, name: str) -> np.random.Generator:
         return self._generators[name]

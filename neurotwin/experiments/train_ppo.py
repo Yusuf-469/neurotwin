@@ -38,18 +38,23 @@ from .seeds import TRAIN, VALIDATION, require_split
 ROOT = Path(__file__).resolve().parents[2]
 RESULTS = ROOT / "results" / "ppo"
 PPO_CONFIG = ROOT / "config" / "ppo_default.json"
-EPISODE_SEED_BLOCK = 15_000          # episode seeds per agent (k-th block starts at 10_000 + k*block)
+EPISODE_SEED_BLOCK = 15_000  # episode seeds per agent (k-th block starts at 10_000 + k*block)
 
 
 def load_ppo_config(overrides: dict[str, Any] | None = None, seed: int = 0) -> PPOConfig:
-    data = {k: v for k, v in json.loads(PPO_CONFIG.read_text(encoding="utf-8")).items()
-            if not k.startswith("_")}       # keys starting with '_' are comments
+    """PPOConfig from config/ppo_default.json with optional overrides."""
+    data = {
+        k: v
+        for k, v in json.loads(PPO_CONFIG.read_text(encoding="utf-8")).items()
+        if not k.startswith("_")
+    }  # keys starting with '_' are comments
     data.update(overrides or {})
     data["hidden"] = tuple(data["hidden"])
     return PPOConfig(seed=seed, **data)
 
 
 def episode_seeds(agent: int):
+    """Disjoint block of TRAIN-range episode seeds for agent ``agent``."""
     start = 10_000 + agent * EPISODE_SEED_BLOCK
     block = range(start, start + EPISODE_SEED_BLOCK)
     require_split([block.start, block.stop - 1], "train")
@@ -57,6 +62,7 @@ def episode_seeds(agent: int):
 
 
 def evaluate(policy, seeds=VALIDATION) -> list[float]:
+    """J per measured day for ``policy`` on validation seeds (scenario A)."""
     seeds = list(seeds)
     require_split(seeds, "validation")
     config, weights = load_default_config(), CostWeights.load()
@@ -84,24 +90,46 @@ def train_agent(args: tuple) -> dict[str, Any]:
     if env_opts.get("uniform_omega"):
         sim_config = sim_config.with_overrides(priority_weights=[1.0] * 5)
     base_w = CostWeights.load()
-    weights = CostWeights(base_w.alpha, env_opts.get("beta", base_w.beta),
-                          env_opts.get("kappa", base_w.kappa))
+    weights = CostWeights(
+        base_w.alpha, env_opts.get("beta", base_w.beta), env_opts.get("kappa", base_w.kappa)
+    )
     drop = tuple(env_opts.get("drop_features", ()))
-    pool = WarmStartPool.generate(sim_config, SCENARIOS["A"], range(MIN_TRAINING_POOL),
-                                  GreedyPlacement())
+    pool = WarmStartPool.generate(
+        sim_config, SCENARIOS["A"], range(MIN_TRAINING_POOL), GreedyPlacement()
+    )
     t0 = time.perf_counter()
-    agent, log = train([lambda: HospitalAllocationEnv(sim_config, start_mode="warm", pool=pool,
-                                                      weights=weights, drop_features=drop)]
-                       * config.n_envs, config, episode_seeds(agent_seed))
+    agent, log = train(
+        [
+            lambda: HospitalAllocationEnv(
+                sim_config, start_mode="warm", pool=pool, weights=weights, drop_features=drop
+            )
+        ]
+        * config.n_envs,
+        config,
+        episode_seeds(agent_seed),
+    )
     train_s = time.perf_counter() - t0
-    agent.meta.update({"name": name, "agent_seed": agent_seed, "train_seconds": train_s,
-                       "drop_features": list(drop), "env_opts": env_opts})
+    agent.meta.update(
+        {
+            "name": name,
+            "agent_seed": agent_seed,
+            "train_seconds": train_s,
+            "drop_features": list(drop),
+            "env_opts": env_opts,
+        }
+    )
     agent.save(out / f"agent_{agent_seed}.pt")
-    (out / f"log_{agent_seed}.json").write_text(json.dumps(
-        {"updates": log.updates, "episode_returns": log.episode_returns}), encoding="utf-8")
+    (out / f"log_{agent_seed}.json").write_text(
+        json.dumps({"updates": log.updates, "episode_returns": log.episode_returns}),
+        encoding="utf-8",
+    )
     costs = evaluate(PPOPolicy(agent))
-    return {"agent_seed": agent_seed, "validation_J": costs, "mean_J": float(np.mean(costs)),
-            "train_seconds": train_s}
+    return {
+        "agent_seed": agent_seed,
+        "validation_J": costs,
+        "mean_J": float(np.mean(costs)),
+        "train_seconds": train_s,
+    }
 
 
 def _baseline_job(name: str) -> list[float]:
@@ -109,6 +137,7 @@ def _baseline_job(name: str) -> list[float]:
 
 
 def main() -> None:
+    """Command-line entry point: train K agents, evaluate on validation seeds."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--name", required=True)
     parser.add_argument("--agents", type=int, default=5)
@@ -124,15 +153,24 @@ def main() -> None:
         priority = base.result()
     agent_means = [r["mean_J"] for r in runs]
     paired = [float(np.mean(np.array(r["validation_J"]) - np.array(priority))) for r in runs]
-    summary = {"name": args.name, "overrides": overrides,
-               "config": vars(load_ppo_config(overrides)) | {"hidden": list(load_ppo_config(overrides).hidden)},
-               "runs": runs, "priority_validation_J": priority,
-               "mean_J_over_agents": float(np.mean(agent_means)),
-               "paired_diff_vs_priority_per_agent": paired}
-    (RESULTS / args.name / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    print(f"{args.name} {overrides}: agent mean J {[round(m, 1) for m in agent_means]} "
-          f"(overall {np.mean(agent_means):.1f}); Priority {np.mean(priority):.1f}; "
-          f"paired PPO-Priority per agent {[round(p, 1) for p in paired]}")
+    summary = {
+        "name": args.name,
+        "overrides": overrides,
+        "config": vars(load_ppo_config(overrides))
+        | {"hidden": list(load_ppo_config(overrides).hidden)},
+        "runs": runs,
+        "priority_validation_J": priority,
+        "mean_J_over_agents": float(np.mean(agent_means)),
+        "paired_diff_vs_priority_per_agent": paired,
+    }
+    (RESULTS / args.name / "summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
+    print(
+        f"{args.name} {overrides}: agent mean J {[round(m, 1) for m in agent_means]} "
+        f"(overall {np.mean(agent_means):.1f}); Priority {np.mean(priority):.1f}; "
+        f"paired PPO-Priority per agent {[round(p, 1) for p in paired]}"
+    )
 
 
 if __name__ == "__main__":

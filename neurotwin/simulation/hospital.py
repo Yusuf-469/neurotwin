@@ -52,8 +52,12 @@ _UNIFORMS_PER_PATIENT = 9
 # RL state uses 1 h, 4 h and 24 h windows (RESEARCH.md §6.5).
 RECENT_WINDOW_HOURS = 24.0
 SNAPSHOT_SCHEMA = "neurotwin.sim_snapshot/1"
-_PATIENT_EVENTS = (EventKind.DISCHARGE, EventKind.ICU_PHASE_END, EventKind.DETERIORATION,
-                   EventKind.ED_TREATMENT_END)
+_PATIENT_EVENTS = (
+    EventKind.DISCHARGE,
+    EventKind.ICU_PHASE_END,
+    EventKind.DETERIORATION,
+    EventKind.ED_TREATMENT_END,
+)
 
 
 @dataclass
@@ -61,9 +65,9 @@ class Accumulators:
     """Exact time integrals and counters. One instance covers [0, now] (used for rewards), a
     second covers only the measurement window [warmup, horizon] (used for metrics)."""
 
-    weighted_request_hours: float = 0.0   # integral of sum of omega over waiting requests
-    request_hours: float = 0.0            # integral of number of waiting requests
-    ed_boarding_hours: float = 0.0        # integral of waiting admission requests from the ED
+    weighted_request_hours: float = 0.0  # integral of sum of omega over waiting requests
+    request_hours: float = 0.0  # integral of number of waiting requests
+    ed_boarding_hours: float = 0.0  # integral of waiting admission requests from the ED
     diversions: int = 0
     placements: int = 0
     off_service_placements: int = 0
@@ -104,12 +108,19 @@ class SimulationResult:
 
     @property
     def diversion_rate_per_100(self) -> float:
-        return 100.0 * self.diversions / self.emergency_arrivals if self.emergency_arrivals else math.nan
+        return (
+            100.0 * self.diversions / self.emergency_arrivals
+            if self.emergency_arrivals
+            else math.nan
+        )
 
     @property
     def off_service_rate_per_100(self) -> float:
-        return (100.0 * self.off_service_placements / self.general_placements
-                if self.general_placements else math.nan)
+        return (
+            100.0 * self.off_service_placements / self.general_placements
+            if self.general_placements
+            else math.nan
+        )
 
     @property
     def mean_ed_wait_hours(self) -> float:
@@ -119,28 +130,37 @@ class SimulationResult:
 class HospitalSimulation:
     """One simulated episode for a given configuration, scenario and seed."""
 
-    def __init__(self, config: SimulationConfig, scenario: ScenarioConfig | None = None,
-                 seed: int = 0, trace_interval_hours: float | None = None) -> None:
+    def __init__(
+        self,
+        config: SimulationConfig,
+        scenario: ScenarioConfig | None = None,
+        seed: int = 0,
+        trace_interval_hours: float | None = None,
+    ) -> None:
         """``trace_interval_hours`` optionally records occupancy snapshots (warm-up analysis).
         Tracing uses no random numbers and never triggers decisions, so it cannot change a run."""
         self.config = config
         self.scenario = scenario or SCENARIOS["A"]
         self.seed = seed
-        self.branch_seed: int | None = None      # set when this run is a what-if branch
+        self.branch_seed: int | None = None  # set when this run is a what-if branch
         self._streams = RandomStreams(seed)
         self._attr_rng = self._streams["patient_attributes"]
         self._staff_rng = self._streams["staffing"]
 
         sc = self.scenario
-        self.physical_beds = {u: round_half_up(config.beds[u.value] * sc.capacity_multiplier)
-                              for u in Unit}
-        self._nominal_nurses = {u: round_half_up(config.nurses[u.value] * sc.staff_multiplier)
-                                for u in Unit}
+        self.physical_beds = {
+            u: round_half_up(config.beds[u.value] * sc.capacity_multiplier) for u in Unit
+        }
+        self._nominal_nurses = {
+            u: round_half_up(config.nurses[u.value] * sc.staff_multiplier) for u in Unit
+        }
         self._nominal_doctors = round_half_up(config.doctors * sc.staff_multiplier)
-        self._em_arrivals = ThinningArrivalProcess(emergency_rate(config, sc),
-                                                   self._streams["arrivals_emergency"])
-        self._el_arrivals = ThinningArrivalProcess(elective_rate(config, sc),
-                                                   self._streams["arrivals_elective"])
+        self._em_arrivals = ThinningArrivalProcess(
+            emergency_rate(config, sc), self._streams["arrivals_emergency"]
+        )
+        self._el_arrivals = ThinningArrivalProcess(
+            elective_rate(config, sc), self._streams["arrivals_elective"]
+        )
 
         self.now = 0.0
         self._queue = EventQueue()
@@ -167,12 +187,15 @@ class HospitalSimulation:
         self._elective_waits: list[float] = []
         self._ed_waits: list[float] = []
         self._recent: dict[str, deque[float]] = {
-            "arrivals": deque(), "discharges": deque(), "diversions": deque()}
+            "arrivals": deque(),
+            "discharges": deque(),
+            "diversions": deque(),
+        }
 
         self._epoch_open = False
         self._finished = False
         self._trace_interval = trace_interval_hours
-        self.trace: list[tuple[float, dict[Unit, int], int]] = []   # (time, occupancy, waiting)
+        self.trace: list[tuple[float, dict[Unit, int], int]] = []  # (time, occupancy, waiting)
         if trace_interval_hours is not None:
             if trace_interval_hours <= 0:
                 raise ValueError("trace interval must be positive")
@@ -241,13 +264,17 @@ class HospitalSimulation:
 
     @property
     def off_service_in_beds(self) -> int:
-        return sum(1 for p in self._patients
-                   if p.off_service and p.location is not None and p.location is not Unit.ICU)
+        return sum(
+            1
+            for p in self._patients
+            if p.off_service and p.location is not None and p.location is not Unit.ICU
+        )
 
     def has_feasible_placement(self) -> bool:
         general_free = any(self.free_staffed(u) > 0 for u in GENERAL_UNITS)
-        return ((self._n_waiting_general > 0 and general_free)
-                or (self._n_waiting_icu > 0 and self.free_staffed(Unit.ICU) > 0))
+        return (self._n_waiting_general > 0 and general_free) or (
+            self._n_waiting_icu > 0 and self.free_staffed(Unit.ICU) > 0
+        )
 
     # ================================================================== public: control
 
@@ -297,27 +324,30 @@ class HospitalSimulation:
         request.unit = unit
         patient = request.patient
         if request.rtype in (RequestType.STEP_DOWN, RequestType.ESCALATION):
-            self._occupied[patient.location] -= 1          # source bed is freed
+            self._occupied[patient.location] -= 1  # source bed is freed
         self._occupied[unit] += 1
         patient.location = unit
         patient.activity_start = self.now
 
         if unit is Unit.ICU:
             patient.off_service = False
-            stay = (patient.escalation_icu_los if request.rtype is RequestType.ESCALATION
-                    else patient.icu_los)
+            stay = (
+                patient.escalation_icu_los
+                if request.rtype is RequestType.ESCALATION
+                else patient.icu_los
+            )
             self._queue.push(self.now + stay, EventKind.ICU_PHASE_END, patient)
             off_service = False
         else:
             off_service = unit is not patient.specialty
             patient.off_service = off_service
-            los = (patient.post_icu_general_los if patient.has_deteriorated
-                   else patient.general_los)
+            los = patient.post_icu_general_los if patient.has_deteriorated else patient.general_los
             if off_service:
                 los *= self.config.off_service_los_multiplier
             if not patient.has_deteriorated and patient.deterioration_delay < los:
-                self._queue.push(self.now + patient.deterioration_delay,
-                                 EventKind.DETERIORATION, patient)
+                self._queue.push(
+                    self.now + patient.deterioration_delay, EventKind.DETERIORATION, patient
+                )
             else:
                 self._queue.push(self.now + los, EventKind.DISCHARGE, patient)
 
@@ -342,7 +372,9 @@ class HospitalSimulation:
         censored = sum(1 for r in self._requests.values() if r.created_at >= warmup)
         measured_hours = self.config.horizon_hours - warmup
         return SimulationResult(
-            scenario=self.scenario.name, seed=self.seed, measured_hours=measured_hours,
+            scenario=self.scenario.name,
+            seed=self.seed,
+            measured_hours=measured_hours,
             emergency_arrivals=self._m_emergency_arrivals,
             diversions=self._measured.diversions,
             boarding_times=list(self._boarding_times),
@@ -383,6 +415,7 @@ class HospitalSimulation:
         Restoring with ``from_snapshot`` and continuing gives results identical to continuing
         this object (tested). Contains hidden information, so it must never be given to a policy.
         """
+
         def pid(p: Patient | None) -> int | None:
             return None if p is None else p.pid
 
@@ -428,8 +461,12 @@ class HospitalSimulation:
     def from_snapshot(cls, snap: dict[str, Any]) -> "HospitalSimulation":
         if snap.get("schema") != SNAPSHOT_SCHEMA:
             raise ValueError(f"unsupported snapshot schema {snap.get('schema')!r}")
-        sim = cls(SimulationConfig.from_dict(snap["config"]), ScenarioConfig(**snap["scenario"]),
-                  seed=snap["seed"], trace_interval_hours=snap["trace_interval"])
+        sim = cls(
+            SimulationConfig.from_dict(snap["config"]),
+            ScenarioConfig(**snap["scenario"]),
+            seed=snap["seed"],
+            trace_interval_hours=snap["trace_interval"],
+        )
         # Everything __init__ set up dynamically is overwritten below.
         if snap["rng_namespace"] != 0:
             sim._set_streams(RandomStreams(snap["branch_seed"], snap["rng_namespace"]))
@@ -445,13 +482,19 @@ class HospitalSimulation:
         by_rid = {r.rid: r for r in sim._request_log}
         sim._requests = {rid: by_rid[rid] for rid in snap["waiting"]}
         sim._queue.replace_all(
-            [(t, EventKind(k), s, None if p_id is None else patients[p_id])
-             for t, k, s, p_id in snap["events"]], snap["event_next_seq"])
+            [
+                (t, EventKind(k), s, None if p_id is None else patients[p_id])
+                for t, k, s, p_id in snap["events"]
+            ],
+            snap["event_next_seq"],
+        )
         sim._occupied = {Unit(u): n for u, n in snap["occupied"].items()}
         sim._nurses_on_shift = {Unit(u): n for u, n in snap["nurses_on_shift"].items()}
         sim._doctors_on_shift = snap["doctors_on_shift"]
         sim._doctors_busy = snap["doctors_busy"]
-        sim._doctor_queue = [(pr, at, p_id, patients[p_id]) for pr, at, p_id in snap["doctor_queue"]]
+        sim._doctor_queue = [
+            (pr, at, p_id, patients[p_id]) for pr, at, p_id in snap["doctor_queue"]
+        ]
         sim._next_rid = snap["next_rid"]
         sim._n_waiting_general = snap["n_waiting_general"]
         sim._n_waiting_icu = snap["n_waiting_icu"]
@@ -468,8 +511,9 @@ class HospitalSimulation:
         sim.trace = [(t, {Unit(u): n for u, n in occ.items()}, w) for t, occ, w in snap["trace"]]
         return sim
 
-    def branch(self, seed: int, resample_in_progress: bool = True,
-               scenario: ScenarioConfig | None = None) -> "HospitalSimulation":
+    def branch(
+        self, seed: int, resample_in_progress: bool = True, scenario: ScenarioConfig | None = None
+    ) -> "HospitalSimulation":
         """What-if branch (RESEARCH.md §6.21): same present, new future randomness.
 
         With ``scenario``, the branch also switches to new operating conditions from now on:
@@ -494,8 +538,11 @@ class HospitalSimulation:
         if scenario is not None:
             sim._apply_scenario(scenario)
         sim._set_streams(RandomStreams(seed, BRANCH_NAMESPACE))
-        entries = [e for e in sim._queue.entries()
-                   if e[1] not in (EventKind.EMERGENCY_ARRIVAL, EventKind.ELECTIVE_ARRIVAL)]
+        entries = [
+            e
+            for e in sim._queue.entries()
+            if e[1] not in (EventKind.EMERGENCY_ARRIVAL, EventKind.ELECTIVE_ARRIVAL)
+        ]
         entries = sim._redraw_hidden_attributes(entries, resample_in_progress)
         sim._queue.replace_all(entries, sim._queue.next_seq)
         sim._push_next_arrival(sim._em_arrivals, sim.now, EventKind.EMERGENCY_ARRIVAL)
@@ -518,20 +565,24 @@ class HospitalSimulation:
     def _apply_scenario(self, scenario: ScenarioConfig) -> None:
         cfg = self.config
         self.scenario = scenario
-        self.physical_beds = {u: round_half_up(cfg.beds[u.value] * scenario.capacity_multiplier)
-                              for u in Unit}
-        self._nominal_nurses = {u: round_half_up(cfg.nurses[u.value] * scenario.staff_multiplier)
-                                for u in Unit}
+        self.physical_beds = {
+            u: round_half_up(cfg.beds[u.value] * scenario.capacity_multiplier) for u in Unit
+        }
+        self._nominal_nurses = {
+            u: round_half_up(cfg.nurses[u.value] * scenario.staff_multiplier) for u in Unit
+        }
         self._nominal_doctors = round_half_up(cfg.doctors * scenario.staff_multiplier)
 
     def _set_streams(self, streams: RandomStreams) -> None:
         self._streams = streams
         self._attr_rng = streams["patient_attributes"]
         self._staff_rng = streams["staffing"]
-        self._em_arrivals = ThinningArrivalProcess(emergency_rate(self.config, self.scenario),
-                                                   streams["arrivals_emergency"])
-        self._el_arrivals = ThinningArrivalProcess(elective_rate(self.config, self.scenario),
-                                                   streams["arrivals_elective"])
+        self._em_arrivals = ThinningArrivalProcess(
+            emergency_rate(self.config, self.scenario), streams["arrivals_emergency"]
+        )
+        self._el_arrivals = ThinningArrivalProcess(
+            elective_rate(self.config, self.scenario), streams["arrivals_elective"]
+        )
 
     def _redraw_hidden_attributes(self, entries: list, resample_in_progress: bool) -> list:
         """Re-draw future (and optionally in-progress) durations of patients in the system.
@@ -588,29 +639,37 @@ class HospitalSimulation:
                 if ward_in_progress and in_progress:
                     base_elapsed = elapsed / mult
                     patient.general_los = base_elapsed + conditional_residual(
-                        cfg.general_los, base_elapsed, u[5])
+                        cfg.general_los, base_elapsed, u[5]
+                    )
                     # Constant hazard: the residual time to deterioration is memoryless.
                     patient.deterioration_delay = elapsed + exponential_from_uniform(
-                        cfg.deterioration_hazard_per_day / 24.0, u[8])
+                        cfg.deterioration_hazard_per_day / 24.0, u[8]
+                    )
                     los = patient.general_los * mult
                     if patient.deterioration_delay < los:
-                        entries[idx] = (patient.activity_start + patient.deterioration_delay,
-                                        EventKind.DETERIORATION) + tuple(entries[idx][2:])
+                        entries[idx] = (
+                            patient.activity_start + patient.deterioration_delay,
+                            EventKind.DETERIORATION,
+                        ) + tuple(entries[idx][2:])
                     else:
-                        entries[idx] = (patient.activity_start + los,
-                                        EventKind.DISCHARGE) + tuple(entries[idx][2:])
+                        entries[idx] = (patient.activity_start + los, EventKind.DISCHARGE) + tuple(
+                            entries[idx][2:]
+                        )
                 elif not ward_in_progress:
                     patient.general_los = fresh(cfg.general_los, u[5])
                     patient.deterioration_delay = exponential_from_uniform(
-                        cfg.deterioration_hazard_per_day / 24.0, u[8])
+                        cfg.deterioration_hazard_per_day / 24.0, u[8]
+                    )
                 patient.post_icu_general_los = fresh(cfg.post_icu_general_los, u[7])
             else:
                 if in_general and kind is EventKind.DISCHARGE and in_progress:
                     base_elapsed = elapsed / mult
                     patient.post_icu_general_los = base_elapsed + conditional_residual(
-                        cfg.post_icu_general_los, base_elapsed, u[7])
-                    entries[idx] = (patient.activity_start + patient.post_icu_general_los * mult,
-                                    ) + tuple(entries[idx][1:])
+                        cfg.post_icu_general_los, base_elapsed, u[7]
+                    )
+                    entries[idx] = (
+                        patient.activity_start + patient.post_icu_general_los * mult,
+                    ) + tuple(entries[idx][1:])
                 elif not (in_general and kind is EventKind.DISCHARGE):
                     patient.post_icu_general_los = fresh(cfg.post_icu_general_los, u[7])
         return entries
@@ -651,24 +710,28 @@ class HospitalSimulation:
             self._recent["discharges"].append(self.now)
             return True
         if kind is EventKind.ICU_PHASE_END:
-            self._create_request(payload, RequestType.STEP_DOWN,
-                                 self.config.step_down_priority, from_ed=False)
+            self._create_request(
+                payload, RequestType.STEP_DOWN, self.config.step_down_priority, from_ed=False
+            )
             return True
         if kind is EventKind.DETERIORATION:
             payload.has_deteriorated = True
-            self._create_request(payload, RequestType.ESCALATION,
-                                 self.config.escalation_priority, from_ed=False)
+            self._create_request(
+                payload, RequestType.ESCALATION, self.config.escalation_priority, from_ed=False
+            )
             return True
         if kind is EventKind.SHIFT_CHANGE:
             self._on_shift_change()
             return True
         if kind is EventKind.PERIODIC_REVIEW:
-            self._queue.push(self.now + self.config.review_interval_hours,
-                             EventKind.PERIODIC_REVIEW)
+            self._queue.push(
+                self.now + self.config.review_interval_hours, EventKind.PERIODIC_REVIEW
+            )
             return True
         if kind is EventKind.TRACE:
-            self.trace.append((self.now, dict(self._occupied),
-                               self._n_waiting_general + self._n_waiting_icu))
+            self.trace.append(
+                (self.now, dict(self._occupied), self._n_waiting_general + self._n_waiting_icu)
+            )
             self._queue.push(self.now + self._trace_interval, EventKind.TRACE)
             return False
         raise AssertionError(f"unhandled event kind {kind}")
@@ -691,8 +754,9 @@ class HospitalSimulation:
         if self.config.ed_treatment is None:
             self._create_admission_request(patient, from_ed=True)
             return True
-        heapq.heappush(self._doctor_queue,
-                       (patient.priority, patient.arrival_time, patient.pid, patient))
+        heapq.heappush(
+            self._doctor_queue, (patient.priority, patient.arrival_time, patient.pid, patient)
+        )
         self._start_treatments()
         return False
 
@@ -708,7 +772,9 @@ class HospitalSimulation:
         # aligned across policies. Each nominal staff member is absent independently.
         keep = 1.0 - self.config.staff_absence_prob
         for unit in Unit:
-            self._nurses_on_shift[unit] = int(self._staff_rng.binomial(self._nominal_nurses[unit], keep))
+            self._nurses_on_shift[unit] = int(
+                self._staff_rng.binomial(self._nominal_nurses[unit], keep)
+            )
         self._doctors_on_shift = int(self._staff_rng.binomial(self._nominal_doctors, keep))
         self._queue.push(self.now + self.config.shift_length_hours, EventKind.SHIFT_CHANGE)
         self._start_treatments()
@@ -722,8 +788,9 @@ class HospitalSimulation:
             patient.activity_start = self.now
             if patient.arrival_time >= self.config.warmup_hours:
                 self._ed_waits.append(self.now - patient.arrival_time)
-            self._queue.push(self.now + patient.ed_treatment_time,
-                             EventKind.ED_TREATMENT_END, patient)
+            self._queue.push(
+                self.now + patient.ed_treatment_time, EventKind.ED_TREATMENT_END, patient
+            )
 
     # ================================================================== internals: entities
 
@@ -733,8 +800,9 @@ class HospitalSimulation:
             while times and times[0] < cutoff:
                 times.popleft()
 
-    def _push_next_arrival(self, process: ThinningArrivalProcess, t: float,
-                           kind: EventKind) -> None:
+    def _push_next_arrival(
+        self, process: ThinningArrivalProcess, t: float, kind: EventKind
+    ) -> None:
         t_next = process.next_arrival(t)
         if math.isfinite(t_next) and t_next <= self.config.horizon_hours:
             self._queue.push(t_next, kind)
@@ -744,21 +812,27 @@ class HospitalSimulation:
         u = self._attr_rng.random(_UNIFORMS_PER_PATIENT)
         probs = cfg.priority_probs_emergency if is_emergency else cfg.priority_probs_elective
         priority = _categorical(probs, u[0]) + 1
-        p_med = cfg.specialty_prob_med_emergency if is_emergency else cfg.specialty_prob_med_elective
+        p_med = (
+            cfg.specialty_prob_med_emergency if is_emergency else cfg.specialty_prob_med_elective
+        )
         specialty = Unit.MED if u[1] < p_med else Unit.SURG
         icu_first = bool(u[2] < cfg.icu_first_prob[priority - 1])
-        ed_time = (sample_duration(cfg.ed_treatment, u[3])
-                   if cfg.ed_treatment is not None else 0.0)
+        ed_time = sample_duration(cfg.ed_treatment, u[3]) if cfg.ed_treatment is not None else 0.0
         patient = Patient(
-            pid=len(self._patients), arrival_time=self.now, is_emergency=is_emergency,
-            priority=priority, specialty=specialty, icu_first=icu_first,
+            pid=len(self._patients),
+            arrival_time=self.now,
+            is_emergency=is_emergency,
+            priority=priority,
+            specialty=specialty,
+            icu_first=icu_first,
             ed_treatment_time=ed_time,
             icu_los=sample_duration(cfg.icu_los, u[4]),
             general_los=sample_duration(cfg.general_los, u[5]),
             escalation_icu_los=sample_duration(cfg.escalation_icu_los, u[6]),
             post_icu_general_los=sample_duration(cfg.post_icu_general_los, u[7]),
             deterioration_delay=exponential_from_uniform(
-                cfg.deterioration_hazard_per_day / 24.0, u[8]),
+                cfg.deterioration_hazard_per_day / 24.0, u[8]
+            ),
         )
         self._patients.append(patient)
         return patient
@@ -767,8 +841,9 @@ class HospitalSimulation:
         rtype = RequestType.ADMIT_ICU if patient.icu_first else RequestType.ADMIT_GENERAL
         self._create_request(patient, rtype, patient.priority, from_ed=from_ed)
 
-    def _create_request(self, patient: Patient, rtype: RequestType, priority: int,
-                        from_ed: bool) -> None:
+    def _create_request(
+        self, patient: Patient, rtype: RequestType, priority: int, from_ed: bool
+    ) -> None:
         request = BedRequest(self._next_rid, patient, rtype, priority, self.now, from_ed)
         self._next_rid += 1
         self._requests[request.rid] = request
@@ -791,7 +866,7 @@ class HospitalSimulation:
             self._n_boarding -= 1
         self._weight_sum -= self.config.priority_weights[request.priority - 1]
         if not self._requests:
-            self._weight_sum = 0.0      # remove floating-point drift when the queue empties
+            self._weight_sum = 0.0  # remove floating-point drift when the queue empties
 
 
 class PlacementPolicy(Protocol):
@@ -825,6 +900,7 @@ def run_episode(sim: HospitalSimulation, policy: PlacementPolicy) -> SimulationR
 
 # ---------------------------------------------------------------------- helpers
 
+
 def _patient_to_dict(p: Patient) -> dict[str, Any]:
     d = asdict(p)
     d["specialty"] = p.specialty.value
@@ -840,15 +916,29 @@ def _patient_from_dict(d: dict[str, Any]) -> Patient:
 
 
 def _request_to_dict(r: BedRequest) -> dict[str, Any]:
-    return {"rid": r.rid, "pid": r.patient.pid, "rtype": r.rtype.value, "priority": r.priority,
-            "created_at": r.created_at, "from_ed": r.from_ed, "placed_at": r.placed_at,
-            "unit": None if r.unit is None else r.unit.value}
+    return {
+        "rid": r.rid,
+        "pid": r.patient.pid,
+        "rtype": r.rtype.value,
+        "priority": r.priority,
+        "created_at": r.created_at,
+        "from_ed": r.from_ed,
+        "placed_at": r.placed_at,
+        "unit": None if r.unit is None else r.unit.value,
+    }
 
 
 def _request_from_dict(d: dict[str, Any], patients: list[Patient]) -> BedRequest:
-    return BedRequest(d["rid"], patients[d["pid"]], RequestType(d["rtype"]), d["priority"],
-                      d["created_at"], d["from_ed"], d["placed_at"],
-                      None if d["unit"] is None else Unit(d["unit"]))
+    return BedRequest(
+        d["rid"],
+        patients[d["pid"]],
+        RequestType(d["rtype"]),
+        d["priority"],
+        d["created_at"],
+        d["from_ed"],
+        d["placed_at"],
+        None if d["unit"] is None else Unit(d["unit"]),
+    )
 
 
 def _categorical(probs: tuple[float, ...], u: float) -> int:
@@ -857,7 +947,7 @@ def _categorical(probs: tuple[float, ...], u: float) -> int:
         cumulative += p
         if u < cumulative:
             return i
-    return len(probs) - 1           # guards against probabilities summing to 1 - eps
+    return len(probs) - 1  # guards against probabilities summing to 1 - eps
 
 
 def _mean(values: list[float]) -> float:

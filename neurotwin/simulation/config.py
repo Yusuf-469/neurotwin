@@ -40,7 +40,9 @@ class DistributionSpec:
 
     def __post_init__(self) -> None:
         if self.dist not in _SUPPORTED_DISTS:
-            raise ValueError(f"unsupported distribution {self.dist!r}; use one of {_SUPPORTED_DISTS}")
+            raise ValueError(
+                f"unsupported distribution {self.dist!r}; use one of {_SUPPORTED_DISTS}"
+            )
         if self.mean < 0:
             raise ValueError("mean must be non-negative")
         if self.dist == "lognormal" and (self.mean <= 0 or self.sd <= 0):
@@ -74,8 +76,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
     "B": ScenarioConfig("B_high_demand", arrival_multiplier=1.10),
     "C": ScenarioConfig("C_staff_shortage", staff_multiplier=0.88),
     "D": ScenarioConfig("D_capacity_loss", capacity_multiplier=0.88),
-    "E": ScenarioConfig("E_combined", arrival_multiplier=1.08, staff_multiplier=0.90,
-                        capacity_multiplier=0.90),
+    "E": ScenarioConfig(
+        "E_combined", arrival_multiplier=1.08, staff_multiplier=0.90, capacity_multiplier=0.90
+    ),
 }
 
 # The v2.0 values, retained as the "severe overload" extension (offered load 1.3-1.9): every
@@ -85,8 +88,9 @@ SEVERE_SCENARIOS: dict[str, ScenarioConfig] = {
     "B_severe": ScenarioConfig("B_severe_demand", arrival_multiplier=1.35),
     "C_severe": ScenarioConfig("C_severe_staff", staff_multiplier=0.65),
     "D_severe": ScenarioConfig("D_severe_capacity", capacity_multiplier=0.6),
-    "E_severe": ScenarioConfig("E_severe_combined", arrival_multiplier=1.25,
-                               staff_multiplier=0.7, capacity_multiplier=0.6),
+    "E_severe": ScenarioConfig(
+        "E_severe_combined", arrival_multiplier=1.25, staff_multiplier=0.7, capacity_multiplier=0.6
+    ),
 }
 
 
@@ -186,10 +190,14 @@ class SimulationConfig:
         for name in ("priority_probs_emergency", "priority_probs_elective"):
             _check_probs(getattr(self, name), name)
         if len(self.icu_first_prob) != NUM_PRIORITIES or not all(
-                0 <= p <= 1 for p in self.icu_first_prob):
+            0 <= p <= 1 for p in self.icu_first_prob
+        ):
             raise ValueError("icu_first_prob needs 5 probabilities in [0, 1]")
-        for name in ("specialty_prob_med_emergency", "specialty_prob_med_elective",
-                     "staff_absence_prob"):
+        for name in (
+            "specialty_prob_med_emergency",
+            "specialty_prob_med_elective",
+            "staff_absence_prob",
+        ):
             if not 0 <= getattr(self, name) <= 1:
                 raise ValueError(f"{name} must be in [0, 1]")
         for name in ("beds", "nurses", "patients_per_nurse"):
@@ -202,7 +210,9 @@ class SimulationConfig:
             raise ValueError("ed_capacity must be >= 1 or null (unlimited)")
         if self.deterioration_hazard_per_day < 0 or self.off_service_los_multiplier <= 0:
             raise ValueError("invalid deterioration hazard or off-service multiplier")
-        if len(self.priority_weights) != NUM_PRIORITIES or any(w < 0 for w in self.priority_weights):
+        if len(self.priority_weights) != NUM_PRIORITIES or any(
+            w < 0 for w in self.priority_weights
+        ):
             raise ValueError("priority_weights needs 5 non-negative values")
         for name in ("step_down_priority", "escalation_priority"):
             if not 1 <= getattr(self, name) <= NUM_PRIORITIES:
@@ -210,16 +220,29 @@ class SimulationConfig:
 
 
 def load_default_config() -> SimulationConfig:
+    """SimulationConfig from config/simulation_default.json."""
     return SimulationConfig.from_json(DEFAULT_CONFIG_PATH)
 
 
 # ---------------------------------------------------------------------- helpers
 
-_DIST_FIELDS = ("ed_treatment", "general_los", "icu_los", "escalation_icu_los",
-                "post_icu_general_los")
-_TUPLE_FIELDS = ("hourly_profile", "weekly_profile", "elective_weekdays", "elective_hours",
-                 "priority_probs_emergency", "priority_probs_elective", "icu_first_prob",
-                 "priority_weights")
+_DIST_FIELDS = (
+    "ed_treatment",
+    "general_los",
+    "icu_los",
+    "escalation_icu_los",
+    "post_icu_general_los",
+)
+_TUPLE_FIELDS = (
+    "hourly_profile",
+    "weekly_profile",
+    "elective_weekdays",
+    "elective_hours",
+    "priority_probs_emergency",
+    "priority_probs_elective",
+    "icu_first_prob",
+    "priority_weights",
+)
 
 
 def _coerce(values: Mapping[str, Any]) -> dict[str, Any]:

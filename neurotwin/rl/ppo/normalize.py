@@ -11,6 +11,8 @@ import numpy as np
 
 
 class RunningMeanStd:
+    """Running mean/variance normaliser with clipping; can be frozen."""
+
     def __init__(self, shape: tuple[int, ...], clip: float = 10.0, epsilon: float = 1e-4) -> None:
         self.mean = np.zeros(shape, dtype=np.float64)
         self.var = np.ones(shape, dtype=np.float64)
@@ -26,7 +28,7 @@ class RunningMeanStd:
         delta = b_mean - self.mean
         total = self.count + b_count
         self.mean = self.mean + delta * b_count / total
-        m2 = self.var * self.count + b_var * b_count + delta ** 2 * self.count * b_count / total
+        m2 = self.var * self.count + b_var * b_count + delta**2 * self.count * b_count / total
         self.var = m2 / total
         self.count = total
 
@@ -35,8 +37,12 @@ class RunningMeanStd:
         return np.clip(z, -self.clip, self.clip).astype(np.float32)
 
     def state_dict(self) -> dict:
-        return {"mean": self.mean.tolist(), "var": self.var.tolist(), "count": self.count,
-                "clip": self.clip}
+        return {
+            "mean": self.mean.tolist(),
+            "var": self.var.tolist(),
+            "count": self.count,
+            "clip": self.clip,
+        }
 
     @classmethod
     def from_state_dict(cls, d: dict) -> "RunningMeanStd":

@@ -4,8 +4,14 @@ import math
 
 import pytest
 
-from neurotwin.simulation import (SCENARIOS, HospitalSimulation, RequestType, Unit,
-                                  load_default_config, run_episode)
+from neurotwin.simulation import (
+    SCENARIOS,
+    HospitalSimulation,
+    RequestType,
+    Unit,
+    load_default_config,
+    run_episode,
+)
 from neurotwin.simulation.validation.reduced import GreedyPlacement
 
 from .helpers import IntermittentPolicy
@@ -20,6 +26,7 @@ def _run(policy, scenario="A", seed=0, config=CFG):
 
 
 # ---------------------------------------------------------------- reproducibility and CRN
+
 
 def test_same_seed_same_result_different_seed_differs():
     _, r1 = _run(GreedyPlacement(), seed=5)
@@ -36,9 +43,19 @@ def test_crn_patients_identical_across_policies():
     pa, pb = list(sim_a.patient_log()), list(sim_b.patient_log())
     n = min(len(pa), len(pb))
     assert n > 200
-    attrs = ("arrival_time", "is_emergency", "priority", "specialty", "icu_first",
-             "ed_treatment_time", "icu_los", "general_los", "escalation_icu_los",
-             "post_icu_general_los", "deterioration_delay")
+    attrs = (
+        "arrival_time",
+        "is_emergency",
+        "priority",
+        "specialty",
+        "icu_first",
+        "ed_treatment_time",
+        "icu_los",
+        "general_los",
+        "escalation_icu_los",
+        "post_icu_general_los",
+        "deterioration_delay",
+    )
     for x, y in zip(pa[:n], pb[:n]):
         assert all(getattr(x, a) == getattr(y, a) for a in attrs)
     # Arrival processes do not depend on the policy, so both runs see every arrival.
@@ -63,6 +80,7 @@ def test_tracing_does_not_change_the_run():
 
 # ---------------------------------------------------------------- exact accounting
 
+
 @pytest.mark.parametrize("policy", [GreedyPlacement(), IntermittentPolicy(period=4)])
 def test_time_integrals_equal_sum_of_individual_waits(policy):
     """Sample-path identity behind Little's law and the reward (RESEARCH.md §6.10, §6.17):
@@ -79,7 +97,7 @@ def test_time_integrals_equal_sum_of_individual_waits(policy):
         if r.from_ed and r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU):
             boarding += wait
         measured += max(0.0, end - max(r.created_at, warmup))
-    assert total > 100                                           # non-trivial queueing
+    assert total > 100  # non-trivial queueing
     assert sim.acc.request_hours == pytest.approx(total, rel=1e-9)
     assert sim.acc.weighted_request_hours == pytest.approx(weighted, rel=1e-9)
     assert sim.acc.ed_boarding_hours == pytest.approx(boarding, rel=1e-9)
@@ -93,10 +111,11 @@ def test_counters_match_logs():
     off = sum(1 for r in placed if r.unit is not Unit.ICU and r.unit is not r.patient.specialty)
     assert sim.acc.off_service_placements == off
     assert sim.acc.diversions == sum(p.diverted for p in sim.patient_log())
-    assert result.diversions > 0                                  # scenario E is congested
+    assert result.diversions > 0  # scenario E is congested
 
 
 # ---------------------------------------------------------------- placement rules
+
 
 class _CheckingPolicy:
     """Greedy policy that asserts engine invariants at every decision."""
@@ -112,7 +131,7 @@ class _CheckingPolicy:
             assert sim.ed_count <= sim.config.ed_capacity
         for req in sim.waiting_requests():
             assert req.rtype.needs_icu == (req.eligible_units == (Unit.ICU,))
-            assert not hasattr(req, "patient")                    # no hidden information
+            assert not hasattr(req, "patient")  # no hidden information
         self.decisions += 1
         return self.greedy.decide(sim)
 
@@ -127,17 +146,17 @@ def test_invariants_hold_at_every_decision(scenario):
 def test_place_rejects_invalid_requests():
     sim = HospitalSimulation(CFG, seed=0)
     with pytest.raises(RuntimeError):
-        sim.place(0, Unit.MED)                                    # no epoch open yet
+        sim.place(0, Unit.MED)  # no epoch open yet
     while sim.next_epoch():
         icu = [r for r in sim.waiting_requests() if r.rtype.needs_icu]
         if icu:
             with pytest.raises(ValueError):
-                sim.place(icu[0].rid, Unit.MED)                   # ineligible unit
+                sim.place(icu[0].rid, Unit.MED)  # ineligible unit
             break
     else:
         pytest.fail("no ICU request occurred")
     with pytest.raises(KeyError):
-        sim.place(10 ** 9, Unit.ICU)
+        sim.place(10**9, Unit.ICU)
 
 
 def test_off_service_multiplies_los_and_deterioration_leads_to_escalation():
@@ -146,8 +165,12 @@ def test_off_service_multiplies_los_and_deterioration_leads_to_escalation():
     checked_off = checked_on = 0
     for r in sim.request_log():
         p = r.patient
-        if (r.rtype is RequestType.ADMIT_GENERAL and r.unit is not None and not p.has_deteriorated
-                and not math.isnan(p.discharged_at)):
+        if (
+            r.rtype is RequestType.ADMIT_GENERAL
+            and r.unit is not None
+            and not p.has_deteriorated
+            and not math.isnan(p.discharged_at)
+        ):
             expected = p.general_los * (1.5 if r.unit is not p.specialty else 1.0)
             assert p.discharged_at - r.placed_at == pytest.approx(expected)
             checked_off += r.unit is not p.specialty
@@ -162,6 +185,6 @@ def test_off_service_multiplies_los_and_deterioration_leads_to_escalation():
 
 def test_capacity_scenario_scales_beds():
     sim = HospitalSimulation(CFG, SCENARIOS["D"], seed=0)
-    assert sim.physical_beds[Unit.MED] == 63                      # 72 * 0.88 = 63.36
+    assert sim.physical_beds[Unit.MED] == 63  # 72 * 0.88 = 63.36
     nurses, doctors = HospitalSimulation(CFG, SCENARIOS["C"], seed=0).nominal_staff
-    assert doctors == 4 and nurses[Unit.ICU] == 5                 # 5*0.88=4.4, 6*0.88=5.28
+    assert doctors == 4 and nurses[Unit.ICU] == 5  # 5*0.88=4.4, 6*0.88=5.28
