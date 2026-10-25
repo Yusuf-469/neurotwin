@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.4 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.5 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -728,8 +728,8 @@ C's load is the closest achievable to 1.02: nurse counts are integers, so 0.90×
 ### Metrics
 | Metric | Direction | Role |
 |---|---|---|
-| Mean boarding time (bed request → placement, ED requests) | Lower | **Primary** |
-| 90th-percentile boarding time | Lower | **Primary** |
+| Mean boarding time (bed request → placement, ED requests; **censoring-inclusive**: requests still waiting at the horizon count with horizon − request time, a lower bound) | Lower | **Primary** |
+| 90th-percentile boarding time (censoring-inclusive) | Lower | **Primary** |
 | Diversion rate (per 100 arrivals) | Lower | **Primary** |
 | Off-service placement rate (per 100 general placements) | Lower | **Primary** |
 | Wait-threshold breach rate (`e > W_max`) | Lower | Secondary |
@@ -860,6 +860,9 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.5 — 2026-10-26 (Stage 6 protocol amendment; `docs/stage6_evaluation_report.md` §2)
+- **Deviation from the pre-registered protocol (commit b762841):** the boarding metrics are now censoring-inclusive. During the single test run, the NaN guard stopped the analysis, because in one PPO episode (scenario B) no ED request created in the measurement window was placed. A definedness audit, which printed counts only and no performance values, showed that requests still waiting at the horizon occur in 84–100% of stressed episodes for every policy. The pre-registered placed-only mean ignored them, which **rewards** leaving hard patients waiting. The amendment applies uniformly to all policies and is conservative against policies that leave patients waiting; the placed-only version is retained as a secondary metric. J is unaffected (it integrates waiting time and was always censoring-robust). The episodes were recomputed deterministically with the same seeds.
 
 ### v2.4 — 2026-10-26 (Stage 5; `docs/stage5_rl_report.md`)
 - PPO validation gates 1–3 passed (§6.18)

@@ -56,6 +56,31 @@ def test_hierarchical_bootstrap_widens_with_agent_variance():
     assert (loose[2] - loose[1]) > 1.5 * (tight[2] - tight[1])
 
 
+def test_boarding_metric_counts_patients_still_waiting():
+    """A policy that never places anyone must get the worst boarding, not an undefined one."""
+    from neurotwin.experiments.metrics import episode_metrics
+    from neurotwin.experiments.objective import CostWeights
+    from neurotwin.simulation import SCENARIOS, HospitalSimulation, load_default_config, run_episode
+    from neurotwin.simulation.entities import RequestType
+
+    class NeverPlace:
+        def decide(self, sim):
+            return None
+
+    # Short warm-up: with nobody placed, the ED fills within ~1.5 days and every later arrival
+    # is diverted, so requests are only created early.
+    cfg = load_default_config().with_overrides(horizon_hours=300.0, warmup_hours=1.0)
+    sim = HospitalSimulation(cfg, SCENARIOS["A"], seed=1)
+    run_episode(sim, NeverPlace())
+    m = episode_metrics(sim, CostWeights.load())
+    expected = [cfg.horizon_hours - r.created_at for r in sim.request_log()
+                if r.created_at >= cfg.warmup_hours and r.from_ed
+                and r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU)]
+    assert m["mean_boarding_h"] == pytest.approx(np.mean(expected))
+    assert m["censored_ed_requests"] == len(expected) > 10
+    assert np.isnan(m["mean_boarding_placed_only_h"])          # the flawed version is undefined
+
+
 def test_end_to_end_on_validation_seeds(tmp_path):
     """Runner + analysis on 3 validation seeds, short episodes, untrained-free policies only."""
     from neurotwin.experiments.statistics import Comparison
