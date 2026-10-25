@@ -8,8 +8,15 @@ Design rules
 * Sessions are in-memory (single-user research tool; no database needed, ARCHITECTURE.md §14).
 * Inputs are bounded (step length, what-if futures and horizon) so a request cannot run for
   hours.
-* The explanation endpoint uses the offline template explainer. No LLM provider is configured
-  (connecting one requires the project owner's confirmation, AGENTS.md).
+* Explanations: if an LLM backend is configured through hosting secrets (a free
+  OpenAI-compatible provider via ``NEUROTWIN_LLM_*``, or Claude via ``ANTHROPIC_API_KEY``;
+  never in code), the guarded LLM explainer is used, with a global hourly cap
+  (``NEUROTWIN_LLM_MAX_PER_HOUR``, default 60) and a per-decision cache, so a public site
+  cannot run up unbounded cost. Otherwise, or when the cap is reached, the offline template
+  explainer is used.
+* At most MAX_SESSIONS sessions are kept; the oldest is evicted first (public hosting).
+* If a built dashboard exists (``dashboard/out`` or ``NEUROTWIN_STATIC_DIR``), it is served at
+  ``/`` by the same process, so the API and UI share one URL.
 
 Run: uvicorn neurotwin.api.app:app --port 8000
 """
@@ -18,17 +25,39 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 import uuid
+from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ..digital_twin.state import observe
-from ..explanation import TemplateExplainer
+from ..explanation import LLMExplainer, TemplateExplainer
+from ..explanation.anthropic_client import llm_configured as claude_configured
+from ..explanation.openai_compatible import OpenAICompatibleClient, openai_compatible_configured
+
+
+def llm_configured() -> bool:
+    """True when any LLM backend is configured (free OpenAI-compatible provider or Claude)."""
+    return openai_compatible_configured() or claude_configured()
+
+
+def _make_llm_client():
+    """The configured LLM client: the free OpenAI-compatible provider first, then Claude."""
+    if openai_compatible_configured():
+        return OpenAICompatibleClient.from_env()
+    from ..explanation.anthropic_client import AnthropicLLMClient
+
+    return AnthropicLLMClient()
+
+
 from ..experiments.metrics import episode_metrics
 from ..experiments.objective import CostWeights
 from ..policies import POLICY_CLASSES, DecisionLog, LoggingPolicy, load_baseline_params, make_policy
@@ -50,6 +79,9 @@ AGENT_PATH = Path(
 MAX_STEP_HOURS = 24 * 14
 MAX_FUTURES = 50
 MAX_WHATIF_HOURS = 24 * 14
+MAX_SESSIONS = 200
+LLM_MAX_PER_HOUR = int(os.environ.get("NEUROTWIN_LLM_MAX_PER_HOUR", "60"))
+STATIC_DIR = Path(os.environ.get("NEUROTWIN_STATIC_DIR", ROOT / "dashboard" / "out"))
 
 ALL_SCENARIOS = {**SCENARIOS, **SEVERE_SCENARIOS}
 
@@ -85,7 +117,33 @@ class Session:
     history: list[dict[str, Any]] = field(default_factory=list)
 
 
-SESSIONS: dict[str, Session] = {}
+SESSIONS: "OrderedDict[str, Session]" = OrderedDict()
+
+
+def _store(sid: str, session: Session) -> None:
+    """Add or refresh a session, evicting the least recently used beyond MAX_SESSIONS."""
+    SESSIONS[sid] = session
+    SESSIONS.move_to_end(sid)
+    while len(SESSIONS) > MAX_SESSIONS:
+        SESSIONS.popitem(last=False)
+
+
+# LLM explanations (only if a key is configured): per-decision cache and a global hourly cap.
+_LLM_CACHE: dict[tuple[str, int], dict[str, Any]] = {}
+_LLM_CALLS: deque[float] = deque()
+_LLM_LOCK = threading.Lock()
+
+
+def _llm_budget_available() -> bool:
+    """Reserve one LLM call if fewer than LLM_MAX_PER_HOUR were made in the last hour."""
+    with _LLM_LOCK:
+        now = time.monotonic()
+        while _LLM_CALLS and now - _LLM_CALLS[0] > 3600:
+            _LLM_CALLS.popleft()
+        if len(_LLM_CALLS) >= LLM_MAX_PER_HOUR:
+            return False
+        _LLM_CALLS.append(now)
+        return True
 
 
 def _new_session(scenario: str, seed: int, policy: str) -> Session:
@@ -114,7 +172,8 @@ def _history_point(sim: HospitalSimulation) -> dict[str, Any]:
 
 def _get(sid: str) -> Session:
     if sid not in SESSIONS:
-        raise HTTPException(404, "unknown session")
+        raise HTTPException(404, "unknown session (it may have expired)")
+    SESSIONS.move_to_end(sid)
     return SESSIONS[sid]
 
 
@@ -164,7 +223,7 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     """Liveness check; also returns the simulation label."""
-    return {"status": "ok", "label": SIMULATION_LABEL}
+    return {"status": "ok", "label": SIMULATION_LABEL, "llm_explanations": llm_configured()}
 
 
 @app.get("/api/policies")
@@ -187,7 +246,7 @@ def start(body: StartRequest) -> dict[str, Any]:
     """Create a session: new simulation with the chosen scenario, seed and policy."""
     session = _new_session(body.scenario, body.seed, body.policy)
     sid = uuid.uuid4().hex[:12]
-    SESSIONS[sid] = session
+    _store(sid, session)
     return {"session_id": sid, **_status(session)}
 
 
@@ -210,7 +269,7 @@ def step(sid: str, body: StepRequest) -> dict[str, Any]:
 def reset(sid: str) -> dict[str, Any]:
     """Restart the session with its original scenario, seed and policy."""
     old = _get(sid)
-    SESSIONS[sid] = _new_session(old.scenario, old.seed, old.policy_name)
+    _store(sid, _new_session(old.scenario, old.seed, old.policy_name))
     return _status(SESSIONS[sid])
 
 
@@ -257,14 +316,28 @@ def decisions(sid: str, limit: int = 50) -> dict[str, Any]:
 
 @app.get("/api/simulation/{sid}/explanations/{decision_id}")
 def explanation(sid: str, decision_id: int) -> dict[str, Any]:
-    """Post-hoc template explanation of one logged decision."""
+    """Post-hoc explanation of one logged decision (template by default; guarded LLM if a key
+    is configured and the hourly cap allows)."""
     records = _get(sid).policy.log.records
     if not 0 <= decision_id < len(records):
         raise HTTPException(404, "unknown decision")
-    return {
-        "label": SIMULATION_LABEL,
-        "explanation": TemplateExplainer().explain(records[decision_id]).as_dict(),
-    }
+    record = records[decision_id]
+    key = (sid, decision_id)
+    if llm_configured():
+        if key in _LLM_CACHE:
+            return {"label": SIMULATION_LABEL, "explanation": _LLM_CACHE[key]}
+        if _llm_budget_available():
+            try:
+                result = LLMExplainer(_make_llm_client()).explain(record).as_dict()
+            except Exception as exc:  # client construction failure: fall back, never 500
+                result = TemplateExplainer().explain(record).as_dict()
+                result["verification_issues"] = [f"LLM unavailable ({type(exc).__name__})"]
+            _LLM_CACHE[key] = result
+            return {"label": SIMULATION_LABEL, "explanation": result}
+        result = TemplateExplainer().explain(record).as_dict()
+        result["verification_issues"] = ["hourly LLM limit reached; template explanation used"]
+        return {"label": SIMULATION_LABEL, "explanation": result}
+    return {"label": SIMULATION_LABEL, "explanation": TemplateExplainer().explain(record).as_dict()}
 
 
 @app.post("/api/simulation/{sid}/whatif")
@@ -313,3 +386,9 @@ def experiment_results() -> dict[str, Any]:
         path = ROOT / rel
         out[key] = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
     return out
+
+
+# Serve the built dashboard (static export) from the same process, if present. Mounted last so
+# that every /api route takes precedence.
+if STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="dashboard")

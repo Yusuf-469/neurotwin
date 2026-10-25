@@ -1,7 +1,8 @@
 // Typed client for the NeuroTwin API (neurotwin/api/app.py).
-// The API base URL comes from NEXT_PUBLIC_API_URL (default: local uvicorn on port 8000).
+// Production (static export served by FastAPI): same origin, so the base URL is "".
+// Development (`npm run dev`): .env.development points at the local API on port 8000.
 
-export const API_URL: string = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL: string = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export interface Status {
   label: string;
@@ -122,10 +123,22 @@ export interface Comparison {
   d_z: number;
 }
 
+export interface JComparison {
+  scenario: string;
+  baseline: string;
+  ppo_mean: number;
+  baseline_mean: number;
+  diff: number;
+  ci_low: number;
+  ci_high: number;
+  rel_diff_pct: number;
+}
+
 export interface StudyResults {
   label: string;
   summary: SummaryEntry[] | null;
   comparisons: Comparison[] | null;
+  J_comparisons: JComparison[] | null;
   robustness: { robustness_index: Record<string, { estimate: number; ci: [number, number] }> } | null;
   crn_check: { metric: string; baseline: string; width_ratio_independent_over_paired: number; variance_reduction: number }[] | null;
   structure: Record<string, { n_states: number; spearman_rho: number; bins: { free_beds: string | number; mean_p_hold: number }[] }> | null;
@@ -137,8 +150,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
+    // FastAPI errors: {"detail": "..."} or {"detail": [{"msg": "..."}]}; show the message only.
+    let message = res.statusText;
+    try {
+      const body = (await res.json()) as { detail?: string | { msg: string }[] };
+      if (typeof body.detail === "string") message = body.detail;
+      else if (Array.isArray(body.detail)) message = body.detail.map((d) => d.msg).join("; ");
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(`Request failed (${res.status}): ${message}`);
   }
   return (await res.json()) as T;
 }

@@ -3,6 +3,14 @@ __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
-results/
 results_*.txt
 results_*.err
+
+# Training outputs are regenerable and ignored, except the five final PPO agents (52 KB each),
+# which the hosted demo and the Stage 6 evaluation depend on.
+results/*
+!results/ppo/
+results/ppo/*
+!results/ppo/final_A/
+results/ppo/final_A/*
+!results/ppo/final_A/agent_*.pt
