@@ -468,8 +468,14 @@ class HospitalSimulation:
         sim.trace = [(t, {Unit(u): n for u, n in occ.items()}, w) for t, occ, w in snap["trace"]]
         return sim
 
-    def branch(self, seed: int, resample_in_progress: bool = True) -> "HospitalSimulation":
+    def branch(self, seed: int, resample_in_progress: bool = True,
+               scenario: ScenarioConfig | None = None) -> "HospitalSimulation":
         """What-if branch (RESEARCH.md §6.21): same present, new future randomness.
+
+        With ``scenario``, the branch also switches to new operating conditions from now on:
+        future arrival rates, nominal staffing (applied from the next shift change) and physical
+        beds. If beds are removed while occupied, the patients stay and no new placements are
+        possible in that unit until occupancy falls below capacity (same rule as staffing).
 
         The returned simulation shares this run's present state but draws all *future*
         randomness from streams for ``seed`` in the branch namespace: future arrivals, staffing
@@ -485,6 +491,8 @@ class HospitalSimulation:
             raise RuntimeError("cannot branch a finished simulation")
         sim = self.clone()
         sim.branch_seed = seed
+        if scenario is not None:
+            sim._apply_scenario(scenario)
         sim._set_streams(RandomStreams(seed, BRANCH_NAMESPACE))
         entries = [e for e in sim._queue.entries()
                    if e[1] not in (EventKind.EMERGENCY_ARRIVAL, EventKind.ELECTIVE_ARRIVAL)]
@@ -493,6 +501,28 @@ class HospitalSimulation:
         sim._push_next_arrival(sim._em_arrivals, sim.now, EventKind.EMERGENCY_ARRIVAL)
         sim._push_next_arrival(sim._el_arrivals, sim.now, EventKind.ELECTIVE_ARRIVAL)
         return sim
+
+    def set_measurement_window(self, start: float, end: float) -> None:
+        """Measure from ``start`` to ``end`` (what-if analysis): replaces warm-up and horizon,
+        and resets every measured accumulator, counter and metric list. Only valid before any
+        part of the new window has elapsed (start >= now)."""
+        if start < self.now or end <= start:
+            raise ValueError("need now <= start < end")
+        self.config = self.config.with_overrides(warmup_hours=start, horizon_hours=end)
+        self._measured = Accumulators()
+        self._m_emergency_arrivals = 0
+        self._m_general_placements = 0
+        self._boarding_times, self._elective_waits, self._ed_waits = [], [], []
+        self._finished = False
+
+    def _apply_scenario(self, scenario: ScenarioConfig) -> None:
+        cfg = self.config
+        self.scenario = scenario
+        self.physical_beds = {u: round_half_up(cfg.beds[u.value] * scenario.capacity_multiplier)
+                              for u in Unit}
+        self._nominal_nurses = {u: round_half_up(cfg.nurses[u.value] * scenario.staff_multiplier)
+                                for u in Unit}
+        self._nominal_doctors = round_half_up(cfg.doctors * scenario.staff_multiplier)
 
     def _set_streams(self, streams: RandomStreams) -> None:
         self._streams = streams

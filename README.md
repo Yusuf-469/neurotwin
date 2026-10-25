@@ -14,8 +14,18 @@ A research simulation of hospital bed allocation. It compares a reinforcement-le
 | 4. Baseline policies | Complete: [report](docs/stage4_baselines_report.md) |
 | 5. RL environment and in-house PPO | Complete: [report](docs/stage5_rl_report.md) |
 | 6. Experimental evaluation (test seeds) | Complete: [report](docs/stage6_evaluation_report.md) |
-| 7. Robustness and generalisation analysis | Next |
-| 8–12 | Planned: [ROADMAP.md](ROADMAP.md) |
+| 7. Robustness and generalisation analysis | In progress (ablations training) |
+| 8–11. What-if, explanations, API, dashboard, integration | Complete: [report](docs/stage8_11_platform_report.md) |
+| 12. Documentation and presentation | Planned |
+
+## Running the platform
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn neurotwin.api.app:app --port 8000   # API
+cd dashboard; npm install; npm run build; npm run start                    # http://localhost:3000
+```
+The PPO policy in the dashboard needs a trained agent at `results/ppo/final_A/agent_1.pt`
+(`python -m neurotwin.experiments.train_ppo --name final_A --agents 5`, about 26 min per agent).
 
 ## Setup (Python 3.10+)
 

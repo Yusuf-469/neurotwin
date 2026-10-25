@@ -44,9 +44,14 @@ class HospitalAllocationEnv(gym.Env):
     def __init__(self, config: SimulationConfig | None = None,
                  scenario: ScenarioConfig | None = None, start_mode: str = "full",
                  pool: WarmStartPool | None = None, weights: CostWeights | None = None,
-                 reward_scale: float = 0.1, scenario_sampler=None) -> None:
+                 reward_scale: float = 0.1, scenario_sampler=None,
+                 drop_features: tuple[int, ...] = ()) -> None:
         """``scenario_sampler(rng) -> ScenarioConfig`` optionally draws a scenario per episode
-        (PPO-DR, RESEARCH.md §6.23); it must only produce training-range scenarios."""
+        (PPO-DR, RESEARCH.md §6.23); it must only produce training-range scenarios.
+
+        ``drop_features`` (0-based indices) are set to 0 in every observation (ablations,
+        RESEARCH.md §6.16). A constant input carries no information, so this is equivalent to
+        removing the feature while keeping the network shape fixed."""
         super().__init__()
         if start_mode not in ("full", "warm"):
             raise ValueError("start_mode must be 'full' or 'warm'")
@@ -63,6 +68,9 @@ class HospitalAllocationEnv(gym.Env):
         self.weights = weights or CostWeights.load()
         self.reward_scale = reward_scale
         self.scenario_sampler = scenario_sampler
+        self.drop_features = tuple(drop_features)
+        if any(not 0 <= i < N_FEATURES for i in self.drop_features):
+            raise ValueError("drop_features out of range")
         self.scales = FeatureScales.from_config(self.config)
         # Count and wait features have no natural upper bound (e.g. mean wait / 4 h under
         # stress), so the space is [-1, inf); PPO normalises observations with running stats.
@@ -128,7 +136,10 @@ class HospitalAllocationEnv(gym.Env):
         self._mask = action_mask(sim)
 
     def _obs(self) -> np.ndarray:
-        return features(self.sim, self.scales)
+        obs = features(self.sim, self.scales)
+        if self.drop_features:
+            obs[list(self.drop_features)] = 0.0
+        return obs
 
     def _info(self, dt: float) -> dict[str, Any]:
         return {"action_mask": self._mask.copy(), "dt_hours": dt, "time": self.sim.now}
