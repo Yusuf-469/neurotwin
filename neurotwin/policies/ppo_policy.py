@@ -35,7 +35,16 @@ class PPOPolicy(AllocationPolicy):
             # Scales come from the configuration (scenario-independent), see rl/features.py.
             self._scales = FeatureScales.from_config(sim.config)
         mask = action_mask(sim)
-        action = self.agent.act(features(sim, self._scales), mask, self.deterministic)
+        obs = features(sim, self._scales)
+        dropped = self.agent.meta.get("drop_features", [])
+        if dropped:
+            obs[dropped] = 0.0        # same feature ablation the agent was trained with
+        action = self.agent.act(obs, mask, self.deterministic)
+        # Decision-time details for the decision log / explanation layer (read-only).
+        probs = self.agent.action_probabilities(obs, mask)
+        self.last_details = {"chosen_action": Action(action).name,
+                             "action_probabilities": {Action(a).name: round(float(p), 4)
+                                                      for a, p in enumerate(probs) if mask[a]}}
         if action == Action.HOLD:
             return None
         return action_to_placement(sim, action)

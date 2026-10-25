@@ -631,47 +631,41 @@ class Explanation:
 
 ## 12. API Layer (`api/`)
 
-### 12.1 Endpoints
+### 12.1 Endpoints (as implemented in `neurotwin/api/app.py`)
 ```
-# Simulation
-POST   /api/simulation/start
-POST   /api/simulation/pause
-POST   /api/simulation/step
-POST   /api/simulation/reset
-GET    /api/simulation/status
-
-# State
-GET    /api/state/current
-GET    /api/state/history
-GET    /api/state/snapshot/{id}
-
-# Policies
-GET    /api/policies
-POST   /api/policies/{name}/evaluate
-
-# Experiments
-POST   /api/experiments/run
-GET    /api/experiments/{id}/status
-GET    /api/experiments/{id}/results
-GET    /api/experiments/{id}/statistics
-
-# What-If
-POST   /api/whatif/evaluate
-GET    /api/whatif/results/{id}
-
-# Explanations
-GET    /api/explanations/{decision_id}
-GET    /api/explanations/recent
+GET    /api/health
+GET    /api/policies                              # baselines (+ "ppo" if an agent exists)
+GET    /api/scenarios                             # A-E and severe-overload scenarios
+POST   /api/simulation/start                      # {scenario, seed, policy} -> session_id
+POST   /api/simulation/{sid}/step                 # {hours <= 336}; history every 4 h
+POST   /api/simulation/{sid}/reset
+GET    /api/simulation/{sid}/state                # observable HospitalState (+ metrics at end)
+GET    /api/simulation/{sid}/history
+GET    /api/simulation/{sid}/decisions?limit=     # decision log records
+GET    /api/simulation/{sid}/explanations/{id}    # post-hoc template explanation
+POST   /api/simulation/{sid}/whatif               # {horizon<=336, futures<=50, multipliers, policies}
+GET    /api/experiments/results                   # pre-computed Stage 6-7 results (read-only)
 ```
+Deviations from the original plan, with reasons:
+- Sessions replace global simulation state (several runs can coexist).
+- **No snapshot endpoint**: snapshots contain hidden patient attributes. Only observable state
+  is served.
+- Experiments are not launched through the API (they are long, CPU-heavy batch jobs run from
+  the command line with fixed seeds). The API serves their committed results.
+- Every result-bearing response carries a "SIMULATION RESULTS" label.
 
 ## 13. Dashboard Layer (`dashboard/`)
 
-### 13.1 Pages
-- `/` - Overview with key metrics
-- `/simulation` - Real-time state and controls
-- `/experiments` - Experiment configuration and results
-- `/whatif` - Counterfactual analysis interface
-- `/decisions` - Decision log with explanations
+### 13.1 Pages (as implemented in `dashboard/`, Next.js 15 + React 19 + TypeScript + Recharts 3)
+- `/`: overview and API connection status
+- `/simulation`: run controls, live state, occupancy/queue chart, **decision log with
+  explanations**, and **what-if panel**. Decisions and what-if are panels on this page rather
+  than separate pages, because both act on the current simulation session.
+- `/experiments`: pre-computed study results (test seeds), robustness, CRN narrowing and
+  learned-reservation structure
+
+A permanent banner on every page states that results are simulation outputs and that the tool
+is not clinical decision support.
 
 ### 13.2 Key Components
 - `SimulationControl`: Start/pause/step, speed slider

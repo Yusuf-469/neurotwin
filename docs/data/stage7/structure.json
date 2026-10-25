@@ -1,0 +1,116 @@
+{
+ "A": {
+  "n_states": 30267,
+  "bins": [
+   {
+    "free_beds": 1,
+    "n": 11918,
+    "mean_p_hold": 0.08800001960295664,
+    "share_argmax_hold": 0.07761369357274711
+   },
+   {
+    "free_beds": 2,
+    "n": 2433,
+    "mean_p_hold": 0.10723151998711095,
+    "share_argmax_hold": 0.10974106041923551
+   },
+   {
+    "free_beds": 3,
+    "n": 1896,
+    "mean_p_hold": 0.058075506608397595,
+    "share_argmax_hold": 0.05010548523206751
+   },
+   {
+    "free_beds": 4,
+    "n": 1766,
+    "mean_p_hold": 0.0365917768597494,
+    "share_argmax_hold": 0.03001132502831257
+   },
+   {
+    "free_beds": 5,
+    "n": 1604,
+    "mean_p_hold": 0.03153749822924449,
+    "share_argmax_hold": 0.02493765586034913
+   },
+   {
+    "free_beds": 6,
+    "n": 1287,
+    "mean_p_hold": 0.022711639913375714,
+    "share_argmax_hold": 0.020202020202020204
+   },
+   {
+    "free_beds": 7,
+    "n": 1176,
+    "mean_p_hold": 0.015823084796676736,
+    "share_argmax_hold": 0.008503401360544218
+   },
+   {
+    "free_beds": ">=8",
+    "n": 8187,
+    "mean_p_hold": 0.004664706233181086,
+    "share_argmax_hold": 0.001832172957127153
+   }
+  ],
+  "spearman_rho": -0.5084409241997918,
+  "spearman_p": 0.0,
+  "isotonic_r2_vs_flat": 0.9833722029980162,
+  "overall_share_argmax_hold": 0.04727921498661909
+ },
+ "E": {
+  "n_states": 24422,
+  "bins": [
+   {
+    "free_beds": 1,
+    "n": 14167,
+    "mean_p_hold": 0.26295546954438404,
+    "share_argmax_hold": 0.24768828968730147
+   },
+   {
+    "free_beds": 2,
+    "n": 3474,
+    "mean_p_hold": 0.38672484090310183,
+    "share_argmax_hold": 0.5331030512377662
+   },
+   {
+    "free_beds": 3,
+    "n": 2564,
+    "mean_p_hold": 0.3634468774500509,
+    "share_argmax_hold": 0.5198907956318253
+   },
+   {
+    "free_beds": 4,
+    "n": 1575,
+    "mean_p_hold": 0.34315690764491186,
+    "share_argmax_hold": 0.49206349206349204
+   },
+   {
+    "free_beds": 5,
+    "n": 1024,
+    "mean_p_hold": 0.3191864951507579,
+    "share_argmax_hold": 0.4453125
+   },
+   {
+    "free_beds": 6,
+    "n": 567,
+    "mean_p_hold": 0.3295543496664374,
+    "share_argmax_hold": 0.5114638447971781
+   },
+   {
+    "free_beds": 7,
+    "n": 407,
+    "mean_p_hold": 0.3101274233114061,
+    "share_argmax_hold": 0.4692874692874693
+   },
+   {
+    "free_beds": ">=8",
+    "n": 644,
+    "mean_p_hold": 0.2720572851651002,
+    "share_argmax_hold": 0.39285714285714285
+   }
+  ],
+  "spearman_rho": 0.21472059261676565,
+  "spearman_p": 1.1972465123312612e-252,
+  "isotonic_r2_vs_flat": 0.009339806399525474,
+  "overall_share_argmax_hold": 0.3545573663090656
+ }
+}

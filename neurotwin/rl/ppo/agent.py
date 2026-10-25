@@ -32,6 +32,13 @@ class PPOAgent:
             return int(dist.probs.argmax(dim=-1).item())
         return int(dist.sample().item())
 
+    @torch.no_grad()
+    def action_probabilities(self, obs: np.ndarray, mask: np.ndarray | None = None) -> np.ndarray:
+        x = torch.as_tensor(self.obs_rms.normalize(obs)).unsqueeze(0)
+        logits, _ = self.model(x)
+        m = None if mask is None else torch.as_tensor(mask, dtype=torch.bool).unsqueeze(0)
+        return masked_distribution(logits, m).probs[0].numpy()
+
     def save(self, path: str | Path) -> None:
         torch.save({"model": self.model.state_dict(),
                     "obs_rms": None if isinstance(self.obs_rms, IdentityNormalizer)

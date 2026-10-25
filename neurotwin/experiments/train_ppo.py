@@ -68,18 +68,34 @@ def evaluate(policy, seeds=VALIDATION) -> list[float]:
     return costs
 
 
-def train_agent(args: tuple[str, int, dict[str, Any]]) -> dict[str, Any]:
-    name, agent_seed, overrides = args
+def train_agent(args: tuple) -> dict[str, Any]:
+    """args = (name, agent_seed, ppo_overrides[, env_opts]).
+
+    env_opts (ablations, RESEARCH.md §6.16): ``drop_features`` (0-based indices), ``beta``,
+    ``kappa`` (reward weights) and ``uniform_omega`` (all priority weights 1 in the *training*
+    reward). Evaluation always uses the standard cost J.
+    """
+    name, agent_seed, overrides = args[:3]
+    env_opts = args[3] if len(args) > 3 else {}
     out = RESULTS / name
     out.mkdir(parents=True, exist_ok=True)
     config = load_ppo_config(overrides, seed=agent_seed)
-    pool = WarmStartPool.generate(load_default_config(), SCENARIOS["A"], range(MIN_TRAINING_POOL),
+    sim_config = load_default_config()
+    if env_opts.get("uniform_omega"):
+        sim_config = sim_config.with_overrides(priority_weights=[1.0] * 5)
+    base_w = CostWeights.load()
+    weights = CostWeights(base_w.alpha, env_opts.get("beta", base_w.beta),
+                          env_opts.get("kappa", base_w.kappa))
+    drop = tuple(env_opts.get("drop_features", ()))
+    pool = WarmStartPool.generate(sim_config, SCENARIOS["A"], range(MIN_TRAINING_POOL),
                                   GreedyPlacement())
     t0 = time.perf_counter()
-    agent, log = train([lambda: HospitalAllocationEnv(start_mode="warm", pool=pool)] * config.n_envs,
-                       config, episode_seeds(agent_seed))
+    agent, log = train([lambda: HospitalAllocationEnv(sim_config, start_mode="warm", pool=pool,
+                                                      weights=weights, drop_features=drop)]
+                       * config.n_envs, config, episode_seeds(agent_seed))
     train_s = time.perf_counter() - t0
-    agent.meta.update({"name": name, "agent_seed": agent_seed, "train_seconds": train_s})
+    agent.meta.update({"name": name, "agent_seed": agent_seed, "train_seconds": train_s,
+                       "drop_features": list(drop), "env_opts": env_opts})
     agent.save(out / f"agent_{agent_seed}.pt")
     (out / f"log_{agent_seed}.json").write_text(json.dumps(
         {"updates": log.updates, "episode_returns": log.episode_returns}), encoding="utf-8")

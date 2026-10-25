@@ -33,15 +33,26 @@ class LoggingPolicy:
         self.log = log or DecisionLog()
 
     def decide(self, sim: HospitalSimulation) -> tuple[int, Unit] | None:
+        from ..rl.actions import Action, action_mask   # local import avoids a package cycle
+
         waiting = sim.waiting_requests()
+        feasible = [Action(a).name for a, ok in enumerate(action_mask(sim)) if ok]
         decision = self.policy.decide(sim)
         record: dict[str, Any] = {
+            "decision_id": len(self.log.records),
             "time": sim.now,
             "policy": getattr(self.policy, "name", type(self.policy).__name__),
             "free_staffed": {u.value: sim.free_staffed(u) for u in Unit},
             "n_waiting": len(waiting),
             "n_waiting_high_priority": sum(r.priority <= 2 for r in waiting),
+            "waiting_by_priority": {str(p): sum(r.priority == p for r in waiting)
+                                    for p in range(1, 6)},
+            "oldest_wait_hours": max((sim.now - r.created_at for r in waiting), default=0.0),
+            "feasible_actions": feasible,
         }
+        details = getattr(self.policy, "last_details", None)
+        if details:
+            record["policy_details"] = details
         if decision is None:
             record["action"] = "HOLD"
         else:
