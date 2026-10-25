@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.5 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.6 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -641,6 +641,19 @@ Constrained MDP: minimise expected waiting and off-service cost subject to `E[di
 
 Run only after the core experiment matrix is complete.
 
+### v2.6 redesign: λ-conditioned policy with online dual ascent (pre-registered 2026-10-26, before any run)
+
+**Flaw in the design above.** If λ is adapted only during training, and training uses scenario A only, the deployed policy has a frozen λ. That policy is simply PPO with a diversion penalty chosen by dual ascent instead of by hand. Its behaviour under stress cannot differ in kind from fixed-β PPO, so the hypothesis cannot be tested.
+
+**Redesign (constraint-conditioned policy).**
+- *Training (scenario A, training seeds only, same hyperparameters as the final PPO, K = 5 agents):* each episode draws λ ~ U[0, 100] (independent stream from the episode seed). The episode reward uses λ in place of β, and λ/100 is appended to the observation (22 inputs). One network therefore represents a family of trade-off policies, indexed by λ.
+- *Deployment (online dual ascent):* the controller starts at λ₀ = 20 (the fixed-β value). Every 24 simulated hours it sets λ ← clip(λ + η·(d − c), 0, 100), where d is the diversions per 100 emergency arrivals over the last 24 h, c = **3 per 100** (budget) and η = **5**. Under stress d rises, so λ rises and the policy shifts toward avoiding diversions *while running*. This is the adaptation the original design lacked.
+- *Comparison (test seeds 200000–200049, scenarios A–E, paired):* λ-PPO vs fixed-β PPO (final_A). Reported: diversions per 100, the share of episodes meeting the budget, mean and 90th-percentile boarding, off-service rate, and J (standard weights; J is not what λ-PPO optimises when λ ≠ 20, so it is reported as context).
+
+**Hypothesis (unchanged in substance):** under stress, λ-PPO keeps diversions closer to the budget than fixed-β PPO, at a measurable cost in waiting and/or off-service placement.
+
+All parameters above (λ range, λ₀, c, η, update interval) are fixed here before training or evaluation, and are not tuned on test seeds.
+
 ## 6.20 Policy-Structure Analysis (RQ4)
 
 1. On test-seed trajectories, record PPO's action probabilities as a function of (free staffed beds in unit *k*, priority mix of waiting requests).
@@ -860,6 +873,9 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.6 — 2026-10-26 (constrained PPO redesign; §6.19)
+- **Pre-registered before any run.** The PPO-Lagrangian design in v2.0 learned a single fixed λ during scenario A training. At test time the multiplier was frozen, so the policy could not respond when stress raised diversions in scenarios B–E, and the comparison could not test what a constrained method claims to do. It is replaced by a λ-conditioned policy, with λ ~ U[0, 100] per training episode and λ/100 as a 22nd input, plus online projected dual ascent at deployment: λ0 = 20, updated every 24 h toward a budget of 3 diversions per 100 arrivals with step size 5. The controller sees only past arrival and diversion times, like every other policy. Training uses the same seeds, hyperparameters and scenario (A) as the final PPO. Evaluation uses test seeds in A–E, paired against fixed-β PPO (final_A), with Holm correction (`neurotwin/experiments/constrained.py`). The constants are in `neurotwin/rl/constrained.py`.
 
 ### v2.5 — 2026-10-26 (Stage 6 protocol amendment; `docs/stage6_evaluation_report.md` §2)
 - **Deviation from the pre-registered protocol (commit b762841):** the boarding metrics are now censoring-inclusive. During the single test run, the NaN guard stopped the analysis, because in one PPO episode (scenario B) no ED request created in the measurement window was placed. A definedness audit, which printed counts only and no performance values, showed that requests still waiting at the horizon occur in 84–100% of stressed episodes for every policy. The pre-registered placed-only mean ignored them, which **rewards** leaving hard patients waiting. The amendment applies uniformly to all policies and is conservative against policies that leave patients waiting; the placed-only version is retained as a secondary metric. J is unaffected (it integrates waiting time and was always censoring-robust). The episodes were recomputed deterministically with the same seeds.
