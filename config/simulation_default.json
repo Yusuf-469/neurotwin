@@ -1,0 +1,46 @@
+{
+  "_comment": "Default model parameters (RESEARCH.md v2 §6.6, §6.20). Every value here is a modelling ASSUMPTION chosen for plausibility, not an estimate from real hospital data. Keys starting with '_' are comments. Units: hours unless stated.",
+
+  "_episode": "21-day warm-up from an empty start, chosen by Welch's method with a 1-week window (docs/stage2_validation_report.md), then 14 measured days.",
+  "horizon_hours": 840.0,
+  "warmup_hours": 504.0,
+  "review_interval_hours": 4.0,
+  "shift_length_hours": 8.0,
+
+  "_arrivals": "Arrivals are patients who will need an inpatient bed (ED patients discharged home are not modelled). Base rates are mean rates per hour; profiles are relative and normalised to mean 1 on load.",
+  "emergency_base_rate": 0.875,
+  "elective_base_rate": 0.375,
+  "hourly_profile": [0.55, 0.45, 0.40, 0.37, 0.36, 0.40, 0.50, 0.70, 0.95, 1.20, 1.35, 1.40,
+                     1.40, 1.35, 1.30, 1.25, 1.25, 1.25, 1.20, 1.15, 1.05, 0.95, 0.80, 0.65],
+  "weekly_profile": [1.10, 1.00, 1.00, 1.00, 1.00, 0.95, 0.95],
+  "elective_weekdays": [0, 1, 2, 3, 4],
+  "elective_hours": [8, 16],
+
+  "_patients": "Priority 1 = most urgent. Probabilities are listed for priorities 1..5.",
+  "priority_probs_emergency": [0.05, 0.10, 0.50, 0.20, 0.15],
+  "priority_probs_elective": [0.0, 0.0, 0.0, 0.5, 0.5],
+  "icu_first_prob": [0.6, 0.3, 0.05, 0.0, 0.0],
+  "specialty_prob_med_emergency": 0.6,
+  "specialty_prob_med_elective": 0.3,
+
+  "_capacity": "Staffed capacity = min(physical beds, nurses on shift x patients per nurse).",
+  "beds": {"MED": 72, "SURG": 70, "ICU": 12},
+  "nurses": {"MED": 15, "SURG": 14, "ICU": 6},
+  "patients_per_nurse": {"MED": 5, "SURG": 5, "ICU": 2},
+  "doctors": 5,
+  "staff_absence_prob": 0.05,
+  "ed_capacity": 30,
+
+  "ed_treatment": {"dist": "lognormal", "mean": 3.0, "sd": 1.5},
+  "general_los": {"dist": "lognormal", "mean": 96.0, "sd": 72.0},
+  "icu_los": {"dist": "lognormal", "mean": 72.0, "sd": 48.0},
+  "escalation_icu_los": {"dist": "lognormal", "mean": 72.0, "sd": 48.0},
+  "post_icu_general_los": {"dist": "lognormal", "mean": 72.0, "sd": 48.0},
+  "deterioration_hazard_per_day": 0.01,
+  "off_service_los_multiplier": 1.1,
+
+  "_weights": "Reward/MIP priority weights omega for priorities 1..5 (RESEARCH.md §6.10).",
+  "priority_weights": [4.0, 3.0, 2.0, 1.0, 1.0],
+  "step_down_priority": 3,
+  "escalation_priority": 1
+}
