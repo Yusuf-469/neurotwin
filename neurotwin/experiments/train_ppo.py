@@ -94,6 +94,12 @@ def train_agent(args: tuple) -> dict[str, Any]:
         base_w.alpha, env_opts.get("beta", base_w.beta), env_opts.get("kappa", base_w.kappa)
     )
     drop = tuple(env_opts.get("drop_features", ()))
+    sampler = None
+    if env_opts.get("domain_randomization"):
+        from .ppo_dr import check_training_range, sample_scenario  # local: avoids import cycle
+
+        check_training_range()
+        sampler = sample_scenario
     pool = WarmStartPool.generate(
         sim_config, SCENARIOS["A"], range(MIN_TRAINING_POOL), GreedyPlacement()
     )
@@ -101,7 +107,12 @@ def train_agent(args: tuple) -> dict[str, Any]:
     agent, log = train(
         [
             lambda: HospitalAllocationEnv(
-                sim_config, start_mode="warm", pool=pool, weights=weights, drop_features=drop
+                sim_config,
+                start_mode="warm",
+                pool=pool,
+                weights=weights,
+                drop_features=drop,
+                scenario_sampler=sampler,
             )
         ]
         * config.n_envs,
