@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neurotwin"
+version = "0.2.0"
+description = "NeuroTwin V2: research simulation of hospital bed allocation (simulation only, not a clinical system)"
+requires-python = ">=3.10"
+dependencies = [
+    # Array maths and seeded RNG streams (SeedSequence.spawn for Common Random Numbers).
+    "numpy>=1.26",
+    # Statistics (CIs, goodness-of-fit) and the exact MIP baseline (scipy.optimize.milp).
+    # Already a required dependency of scikit-learn, which is an approved technology.
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["neurotwin*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: long statistical validation runs (deselect with -m 'not slow')",
+]
