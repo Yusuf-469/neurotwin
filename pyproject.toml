@@ -13,10 +13,20 @@ dependencies = [
     # Statistics (CIs, goodness-of-fit) and the exact MIP baseline (scipy.optimize.milp).
     # Already a required dependency of scikit-learn, which is an approved technology.
     "scipy>=1.11",
+    # Standard RL environment interface (approved technology, AGENTS.md).
+    "gymnasium>=1.0",
+    # Neural networks for the in-house PPO (approved technology).
+    "torch>=2.2",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    # Reference implementations used ONLY to validate the in-house PPO (RESEARCH.md §6.18);
+    # never on the training path.
+    "stable-baselines3>=2.3",
+    "sb3-contrib>=2.3",
+]
 
 [tool.setuptools.packages.find]
 include = ["neurotwin*"]

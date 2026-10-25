@@ -222,13 +222,15 @@ Create Gymnasium-compatible RL environment, implement PPO in-house, validate it,
 - CartPole-v1 and hospital-env learning curves vs stable-baselines3 (matched hyperparameters)
 
 ### Completion Criteria
-- [ ] Environment passes `gymnasium.make()` instantiation
-- [ ] `reset()` returns valid observation
-- [ ] `step()` returns valid (obs, reward, terminated, truncated, info)
-- [ ] Actions produce valid state transitions
-- [ ] In-house PPO passes all unit tests and matches the reference on CartPole-v1
-- [ ] PPO agent trains without errors on the hospital env (K >= 5 training seeds)
-- [ ] Checkpoints save/load correctly
+- [x] Environment instantiates and passes Gymnasium passive checks
+- [x] `reset()` returns valid observation
+- [x] `step()` returns valid (obs, reward, terminated, truncated, info)
+- [x] Actions produce valid state transitions (masks = feasible placements; env ≡ direct simulation)
+- [x] In-house PPO passes all unit tests and matches the reference on CartPole-v1 and the hospital env
+- [x] PPO agent trains without errors on the hospital env (K = 5 training seeds)
+- [x] Checkpoints save/load correctly
+
+**Status: complete (2026-10-26).** See `docs/stage5_rl_report.md`.
 
 ---
 
