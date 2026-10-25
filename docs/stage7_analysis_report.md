@@ -83,7 +83,45 @@ HOLD then means keeping a bed free for a possible urgent arrival. The analysis b
 - **The structure breaks down out of distribution.** In E, P(HOLD) is high (≈0.3) at every b and shows no decreasing structure. The policy holds far more often in states it never saw in training. This is the mechanistic explanation for its diversion increase in §1, and it is reported as a negative result.
 
 ## 4. Ablations (§6.16; `ablation_*.json`)
-**Status: pending.** Training is in progress: 8 variants × K = 3 agents. Using K = 3 instead of 5 is a disclosed deviation made for compute reasons. Results will be added after `python -m neurotwin.experiments.ablations evaluate`.
+**Commands:** `python -m neurotwin.experiments.ablations train`, then `python -m neurotwin.experiments.ablations evaluate`. The second produces `ablation_episodes.json` and `ablation_comparisons.json`.
+
+**Design**
+- Each variant retrains PPO with one change and the same hyperparameters, seeds and scenario (A).
+- Removed observation features are set to a constant 0, which keeps the network shape fixed.
+- Evaluation is on the 50 test seeds in A and E.
+- Each variant is compared with the full model (final_A), so Δ = ablated − full, and positive means removing the component hurts.
+- Holm correction is applied over all 80 comparisons (8 variants × 2 scenarios × 5 metrics).
+
+**Disclosed deviations and limits**
+- **K = 3 agents per variant** instead of 5, for compute reasons.
+- **The full model's agent variance is not resampled:** it enters agent-averaged per seed. Its CIs are therefore somewhat optimistic.
+- **The full model includes agent 0,** whose rare collapses in stressed episodes (Stage 6) raise its scenario-E means. The ablations use agents 0–2 with the same seeds, but their training differs, so this cannot be matched exactly.
+
+| Variant (what is removed) | ΔJ in A | 95% CI | ΔJ in E | 95% CI |
+|---|---|---|---|---|
+| B: demand history (3 features) | +0.4 | [−4.9, 5.8] | +18.4 | [−19.2, 57.0] |
+| C: time of day / week (4) | +4.0 | [−0.8, 9.0] | +15.0 | [−24.2, 52.8] |
+| D: staffing (2) | −0.9 | [−6.7, 5.7] | −49.2 | [−117.1, 17.3] |
+| E: priority aggregates (3) | −2.0 | [−6.0, 2.3] | +9.4 | [−39.9, 58.9] |
+| F1: diversion penalty (β = 0) | +0.5 | [−5.2, 5.9] | −27.1 | [−161.4, 69.5] |
+| F2: off-service penalty (κ = 0) | +13.4 | [4.1, 24.5] | −65.3 | [−157.0, 5.8] |
+| F3: uniform priority weights in reward | **+23.5*** | [13.2, 34.4] | −80.2 | [−181.1, 34.8] |
+| G: ICU-flow state (2) | +15.6 | [1.5, 37.3] | +32.8 | [−34.4, 89.7] |
+
+\* significant after Holm. The full model's J is 208.1 in A and 1453.5 in E. Every metric is in `ablation_comparisons.json`.
+
+**Findings**
+1. **The priority-weighted reward is the component that matters most.** Training with uniform priority weights (F3) is the only variant whose J in A is significantly worse after Holm: +23.5, or +11%, with mean boarding also significantly worse. The reward structure therefore carries more of the policy's performance than any single observation group.
+
+   In E, F3 has a significantly *lower* p90 boarding time: −13.7 h, 95% CI [−19.0, −8.2]. Weighting all patients equally shortens the longest waits, at the cost of priority-weighted waiting. This is the expected trade-off, and shows that J encodes a value judgement.
+2. **The off-service penalty does what it is designed to do.** Without κ (F2), off-service placements rise significantly in A (+3.2 per 100). The nominal J increase (+13.4) does not survive Holm. This is a sanity check that the reward terms are wired correctly.
+3. **No single observation group is necessary in A.** Removing demand history, temporal, staffing or priority-aggregate features changes J in A by less than 5 per day, and no change is significant. The features are partly redundant: the remaining inputs carry much of the same information. ICU-flow state (G) has the largest nominal effect (+15.6), but it does not survive Holm.
+4. **The diversion penalty learned in A has no measurable effect, even under stress.** Training with β = 0 (F1) leaves diversions in A unchanged. In E, F1 has nominally *fewer* diversions (−1.2 per 100), which is not significant after Holm.
+
+   Diversions are rare in A (about 0.3 per 100 arrivals), so the β term gives almost no training signal. A fixed penalty learned in the training scenario therefore cannot control diversions under stress. This is direct evidence for the constrained-PPO redesign in §6.
+5. **No feature group helps under stress.** In E, no ΔJ is significant. Several observation ablations are associated with significantly fewer off-service placements (C, E, G) and diversions (B, C).
+
+   One untested explanation is that fewer inputs mean less extrapolation outside the training distribution, which would be consistent with the structure breakdown in §3. Agent-level differences (see the limits above) could also contribute. We do not claim a causal effect.
 
 ## 5. Domain-randomised PPO (PPO-DR, §6.23; `ppo_dr_*.json`)
 **Status: pending.** The training range has been checked to be strictly milder than every test scenario (`ppo_dr check`; tested in `tests/test_stage7.py`).
