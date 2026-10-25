@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.3 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.4 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -623,6 +623,14 @@ PPO is implemented in-house in PyTorch (ARCHITECTURE.md §8.5).
 2. CartPole-v1: learning curves over 5 seeds comparable to stable-baselines3 PPO with matched hyperparameters
 3. Hospital environment: in-house vs reference PPO (sb3-contrib MaskablePPO, test-only dependency) learning curves with overlapping CIs, using Δt-independent discounting for the comparison (the reference does not support SMDP discounting)
 
+**Gate results (2026-10-26, `docs/stage5_rl_report.md`):**
+
+| Gate | Result |
+|---|---|
+| 1. Unit tests | Pass: GAE with Δt ≠ 1 vs hand computation; boundary handling; clipped-loss identity and zero gradient outside the trust region; masked probability and gradient exactly 0; the trainer passes γ^Δt to GAE (and γ when `semi_markov=False`) |
+| 2. CartPole-v1, 200k steps × 5 seeds | Final return: in-house 446.5 [341.9, 551.1], stable-baselines3 369.5 [237.4, 501.6], p = 0.24; learning curves track each other |
+| 3. Hospital env, 300k steps × 5 seeds | Final return: in-house −425.6 [−491.1, −360.1], MaskablePPO −441.1 [−516.0, −366.3], p = 0.68; curves overlap. Both learn slowly at these settings, so the difficulty is in the problem, not the implementation |
+
 ## 6.19 Extension: Constrained PPO (PPO-Lagrangian)
 
 Constrained MDP: minimise expected waiting and off-service cost subject to `E[diversions per day] ≤ c_div`. The β term is replaced by a Lagrange multiplier λ ≥ 0 updated by dual ascent on the measured constraint violation (Tessler et al., 2019; Ray et al., 2019).
@@ -763,11 +771,13 @@ C's load is the closest achievable to 1.02: nurse counts are integers, so 0.90×
 | Minibatch size | 64, 128, 256 |
 | Update epochs | 4, 10 |
 | Clip range ε | 0.1, 0.2, 0.3 |
-| Entropy coefficient | 0.0, 0.01, 0.05 |
-| γ (per hour) | 0.98, 0.99, 0.995 |
-| GAE λ | 0.9, 0.95 |
+| Entropy coefficient | 0.0, 0.001, 0.01 (selected 0.001) |
+| γ (per hour) | 0.80, 0.90, 0.95 (selected 0.95); 0.99 failed to learn (see below) |
+| GAE λ | 0.9, 0.95 (selected 0.9) |
 | Hidden layers | [64, 64], [128, 128], [256, 256] |
-| Training steps | 1M, 3M, 5M |
+| Training steps | 1M, 3M, 5M (selected 3M) |
+
+**v2.4 note on the discount range.** The v2.0 range (γ ≥ 0.98 per hour) did not learn in development runs: with γ = 0.99, λ = 0.95 and entropy 0.01, the policy stayed near-uniform (KL → 0) after 600k steps and held 42% of the time, at J ≈ 313 against Priority's 169. One placement changes total waiting cost very little compared with the noise from future arrivals, so long-horizon advantage estimates are dominated by noise. Shorter horizons (γ 0.80–0.95, λ 0.9) and a small entropy bonus learn. The range was therefore moved to {0.80, 0.90, 0.95}. **Trade-off acknowledged:** γ = 0.95 per hour has a half-life of about 13.5 h, so the learned look-ahead spans hours, not days. RQ1 is interpreted accordingly. Selection used scenario A validation seeds only (`docs/stage5_rl_report.md`).
 
 ### Reward weights
 | Weight | Range |
@@ -850,6 +860,11 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.4 — 2026-10-26 (Stage 5; `docs/stage5_rl_report.md`)
+- PPO validation gates 1–3 passed (§6.18)
+- Discount range moved from γ ≥ 0.98/h to {0.80, 0.90, 0.95}/h after development runs showed no learning at long horizons; γ = 0.95, λ = 0.9, entropy 0.001 and 3M steps selected on validation seeds (§6.20)
+- Observation space declared as [−1, ∞) (counts and waits are unbounded)
 
 ### v2.3 — 2026-10-26 (Stage 4; `docs/stage4_baselines_report.md`)
 - **Scenario recalibration (§6.22)** on analytical, policy-independent offered load, with criteria stated before examining policy results. A: ρ 0.88 → 0.93 (base rates raised 5.8%). B–E: from ρ 1.19–1.77 to 1.02–1.10. The old values are kept as a severe-overload extension

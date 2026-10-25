@@ -12,8 +12,9 @@ A research simulation of hospital bed allocation. It compares a reinforcement-le
 | 2. Discrete-event simulator | Complete: [validation report](docs/stage2_validation_report.md) |
 | 3. Digital twin state | Complete: [report](docs/stage3_digital_twin_report.md) |
 | 4. Baseline policies | Complete: [report](docs/stage4_baselines_report.md) |
-| 5. RL environment and in-house PPO | Next |
-| 6–12 | Planned: [ROADMAP.md](ROADMAP.md) |
+| 5. RL environment and in-house PPO | Complete: [report](docs/stage5_rl_report.md) |
+| 6. Experimental evaluation (test seeds) | Next |
+| 7–12 | Planned: [ROADMAP.md](ROADMAP.md) |
 
 ## Setup (Python 3.10+)
 

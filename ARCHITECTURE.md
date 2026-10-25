@@ -438,7 +438,8 @@ class OptimizationAllocator(AllocationPolicy):
 ### 8.1 Gymnasium Environment
 ```python
 class HospitalResourceEnv(gymnasium.Env):
-    observation_space: Box(low=-1, high=1, shape=(21,), dtype=np.float32)
+    observation_space: Box(low=-1, high=inf, shape=(21,), dtype=np.float32)
+    # counts and waits are unbounded above; PPO uses running observation normalisation
     # 21 features, exact list and normalisation in RESEARCH.md §6.5
 
     action_space: Discrete(7)
@@ -506,8 +507,14 @@ rl/ppo/
 ├── gae.py           # Generalised Advantage Estimation
 ├── losses.py        # Clipped surrogate, clipped value loss, entropy bonus
 ├── normalize.py     # Running observation normalisation (frozen at evaluation)
-└── trainer.py       # Rollout/update loop, LR annealing, grad clipping, checkpoints
+├── agent.py         # Network + normaliser, save/load, deterministic act()
+├── trainer.py       # Rollout/update loop, LR annealing, grad clipping, truncation bootstrap
+└── validate.py      # Gates 2-3: CartPole and hospital env vs stable-baselines3 / MaskablePPO
 ```
+Related: `rl/env.py` (Gymnasium env), `rl/actions.py` (7 actions + masks), `rl/features.py`
+(21 features), `policies/ppo_policy.py` (PPO as an AllocationPolicy for evaluation),
+`experiments/train_ppo.py` (K agents, checkpoints, validation-seed evaluation),
+`config/ppo_default.json` (hyperparameters).
 
 Validation before any hospital result is reported (`docs/stage1_design_review.md` B2):
 1. CartPole-v1 learning curves comparable to stable-baselines3 under matched hyperparameters.
