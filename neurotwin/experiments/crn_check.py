@@ -32,40 +32,65 @@ def _half_width(x: np.ndarray) -> float:
 
 
 def main() -> None:
+    """Run the independent-seed block and report CRN variance reduction."""
     seeds = list(CRN_INDEPENDENT)
     require_split(seeds, "crn_independent")
     jobs = build_jobs(seeds, ["A"], 0, DEFAULT_AGENTS, policies=BASELINES)
     with ProcessPoolExecutor(4) as ex:
         independent = list(ex.map(run_job, jobs))
-    test = [r for r in read_rows(ROOT / "docs" / "data" / "stage6" / "episodes.csv")
-            if r["scenario"] == "A"]
+    test = [
+        r
+        for r in read_rows(ROOT / "docs" / "data" / "stage6" / "episodes.csv")
+        if r["scenario"] == "A"
+    ]
     test_seeds = sorted({int(r["seed"]) for r in test})
     out = []
     for metric in METRICS:
-        ppo = np.array([np.mean([r[metric] for r in test if r["policy"] == "ppo" and int(r["seed"]) == s])
-                        for s in test_seeds])
+        ppo = np.array(
+            [
+                np.mean([r[metric] for r in test if r["policy"] == "ppo" and int(r["seed"]) == s])
+                for s in test_seeds
+            ]
+        )
         for b in BASELINES:
-            paired_b = np.array([next(r[metric] for r in test if r["policy"] == b and int(r["seed"]) == s)
-                                 for s in test_seeds])
-            indep_b = np.array([r[metric] for r in sorted(independent, key=lambda r: r["seed"])
-                                if r["policy"] == b])
+            paired_b = np.array(
+                [
+                    next(r[metric] for r in test if r["policy"] == b and int(r["seed"]) == s)
+                    for s in test_seeds
+                ]
+            )
+            indep_b = np.array(
+                [
+                    r[metric]
+                    for r in sorted(independent, key=lambda r: r["seed"])
+                    if r["policy"] == b
+                ]
+            )
             d = ppo - paired_b
             hw_paired = _half_width(d)
-            hw_indep = float(stats.t.ppf(0.975, 2 * len(ppo) - 2)
-                             * math.sqrt(ppo.var(ddof=1) / len(ppo) + indep_b.var(ddof=1) / len(indep_b)))
+            hw_indep = float(
+                stats.t.ppf(0.975, 2 * len(ppo) - 2)
+                * math.sqrt(ppo.var(ddof=1) / len(ppo) + indep_b.var(ddof=1) / len(indep_b))
+            )
             reduction = 1 - d.var(ddof=1) / (ppo.var(ddof=1) + paired_b.var(ddof=1))
-            entry = {"metric": metric, "baseline": b,
-                     "paired_diff": float(d.mean()), "paired_ci_half_width": hw_paired,
-                     "independent_diff": float(ppo.mean() - indep_b.mean()),
-                     "independent_ci_half_width": hw_indep,
-                     "width_ratio_independent_over_paired": hw_indep / hw_paired,
-                     "variance_reduction": float(reduction),
-                     "per_seed_correlation": float(np.corrcoef(ppo, paired_b)[0, 1])}
+            entry = {
+                "metric": metric,
+                "baseline": b,
+                "paired_diff": float(d.mean()),
+                "paired_ci_half_width": hw_paired,
+                "independent_diff": float(ppo.mean() - indep_b.mean()),
+                "independent_ci_half_width": hw_indep,
+                "width_ratio_independent_over_paired": hw_indep / hw_paired,
+                "variance_reduction": float(reduction),
+                "per_seed_correlation": float(np.corrcoef(ppo, paired_b)[0, 1]),
+            }
             out.append(entry)
-            print(f"{metric:16s} vs {b:17s} paired {entry['paired_diff']:7.2f} ±{hw_paired:6.2f} | "
-                  f"independent {entry['independent_diff']:7.2f} ±{hw_indep:6.2f} | "
-                  f"CI {entry['width_ratio_independent_over_paired']:4.1f}x narrower with CRN, "
-                  f"variance reduction {reduction:5.1%}, corr {entry['per_seed_correlation']:.3f}")
+            print(
+                f"{metric:16s} vs {b:17s} paired {entry['paired_diff']:7.2f} ±{hw_paired:6.2f} | "
+                f"independent {entry['independent_diff']:7.2f} ±{hw_indep:6.2f} | "
+                f"CI {entry['width_ratio_independent_over_paired']:4.1f}x narrower with CRN, "
+                f"variance reduction {reduction:5.1%}, corr {entry['per_seed_correlation']:.3f}"
+            )
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "crn_check.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
 

@@ -16,6 +16,8 @@ from ..simulation.hospital import HospitalSimulation
 
 @dataclass(frozen=True)
 class HospitalState:
+    """Policy-visible hospital state at one moment (no hidden patient data)."""
+
     time: float
     hour_of_week: float
     physical_beds: dict[str, int]
@@ -44,10 +46,17 @@ class HospitalState:
         """JSON-serialisable form (for history export, the API and the dashboard)."""
         d = {k: v for k, v in vars(self).items() if k != "waiting_requests"}
         d["waiting_requests"] = [
-            {"rid": r.rid, "type": r.rtype.value, "priority": r.priority,
-             "created_at": r.created_at, "primary_unit": r.primary_unit.value,
-             "eligible_units": [u.value for u in r.eligible_units], "from_ed": r.from_ed}
-            for r in self.waiting_requests]
+            {
+                "rid": r.rid,
+                "type": r.rtype.value,
+                "priority": r.priority,
+                "created_at": r.created_at,
+                "primary_unit": r.primary_unit.value,
+                "eligible_units": [u.value for u in r.eligible_units],
+                "from_ed": r.from_ed,
+            }
+            for r in self.waiting_requests
+        ]
         for key in ("recent_arrivals", "recent_discharges", "recent_diversions"):
             d[key] = list(d[key])
         return d

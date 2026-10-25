@@ -13,8 +13,13 @@ interval. The 95% intervals are reported by the validation report script.
 
 import pytest
 
-from neurotwin.simulation.validation.queueing import (erlang_c, mmc_mean_wait, mmck_blocking,
-                                                      mmck_mean_wait, mmck_wait_probability)
+from neurotwin.simulation.validation.queueing import (
+    erlang_c,
+    mmc_mean_wait,
+    mmck_blocking,
+    mmck_mean_wait,
+    mmck_wait_probability,
+)
 from neurotwin.simulation.validation.reduced import estimate_replication, mmck_config
 
 from .helpers import t_confidence_interval
@@ -30,13 +35,23 @@ def _replicate(config):
 
 def _assert_in_ci(samples, analytic, label):
     lo, hi = t_confidence_interval(samples, 0.99)
-    assert lo <= analytic <= hi, f"{label}: analytic {analytic:.4f} outside 99% CI [{lo:.4f}, {hi:.4f}]"
+    assert (
+        lo <= analytic <= hi
+    ), f"{label}: analytic {analytic:.4f} outside 99% CI [{lo:.4f}, {hi:.4f}]"
 
 
 def _check_mmc(rho, horizon, warmup):
     lam = rho * C * MU
-    estimates = _replicate(mmck_config(servers=C, arrival_rate=lam, mean_service=MEAN_SERVICE,
-                                       ed_capacity=None, horizon=horizon, warmup=warmup))
+    estimates = _replicate(
+        mmck_config(
+            servers=C,
+            arrival_rate=lam,
+            mean_service=MEAN_SERVICE,
+            ed_capacity=None,
+            horizon=horizon,
+            warmup=warmup,
+        )
+    )
     _assert_in_ci([e.mean_wait for e in estimates], mmc_mean_wait(C, lam, MU), "W_q")
     _assert_in_ci([e.wait_probability for e in estimates], erlang_c(C, lam / MU), "P(wait)")
     assert all(e.blocking == 0 for e in estimates)
@@ -57,9 +72,18 @@ def test_mmc_matches_erlang_c_heavy_load():
 def test_mmck_matches_finite_waiting_room(rho_offered, ed_capacity):
     lam = rho_offered * C * MU
     k = C + ed_capacity
-    estimates = _replicate(mmck_config(servers=C, arrival_rate=lam, mean_service=MEAN_SERVICE,
-                                       ed_capacity=ed_capacity, horizon=4000.0, warmup=400.0))
+    estimates = _replicate(
+        mmck_config(
+            servers=C,
+            arrival_rate=lam,
+            mean_service=MEAN_SERVICE,
+            ed_capacity=ed_capacity,
+            horizon=4000.0,
+            warmup=400.0,
+        )
+    )
     _assert_in_ci([e.blocking for e in estimates], mmck_blocking(C, k, lam, MU), "blocking")
     _assert_in_ci([e.mean_wait for e in estimates], mmck_mean_wait(C, k, lam, MU), "W_q")
-    _assert_in_ci([e.wait_probability for e in estimates],
-                  mmck_wait_probability(C, k, lam, MU), "P(wait)")
+    _assert_in_ci(
+        [e.wait_probability for e in estimates], mmck_wait_probability(C, k, lam, MU), "P(wait)"
+    )

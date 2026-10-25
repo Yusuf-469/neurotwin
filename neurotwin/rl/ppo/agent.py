@@ -14,15 +14,19 @@ from .normalize import IdentityNormalizer, RunningMeanStd
 
 
 class PPOAgent:
-    def __init__(self, model: ActorCritic, obs_rms: RunningMeanStd,
-                 meta: dict[str, Any] | None = None) -> None:
+    """Trained actor-critic plus its frozen observation normaliser."""
+
+    def __init__(
+        self, model: ActorCritic, obs_rms: RunningMeanStd, meta: dict[str, Any] | None = None
+    ) -> None:
         self.model = model
         self.obs_rms = obs_rms
         self.meta = meta or {}
 
     @torch.no_grad()
-    def act(self, obs: np.ndarray, mask: np.ndarray | None = None,
-            deterministic: bool = True) -> int:
+    def act(
+        self, obs: np.ndarray, mask: np.ndarray | None = None, deterministic: bool = True
+    ) -> int:
         """Action for one raw observation. Deterministic = argmax of the masked policy."""
         x = torch.as_tensor(self.obs_rms.normalize(obs)).unsqueeze(0)
         logits, _ = self.model(x)
@@ -40,14 +44,23 @@ class PPOAgent:
         return masked_distribution(logits, m).probs[0].numpy()
 
     def save(self, path: str | Path) -> None:
-        torch.save({"model": self.model.state_dict(),
-                    "obs_rms": None if isinstance(self.obs_rms, IdentityNormalizer)
-                    else self.obs_rms.state_dict(),
-                    "obs_dim": self.model.actor[0].in_features,
-                    "n_actions": self.model.actor[-1].out_features,
-                    "hidden": [m.out_features for m in self.model.actor[:-1]
-                               if isinstance(m, torch.nn.Linear)],
-                    "meta": self.meta}, path)
+        torch.save(
+            {
+                "model": self.model.state_dict(),
+                "obs_rms": (
+                    None
+                    if isinstance(self.obs_rms, IdentityNormalizer)
+                    else self.obs_rms.state_dict()
+                ),
+                "obs_dim": self.model.actor[0].in_features,
+                "n_actions": self.model.actor[-1].out_features,
+                "hidden": [
+                    m.out_features for m in self.model.actor[:-1] if isinstance(m, torch.nn.Linear)
+                ],
+                "meta": self.meta,
+            },
+            path,
+        )
 
     @classmethod
     def load(cls, path: str | Path) -> "PPOAgent":
@@ -55,7 +68,10 @@ class PPOAgent:
         model = ActorCritic(d["obs_dim"], d["n_actions"], tuple(d["hidden"]))
         model.load_state_dict(d["model"])
         model.eval()
-        rms = (IdentityNormalizer((d["obs_dim"],)) if d["obs_rms"] is None
-               else RunningMeanStd.from_state_dict(d["obs_rms"]))
+        rms = (
+            IdentityNormalizer((d["obs_dim"],))
+            if d["obs_rms"] is None
+            else RunningMeanStd.from_state_dict(d["obs_rms"])
+        )
         rms.frozen = True
         return cls(model, rms, d["meta"])

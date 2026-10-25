@@ -60,15 +60,25 @@ def _record(args: tuple[int, str, int]) -> list[tuple[int, float, int]]:
                 probs = masked_distribution(logits, torch.as_tensor(mask).unsqueeze(0)).probs[0]
             action = int(probs.argmax())
             if sim.now >= sim.config.warmup_hours and mask[Action.ADMIT_PRIMARY_PRIORITY]:
-                admissions = [r for r in sim.waiting_requests()
-                              if r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU)]
+                admissions = [
+                    r
+                    for r in sim.waiting_requests()
+                    if r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU)
+                ]
                 if admissions and all(r.priority >= 3 for r in admissions):
                     _, unit = action_to_placement(sim, Action.ADMIT_PRIMARY_PRIORITY)
-                    records.append((sim.free_staffed(unit), float(probs[Action.HOLD]),
-                                    int(action == Action.HOLD)))
+                    records.append(
+                        (
+                            sim.free_staffed(unit),
+                            float(probs[Action.HOLD]),
+                            int(action == Action.HOLD),
+                        )
+                    )
             return None if action == Action.HOLD else action_to_placement(sim, action)
 
-    run_episode(HospitalSimulation(load_default_config(), SCENARIOS[scenario], seed=seed), Recorder())
+    run_episode(
+        HospitalSimulation(load_default_config(), SCENARIOS[scenario], seed=seed), Recorder()
+    )
     return records
 
 
@@ -77,7 +87,7 @@ def isotonic_decreasing(y: np.ndarray, w: np.ndarray) -> np.ndarray:
     blocks = [[float(v), float(wt), 1] for v, wt in zip(y, w)]
     i = 0
     while i < len(blocks) - 1:
-        if blocks[i][0] < blocks[i + 1][0]:                    # violates non-increasing
+        if blocks[i][0] < blocks[i + 1][0]:  # violates non-increasing
             v1, w1, n1 = blocks[i]
             v2, w2, n2 = blocks[i + 1]
             blocks[i] = [(v1 * w1 + v2 * w2) / (w1 + w2), w1 + w2, n1 + n2]
@@ -89,6 +99,7 @@ def isotonic_decreasing(y: np.ndarray, w: np.ndarray) -> np.ndarray:
 
 
 def main() -> None:
+    """Run the reservation-structure analysis for scenarios A and E; write JSON."""
     results = {}
     for scenario in ("A", "E"):
         jobs = [(a, scenario, s) for a in range(5) for s in SEEDS]
@@ -109,20 +120,32 @@ def main() -> None:
         rho, p_rho = stats.spearmanr(free, p_hold)
         results[scenario] = {
             "n_states": len(recs),
-            "bins": [{"free_beds": int(k) if k < MAX_BIN else f">={MAX_BIN}", "n": int(n),
-                      "mean_p_hold": float(m),
-                      "share_argmax_hold": float(np.mean([c for _, c in bins[k]]))}
-                     for k, n, m in zip(keys, counts, mean_p)],
-            "spearman_rho": float(rho), "spearman_p": float(p_rho),
+            "bins": [
+                {
+                    "free_beds": int(k) if k < MAX_BIN else f">={MAX_BIN}",
+                    "n": int(n),
+                    "mean_p_hold": float(m),
+                    "share_argmax_hold": float(np.mean([c for _, c in bins[k]])),
+                }
+                for k, n, m in zip(keys, counts, mean_p)
+            ],
+            "spearman_rho": float(rho),
+            "spearman_p": float(p_rho),
             "isotonic_r2_vs_flat": 1 - sse_iso / sse_flat if sse_flat > 0 else float("nan"),
             "overall_share_argmax_hold": float(chose_hold.mean()),
         }
-        print(f"Scenario {scenario}: {len(recs)} reservation states; overall argmax-HOLD share "
-              f"{chose_hold.mean():.3f}; Spearman rho(free beds, P(HOLD)) = {rho:.3f} (p={p_rho:.2g}); "
-              f"isotonic (decreasing) R^2 = {results[scenario]['isotonic_r2_vs_flat']:.3f}")
+        print(
+            f"Scenario {scenario}: {len(recs)} reservation states; overall argmax-HOLD share "
+            f"{chose_hold.mean():.3f}; "
+            f"Spearman rho(free beds, P(HOLD)) = {rho:.3f} (p={p_rho:.2g}); "
+            f"isotonic (decreasing) R^2 = {results[scenario]['isotonic_r2_vs_flat']:.3f}"
+        )
         for b in results[scenario]["bins"]:
-            print(f"   free beds {b['free_beds']!s:>4}: n={b['n']:6d}  mean P(HOLD)={b['mean_p_hold']:.3f}  "
-                  f"argmax HOLD={b['share_argmax_hold']:.3f}")
+            print(
+                f"   free beds {b['free_beds']!s:>4}: n={b['n']:6d}  "
+                f"mean P(HOLD)={b['mean_p_hold']:.3f}  "
+                f"argmax HOLD={b['share_argmax_hold']:.3f}"
+            )
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "structure.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
 

@@ -19,6 +19,8 @@ from .base import AllocationPolicy
 
 
 class PPOPolicy(AllocationPolicy):
+    """Trained PPO agent wrapped as an AllocationPolicy (deterministic by default)."""
+
     name = "ppo"
 
     def __init__(self, agent: PPOAgent, deterministic: bool = True) -> None:
@@ -38,13 +40,16 @@ class PPOPolicy(AllocationPolicy):
         obs = features(sim, self._scales)
         dropped = self.agent.meta.get("drop_features", [])
         if dropped:
-            obs[dropped] = 0.0        # same feature ablation the agent was trained with
+            obs[dropped] = 0.0  # same feature ablation the agent was trained with
         action = self.agent.act(obs, mask, self.deterministic)
         # Decision-time details for the decision log / explanation layer (read-only).
         probs = self.agent.action_probabilities(obs, mask)
-        self.last_details = {"chosen_action": Action(action).name,
-                             "action_probabilities": {Action(a).name: round(float(p), 4)
-                                                      for a, p in enumerate(probs) if mask[a]}}
+        self.last_details = {
+            "chosen_action": Action(action).name,
+            "action_probabilities": {
+                Action(a).name: round(float(p), 4) for a, p in enumerate(probs) if mask[a]
+            },
+        }
         if action == Action.HOLD:
             return None
         return action_to_placement(sim, action)

@@ -33,7 +33,7 @@ from ..simulation.hospital import HospitalSimulation
 from .base import AllocationPolicy
 
 UNITS: tuple[Unit, ...] = (Unit.MED, Unit.SURG, Unit.ICU)
-Values = Sequence[dict[Unit, float]]          # per request: unit -> value (eligible units only)
+Values = Sequence[dict[Unit, float]]  # per request: unit -> value (eligible units only)
 
 
 def _variables(values: Values) -> list[tuple[int, Unit, float]]:
@@ -55,9 +55,13 @@ def solve_assignment(values: Values, caps: dict[Unit, int]) -> tuple[dict[int, U
     if not variables:
         return {}, 0.0
     a, upper = _constraint_matrix(variables, len(values), caps)
-    c = -np.array([v for _, _, v in variables])               # milp minimises
-    res = milp(c, constraints=LinearConstraint(a, -np.inf, upper),
-               integrality=np.ones(len(variables)), bounds=Bounds(0, 1))
+    c = -np.array([v for _, _, v in variables])  # milp minimises
+    res = milp(
+        c,
+        constraints=LinearConstraint(a, -np.inf, upper),
+        integrality=np.ones(len(variables)),
+        bounds=Bounds(0, 1),
+    )
     if not res.success:
         raise RuntimeError(f"MILP failed: {res.message}")
     chosen = {variables[j][0]: variables[j][1] for j in np.flatnonzero(res.x > 0.5)}
@@ -70,8 +74,9 @@ def solve_lp_relaxation(values: Values, caps: dict[Unit, int]) -> tuple[np.ndarr
     if not variables:
         return np.zeros(0), 0.0
     a, upper = _constraint_matrix(variables, len(values), caps)
-    res = linprog(-np.array([v for _, _, v in variables]), A_ub=a, b_ub=upper, bounds=(0, 1),
-                  method="highs")
+    res = linprog(
+        -np.array([v for _, _, v in variables]), A_ub=a, b_ub=upper, bounds=(0, 1), method="highs"
+    )
     if not res.success:
         raise RuntimeError(f"LP failed: {res.message}")
     return res.x, float(-res.fun)
@@ -100,8 +105,13 @@ class OptimizationAllocator(AllocationPolicy):
 
     name = "mip"
 
-    def __init__(self, review_horizon_hours: float = 4.0, breach_threshold_hours: float = 4.0,
-                 breach_cost: float = 10.0, off_service_cost: float = 2.0) -> None:
+    def __init__(
+        self,
+        review_horizon_hours: float = 4.0,
+        breach_threshold_hours: float = 4.0,
+        breach_cost: float = 10.0,
+        off_service_cost: float = 2.0,
+    ) -> None:
         self.review_horizon_hours = review_horizon_hours
         self.breach_threshold_hours = breach_threshold_hours
         self.breach_cost = breach_cost
@@ -115,8 +125,12 @@ class OptimizationAllocator(AllocationPolicy):
             c = omega[r.priority - 1] * horizon_wait
             if horizon_wait > self.breach_threshold_hours:
                 c += self.breach_cost
-            values.append({k: c - (self.off_service_cost if k is not r.primary_unit else 0.0)
-                           for k in r.eligible_units})
+            values.append(
+                {
+                    k: c - (self.off_service_cost if k is not r.primary_unit else 0.0)
+                    for k in r.eligible_units
+                }
+            )
             rids.append(r.rid)
         return rids, values
 
@@ -130,6 +144,9 @@ class OptimizationAllocator(AllocationPolicy):
         return rids[i], chosen[i]
 
     def params(self) -> dict[str, Any]:
-        return {"review_horizon_hours": self.review_horizon_hours,
-                "breach_threshold_hours": self.breach_threshold_hours,
-                "breach_cost": self.breach_cost, "off_service_cost": self.off_service_cost}
+        return {
+            "review_horizon_hours": self.review_horizon_hours,
+            "breach_threshold_hours": self.breach_threshold_hours,
+            "breach_cost": self.breach_cost,
+            "off_service_cost": self.off_service_cost,
+        }

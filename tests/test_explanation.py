@@ -38,9 +38,13 @@ def test_template_explanations_use_only_logged_facts():
         e = explainer.explain(r)
         assert e.decision_id == r["decision_id"] and e.policy == "priority"
         assert not verify_numbers(e.summary + " " + e.reasoning, r), (e.summary, e.reasoning)
-        assert "not clinical advice" in e.limitations and "confidence" not in e.reliability_indicator
+        assert (
+            "not clinical advice" in e.limitations and "confidence" not in e.reliability_indicator
+        )
         json.dumps(e.as_dict())
-    assert any("off-service" in explainer.explain(r).summary for r in records if r.get("off_service"))
+    assert any(
+        "off-service" in explainer.explain(r).summary for r in records if r.get("off_service")
+    )
 
 
 def test_ppo_explanations_report_probabilities_not_confidence():
@@ -68,7 +72,9 @@ class BrokenLLM:
 def test_llm_guard_flags_invented_numbers_and_falls_back_on_failure():
     records, _ = _records(PriorityAllocator())
     r = next(x for x in records if x["action"] == "PLACE")
-    honest = LLMExplainer(FakeLLM(f"The policy placed a priority {r['priority']} patient.")).explain(r)
+    honest = LLMExplainer(
+        FakeLLM(f"The policy placed a priority {r['priority']} patient.")
+    ).explain(r)
     assert honest.generated_by == "llm" and honest.reliability_indicator.startswith("medium")
     invented = LLMExplainer(FakeLLM("This saved 987.65 hours of waiting.")).explain(r)
     assert invented.reliability_indicator.startswith("low")
@@ -83,6 +89,7 @@ def test_explanation_package_cannot_reach_the_simulation():
     """Structural guard for AGENTS.md rule 15: the explanation layer imports no engine module."""
     import ast
     from pathlib import Path
+
     src = Path(__file__).resolve().parents[1] / "neurotwin" / "explanation"
     for path in src.glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))

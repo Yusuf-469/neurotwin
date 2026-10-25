@@ -15,6 +15,7 @@ MASK_VALUE = -1e9
 
 
 def masked_distribution(logits: torch.Tensor, mask: torch.Tensor | None) -> Categorical:
+    """Categorical distribution with invalid actions given probability 0."""
     if mask is not None:
         logits = torch.where(mask, logits, torch.full_like(logits, MASK_VALUE))
     return Categorical(logits=logits)

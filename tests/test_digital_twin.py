@@ -7,10 +7,21 @@ import numpy as np
 import pytest
 from scipy import stats
 
-from neurotwin.digital_twin import (RecordingPolicy, WarmStartPool, load_snapshot, observe,
-                                    save_snapshot)
-from neurotwin.simulation import (SCENARIOS, HospitalSimulation, Unit, load_default_config,
-                                  run_episode, run_until)
+from neurotwin.digital_twin import (
+    RecordingPolicy,
+    WarmStartPool,
+    load_snapshot,
+    observe,
+    save_snapshot,
+)
+from neurotwin.simulation import (
+    SCENARIOS,
+    HospitalSimulation,
+    Unit,
+    load_default_config,
+    run_episode,
+    run_until,
+)
 from neurotwin.simulation.config import DistributionSpec
 from neurotwin.simulation.distributions import conditional_residual, sample_duration
 from neurotwin.simulation.events import EventKind
@@ -19,26 +30,59 @@ from neurotwin.simulation.validation.reduced import GreedyPlacement
 from .helpers import IntermittentPolicy
 
 CFG = load_default_config()
-_PATIENT_ATTRS = ("arrival_time", "is_emergency", "priority", "specialty", "icu_first",
-                  "ed_treatment_time", "icu_los", "general_los", "escalation_icu_los",
-                  "post_icu_general_los", "deterioration_delay")
+_PATIENT_ATTRS = (
+    "arrival_time",
+    "is_emergency",
+    "priority",
+    "specialty",
+    "icu_first",
+    "ed_treatment_time",
+    "icu_los",
+    "general_los",
+    "escalation_icu_los",
+    "post_icu_general_los",
+    "deterioration_delay",
+)
 
 
 def _fingerprint(sim: HospitalSimulation) -> str:
     """Everything observable about a finished run, as a string (NaN-safe comparison)."""
     res = sim.result()
-    patients = [[getattr(p, a) if not isinstance(getattr(p, a), Unit) else getattr(p, a).value
-                 for a in _PATIENT_ATTRS] + [p.discharged_at, p.diverted] for p in sim.patient_log()]
-    return json.dumps([res.boarding_times, res.elective_waits, res.ed_waits, res.diversions,
-                       vars(sim.acc), vars(sim.measured), patients])
+    patients = [
+        [
+            getattr(p, a) if not isinstance(getattr(p, a), Unit) else getattr(p, a).value
+            for a in _PATIENT_ATTRS
+        ]
+        + [p.discharged_at, p.diverted]
+        for p in sim.patient_log()
+    ]
+    return json.dumps(
+        [
+            res.boarding_times,
+            res.elective_waits,
+            res.ed_waits,
+            res.diversions,
+            vars(sim.acc),
+            vars(sim.measured),
+            patients,
+        ]
+    )
 
 
 def _attrs(patients) -> str:
-    return json.dumps([[getattr(p, a) if not isinstance(getattr(p, a), Unit) else getattr(p, a).value
-                        for a in _PATIENT_ATTRS] for p in patients])
+    return json.dumps(
+        [
+            [
+                getattr(p, a) if not isinstance(getattr(p, a), Unit) else getattr(p, a).value
+                for a in _PATIENT_ATTRS
+            ]
+            for p in patients
+        ]
+    )
 
 
 # ---------------------------------------------------------------- exact snapshot / restore
+
 
 @pytest.mark.parametrize("policy", [GreedyPlacement(), IntermittentPolicy(period=3)])
 def test_snapshot_restore_continues_identically(policy):
@@ -54,7 +98,7 @@ def test_snapshot_restore_continues_identically(policy):
 def test_snapshot_at_an_open_decision_epoch():
     sim = HospitalSimulation(CFG, SCENARIOS["C"], seed=4)
     run_until(sim, GreedyPlacement(), until=200.0)
-    assert sim.next_epoch()                                  # now inside a decision epoch
+    assert sim.next_epoch()  # now inside a decision epoch
     restored = HospitalSimulation.from_snapshot(json.loads(json.dumps(sim.to_snapshot())))
     assert restored.epoch_open
     run_until(sim, GreedyPlacement())
@@ -77,12 +121,13 @@ def test_clone_is_independent_and_exact():
     run_until(sim, GreedyPlacement(), until=100.0)
     twin = sim.clone()
     run_until(twin, GreedyPlacement())
-    assert sim.now == 100.0 and not sim.finished             # original untouched
+    assert sim.now == 100.0 and not sim.finished  # original untouched
     run_until(sim, GreedyPlacement())
     assert _fingerprint(sim) == _fingerprint(twin)
 
 
 # ---------------------------------------------------------------- what-if branches
+
 
 def _warm(seed=13, until=600.0, scenario="B"):
     sim = HospitalSimulation(CFG, SCENARIOS[scenario], seed=seed)
@@ -94,8 +139,15 @@ def test_branch_preserves_the_present():
     sim = _warm()
     branch = sim.branch(7)
     a, b = observe(sim), observe(branch)
-    for field in ("time", "occupied", "staffed_capacity", "waiting_requests", "ed_count",
-                  "recent_arrivals", "cumulative_placements"):
+    for field in (
+        "time",
+        "occupied",
+        "staffed_capacity",
+        "waiting_requests",
+        "ed_count",
+        "recent_arrivals",
+        "cumulative_placements",
+    ):
         assert getattr(a, field) == getattr(b, field)
 
 
@@ -104,7 +156,7 @@ def test_branch_with_same_seed_gives_same_future_whatever_the_policy():
     sim = _warm()
     n0 = len(list(sim.patient_log()))
     b1, b2 = sim.branch(7), sim.branch(7)
-    assert _attrs(b1.patient_log()) == _attrs(b2.patient_log())       # redraws identical
+    assert _attrs(b1.patient_log()) == _attrs(b2.patient_log())  # redraws identical
     run_until(b1, GreedyPlacement())
     run_until(b2, IntermittentPolicy(period=4))
     new1, new2 = list(b1.patient_log())[n0:], list(b2.patient_log())[n0:]
@@ -149,24 +201,34 @@ def test_branch_never_schedules_the_past_and_respects_elapsed_time():
 
 def test_branch_without_resampling_keeps_in_progress_end_times():
     sim = _warm()
-    before = {p.pid: (t, k) for t, k, _, p in sim._queue.entries()
-              if p is not None and k is not EventKind.ED_TREATMENT_END}
+    before = {
+        p.pid: (t, k)
+        for t, k, _, p in sim._queue.entries()
+        if p is not None and k is not EventKind.ED_TREATMENT_END
+    }
     branch = sim.branch(3, resample_in_progress=False)
-    after = {p.pid: (t, k) for t, k, _, p in branch._queue.entries()
-             if p is not None and k is not EventKind.ED_TREATMENT_END}
+    after = {
+        p.pid: (t, k)
+        for t, k, _, p in branch._queue.entries()
+        if p is not None and k is not EventKind.ED_TREATMENT_END
+    }
     assert before == after and len(before) > 50
 
 
-@pytest.mark.parametrize("spec,elapsed", [
-    (DistributionSpec("lognormal", 96.0, 72.0), 60.0),
-    (DistributionSpec("lognormal", 96.0, 72.0), 200.0),
-    (DistributionSpec("lognormal", 3.0, 1.5), 4.0),
-])
+@pytest.mark.parametrize(
+    "spec,elapsed",
+    [
+        (DistributionSpec("lognormal", 96.0, 72.0), 60.0),
+        (DistributionSpec("lognormal", 96.0, 72.0), 200.0),
+        (DistributionSpec("lognormal", 3.0, 1.5), 4.0),
+    ],
+)
 def test_conditional_residual_matches_rejection_sampling(spec, elapsed):
     """e + residual must follow T | T > e (two-sample KS against rejection sampling)."""
     rng = np.random.default_rng(1)
-    conditional = elapsed + np.array([conditional_residual(spec, elapsed, u)
-                                      for u in rng.random(20_000)])
+    conditional = elapsed + np.array(
+        [conditional_residual(spec, elapsed, u) for u in rng.random(20_000)]
+    )
     raw = np.array([sample_duration(spec, u) for u in rng.random(400_000)])
     reference = raw[raw > elapsed][:20_000]
     assert len(reference) > 2_000
@@ -181,6 +243,7 @@ def test_conditional_residual_exponential_is_memoryless():
 
 
 # ---------------------------------------------------------------- observable state and history
+
 
 def test_observed_state_has_no_hidden_information_and_serialises():
     sim = _warm(until=300.0)
@@ -205,6 +268,7 @@ def test_recording_policy_does_not_change_the_run(tmp_path):
 
 
 # ---------------------------------------------------------------- warm-start pool
+
 
 def test_warm_start_pool_rejects_non_training_seeds():
     with pytest.raises(ValueError):

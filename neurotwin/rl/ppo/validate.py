@@ -32,17 +32,43 @@ from scipy import stats
 from .trainer import PPOConfig, train
 
 RESULTS = Path(__file__).resolve().parents[3] / "results"
-CARTPOLE = dict(n_envs=4, n_steps=128, n_epochs=4, n_minibatches=4, learning_rate=2.5e-4,
-                gamma=0.99, gae_lambda=0.95, clip=0.2, ent_coef=0.01, vf_coef=0.5,
-                max_grad_norm=0.5, vf_clip=None, normalize_obs=False)
+CARTPOLE = dict(
+    n_envs=4,
+    n_steps=128,
+    n_epochs=4,
+    n_minibatches=4,
+    learning_rate=2.5e-4,
+    gamma=0.99,
+    gae_lambda=0.95,
+    clip=0.2,
+    ent_coef=0.01,
+    vf_coef=0.5,
+    max_grad_norm=0.5,
+    vf_clip=None,
+    normalize_obs=False,
+)
 # Settings in the range where PPO learns on this env (development sweep, stage-5 report);
 # per-step discounting and no observation normalisation to match the reference exactly.
-HOSPITAL = dict(n_envs=8, n_steps=256, n_epochs=10, n_minibatches=8, learning_rate=3e-4,
-                gamma=0.95, gae_lambda=0.9, clip=0.2, ent_coef=0.001, vf_coef=0.5,
-                max_grad_norm=0.5, vf_clip=None, normalize_obs=False, semi_markov=False)
+HOSPITAL = dict(
+    n_envs=8,
+    n_steps=256,
+    n_epochs=10,
+    n_minibatches=8,
+    learning_rate=3e-4,
+    gamma=0.95,
+    gae_lambda=0.9,
+    clip=0.2,
+    ent_coef=0.001,
+    vf_coef=0.5,
+    max_grad_norm=0.5,
+    vf_clip=None,
+    normalize_obs=False,
+    semi_markov=False,
+)
 
 
 # ---------------------------------------------------------------- environment factories
+
 
 def _cartpole():
     return gym.make("CartPole-v1")
@@ -56,16 +82,20 @@ def _hospital():
     from ...simulation.config import SCENARIOS, load_default_config
     from ...simulation.validation.reduced import GreedyPlacement
     from ..env import HospitalAllocationEnv
+
     global _POOL
     if _POOL is None:
-        _POOL = WarmStartPool.generate(load_default_config(), SCENARIOS["A"],
-                                       range(MIN_TRAINING_POOL), GreedyPlacement())
+        _POOL = WarmStartPool.generate(
+            load_default_config(), SCENARIOS["A"], range(MIN_TRAINING_POOL), GreedyPlacement()
+        )
     return HospitalAllocationEnv(start_mode="warm", pool=_POOL)
 
 
 # ---------------------------------------------------------------- runs
 
+
 def run_ours(args) -> list[tuple[int, float]]:
+    """Train the in-house PPO for one validation-gate run; return episode returns."""
     task, seed, steps = args
     hp = CARTPOLE if task == "cartpole" else HOSPITAL
     make = _cartpole if task == "cartpole" else _hospital
@@ -77,10 +107,12 @@ def run_ours(args) -> list[tuple[int, float]]:
 
 
 def run_reference(args) -> list[tuple[int, float]]:
+    """Train the stable-baselines3 reference for one run; return episode returns."""
     import torch
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import BaseCallback
     from stable_baselines3.common.env_util import make_vec_env
+
     task, seed, steps = args
     torch.set_num_threads(1)
     hp = CARTPOLE if task == "cartpole" else HOSPITAL
@@ -94,18 +126,27 @@ def run_reference(args) -> list[tuple[int, float]]:
             return True
 
     lr = hp["learning_rate"]
-    kwargs = dict(n_steps=hp["n_steps"], batch_size=hp["n_envs"] * hp["n_steps"] // hp["n_minibatches"],
-                  n_epochs=hp["n_epochs"], learning_rate=lambda progress: lr * progress,
-                  gamma=hp["gamma"], gae_lambda=hp["gae_lambda"], clip_range=hp["clip"],
-                  ent_coef=hp["ent_coef"], vf_coef=hp["vf_coef"], max_grad_norm=hp["max_grad_norm"],
-                  seed=seed, verbose=0,
-                  policy_kwargs=dict(net_arch=dict(pi=[64, 64], vf=[64, 64]),
-                                     activation_fn=torch.nn.Tanh))
+    kwargs = dict(
+        n_steps=hp["n_steps"],
+        batch_size=hp["n_envs"] * hp["n_steps"] // hp["n_minibatches"],
+        n_epochs=hp["n_epochs"],
+        learning_rate=lambda progress: lr * progress,
+        gamma=hp["gamma"],
+        gae_lambda=hp["gae_lambda"],
+        clip_range=hp["clip"],
+        ent_coef=hp["ent_coef"],
+        vf_coef=hp["vf_coef"],
+        max_grad_norm=hp["max_grad_norm"],
+        seed=seed,
+        verbose=0,
+        policy_kwargs=dict(net_arch=dict(pi=[64, 64], vf=[64, 64]), activation_fn=torch.nn.Tanh),
+    )
     if task == "cartpole":
         env = make_vec_env("CartPole-v1", n_envs=hp["n_envs"], seed=seed)
         model = PPO("MlpPolicy", env, **kwargs)
     else:
         from sb3_contrib import MaskablePPO
+
         env = make_vec_env(_hospital, n_envs=hp["n_envs"], seed=seed * 10_000)
         model = MaskablePPO("MlpPolicy", env, **kwargs)
     model.learn(total_timesteps=steps, callback=Recorder())
@@ -113,6 +154,7 @@ def run_reference(args) -> list[tuple[int, float]]:
 
 
 # ---------------------------------------------------------------- analysis
+
 
 def _final(curve: list[tuple[int, float]]) -> float:
     return float(np.mean([r for _, r in curve[-20:]]))
@@ -134,6 +176,7 @@ def _ci(x) -> str:
 
 
 def main() -> None:
+    """Command-line entry point for validation gates 2 and 3."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("task", choices=["cartpole", "hospital"])
     parser.add_argument("--steps", type=int, default=None)
@@ -152,17 +195,26 @@ def main() -> None:
 
     final_ours, final_ref = [_final(c) for c in ours], [_final(c) for c in ref]
     p = stats.ttest_ind(final_ours, final_ref, equal_var=False).pvalue
-    print(f"Task {args.task}: {steps} steps x {args.seeds} seeds ({time.perf_counter() - t0:.0f} s)")
+    print(
+        f"Task {args.task}: {steps} steps x {args.seeds} seeds ({time.perf_counter() - t0:.0f} s)"
+    )
     print(f"  final return (last 20 episodes), mean [95% CI over seeds]:")
     print(f"    in-house : {_ci(final_ours)}   per seed {[round(v, 1) for v in final_ours]}")
     print(f"    reference: {_ci(final_ref)}   per seed {[round(v, 1) for v in final_ref]}")
     print(f"    Welch t-test p = {p:.3g}")
     print("  learning curve (mean return per 10% of training, averaged over seeds):")
-    print("    in-house : " + " ".join(f"{v:8.1f}" for v in np.nanmean([_binned(c, steps) for c in ours], axis=0)))
-    print("    reference: " + " ".join(f"{v:8.1f}" for v in np.nanmean([_binned(c, steps) for c in ref], axis=0)))
+    print(
+        "    in-house : "
+        + " ".join(f"{v:8.1f}" for v in np.nanmean([_binned(c, steps) for c in ours], axis=0))
+    )
+    print(
+        "    reference: "
+        + " ".join(f"{v:8.1f}" for v in np.nanmean([_binned(c, steps) for c in ref], axis=0))
+    )
     RESULTS.mkdir(exist_ok=True)
-    (RESULTS / f"ppo_validation_{args.task}.json").write_text(json.dumps(
-        {"steps": steps, "ours": ours, "reference": ref, "p_final": p}), encoding="utf-8")
+    (RESULTS / f"ppo_validation_{args.task}.json").write_text(
+        json.dumps({"steps": steps, "ours": ours, "reference": ref, "p_final": p}), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":

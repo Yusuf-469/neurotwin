@@ -49,7 +49,9 @@ def mmck_distribution(c: int, k: int, lam: float, mu: float) -> list[float]:
     log_terms = []
     for n in range(k + 1):
         if n <= c:
-            log_terms.append(n * math.log(a) - math.lgamma(n + 1) if a > 0 else (0.0 if n == 0 else -math.inf))
+            log_terms.append(
+                n * math.log(a) - math.lgamma(n + 1) if a > 0 else (0.0 if n == 0 else -math.inf)
+            )
         else:
             log_terms.append(c * math.log(a) - math.lgamma(c + 1) + (n - c) * math.log(a / c))
     m = max(log_terms)

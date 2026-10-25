@@ -22,8 +22,15 @@ from ..entities import Unit
 from ..hospital import HospitalSimulation
 
 
-def mmck_config(*, servers: int, arrival_rate: float, mean_service: float,
-                ed_capacity: int | None, horizon: float, warmup: float) -> SimulationConfig:
+def mmck_config(
+    *,
+    servers: int,
+    arrival_rate: float,
+    mean_service: float,
+    ed_capacity: int | None,
+    horizon: float,
+    warmup: float,
+) -> SimulationConfig:
     """Engine configuration equivalent to M/M/c/K with K = c + ed_capacity (or M/M/c if None)."""
     return load_default_config().with_overrides(
         horizon_hours=horizon,
@@ -56,7 +63,9 @@ class GreedyPlacement:
     def decide(self, sim: HospitalSimulation) -> tuple[int, Unit] | None:
         best = None
         for req in sim.waiting_requests():
-            units = [req.primary_unit] + [u for u in req.eligible_units if u is not req.primary_unit]
+            units = [req.primary_unit] + [
+                u for u in req.eligible_units if u is not req.primary_unit
+            ]
             unit = next((u for u in units if sim.free_staffed(u) > 0), None)
             if unit is None:
                 continue

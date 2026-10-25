@@ -29,43 +29,60 @@ from ..experiments.statistics import hierarchical_paired_bootstrap
 from ..simulation.config import ScenarioConfig
 from ..simulation.hospital import HospitalSimulation, PlacementPolicy, run_until
 
-LABEL = ("SIMULATION RESULTS: counterfactual outcomes of a simplified research model; "
-         "not real-world or clinical evidence.")
-REPORTED_METRICS = ("J_per_day", "mean_boarding_h", "p90_boarding_h", "diversion_per_100",
-                    "off_service_per_100")
+LABEL = (
+    "SIMULATION RESULTS: counterfactual outcomes of a simplified research model; "
+    "not real-world or clinical evidence."
+)
+REPORTED_METRICS = (
+    "J_per_day",
+    "mean_boarding_h",
+    "p90_boarding_h",
+    "diversion_per_100",
+    "off_service_per_100",
+)
 
 PolicyFactory = Callable[[], PlacementPolicy]
 
 
 @dataclass(frozen=True)
 class WhatIfRequest:
+    """Parameters of a what-if analysis (horizon, futures, optional new conditions)."""
+
     horizon_hours: float = 72.0
     n_futures: int = 30
-    scenario: ScenarioConfig | None = None          # None = keep current conditions
+    scenario: ScenarioConfig | None = None  # None = keep current conditions
     first_future_seed: int = 0
-    reference_policy: str | None = None             # default: first policy given
+    reference_policy: str | None = None  # default: first policy given
 
 
 @dataclass
 class WhatIfResult:
+    """Per-policy metrics and paired comparisons of a what-if analysis."""
+
     label: str
     start_time: float
     horizon_hours: float
     scenario: str
     n_futures: int
-    per_policy: dict[str, dict[str, dict[str, float]]]      # policy -> metric -> mean/ci
+    per_policy: dict[str, dict[str, dict[str, float]]]  # policy -> metric -> mean/ci
     comparisons: list[dict[str, Any]] = field(default_factory=list)
     raw: dict[str, dict[str, list[float]]] = field(default_factory=dict, repr=False)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"label": self.label, "start_time": self.start_time,
-                "horizon_hours": self.horizon_hours, "scenario": self.scenario,
-                "n_futures": self.n_futures, "per_policy": self.per_policy,
-                "comparisons": self.comparisons}
+        return {
+            "label": self.label,
+            "start_time": self.start_time,
+            "horizon_hours": self.horizon_hours,
+            "scenario": self.scenario,
+            "n_futures": self.n_futures,
+            "per_policy": self.per_policy,
+            "comparisons": self.comparisons,
+        }
 
 
-def _run_future(args: tuple[HospitalSimulation, int, ScenarioConfig | None,
-                            dict[str, PolicyFactory]]) -> dict[str, dict[str, float]]:
+def _run_future(
+    args: tuple[HospitalSimulation, int, ScenarioConfig | None, dict[str, PolicyFactory]],
+) -> dict[str, dict[str, float]]:
     prepared, seed, scenario, factories = args
     weights = CostWeights.load()
     out = {}
@@ -77,6 +94,8 @@ def _run_future(args: tuple[HospitalSimulation, int, ScenarioConfig | None,
 
 
 class WhatIfEngine:
+    """Compares policies from one state on common random futures."""
+
     def __init__(self, policies: dict[str, PolicyFactory], workers: int = 1) -> None:
         if not policies:
             raise ValueError("need at least one policy")
@@ -106,8 +125,10 @@ class WhatIfEngine:
             for m, values in metrics.items():
                 x = np.asarray(values, dtype=float)
                 x = x[~np.isnan(x)]
-                per_policy[p][m] = {"mean": float(x.mean()) if len(x) else math.nan,
-                                    "n": int(len(x))}
+                per_policy[p][m] = {
+                    "mean": float(x.mean()) if len(x) else math.nan,
+                    "n": int(len(x)),
+                }
         reference = request.reference_policy or next(iter(self.policies))
         comparisons = []
         for p in self.policies:
@@ -119,8 +140,24 @@ class WhatIfEngine:
                 if ok.sum() < 2:
                     continue
                 diff, lo, hi, _ = hierarchical_paired_bootstrap(a[ok][None, :], b[ok], n_boot=2000)
-                comparisons.append({"policy": p, "reference": reference, "metric": m,
-                                    "diff_mean": diff, "ci95": [lo, hi], "n_futures": int(ok.sum())})
+                comparisons.append(
+                    {
+                        "policy": p,
+                        "reference": reference,
+                        "metric": m,
+                        "diff_mean": diff,
+                        "ci95": [lo, hi],
+                        "n_futures": int(ok.sum()),
+                    }
+                )
         name = request.scenario.name if request.scenario else f"current ({sim.scenario.name})"
-        return WhatIfResult(LABEL, sim.now, request.horizon_hours, name, request.n_futures,
-                            per_policy, comparisons, raw)
+        return WhatIfResult(
+            LABEL,
+            sim.now,
+            request.horizon_hours,
+            name,
+            request.n_futures,
+            per_policy,
+            comparisons,
+            raw,
+        )

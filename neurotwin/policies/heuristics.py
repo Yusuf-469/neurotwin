@@ -6,8 +6,14 @@ from typing import Any, Mapping
 
 from ..simulation.entities import RequestView, Unit
 from ..simulation.hospital import HospitalSimulation
-from .base import (RuleBasedPolicy, fifo_key, other_ward, primary_then_off_service_after_wait,
-                   priority_key, staffed_occupancy)
+from .base import (
+    RuleBasedPolicy,
+    fifo_key,
+    other_ward,
+    primary_then_off_service_after_wait,
+    priority_key,
+    staffed_occupancy,
+)
 
 
 class FCFSAllocator(RuleBasedPolicy):
@@ -79,8 +85,9 @@ class TrunkReservationAllocator(RuleBasedPolicy):
     name = "trunk_reservation"
     LOW_PRIORITY_FROM = 3
 
-    def __init__(self, reserve: Mapping[str, int] | None = None,
-                 off_service_wait_hours: float = 4.0) -> None:
+    def __init__(
+        self, reserve: Mapping[str, int] | None = None, off_service_wait_hours: float = 4.0
+    ) -> None:
         reserve = dict(reserve or {"MED": 1, "SURG": 1, "ICU": 1})
         if set(reserve) != {u.value for u in Unit} or any(v < 0 for v in reserve.values()):
             raise ValueError("reserve needs non-negative levels for MED, SURG and ICU")
@@ -101,11 +108,14 @@ class TrunkReservationAllocator(RuleBasedPolicy):
         if request.rtype.needs_icu:
             return None
         other = other_ward(primary)
-        if (sim.now - request.created_at >= self.off_service_wait_hours
-                and self._admissible(request, sim, other)):
+        if sim.now - request.created_at >= self.off_service_wait_hours and self._admissible(
+            request, sim, other
+        ):
             return other
         return None
 
     def params(self) -> dict[str, Any]:
-        return {"reserve": {u.value: r for u, r in self.reserve.items()},
-                "off_service_wait_hours": self.off_service_wait_hours}
+        return {
+            "reserve": {u.value: r for u, r in self.reserve.items()},
+            "off_service_wait_hours": self.off_service_wait_hours,
+        }

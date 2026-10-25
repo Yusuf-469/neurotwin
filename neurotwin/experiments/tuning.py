@@ -43,14 +43,17 @@ WAIT_GRID = [2.0, 4.0, 8.0, 12.0]
 
 
 def candidate_grid(name: str, tuned: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Parameter grid for one baseline (trunk reservation uses Priority's W_os)."""
     if name in ("fcfs", "priority"):
         return [{"off_service_wait_hours": w} for w in WAIT_GRID]
     if name == "load_balancing":
         return [{"imbalance_threshold": t} for t in (0.05, 0.1, 0.2, 0.3)]
     if name == "trunk_reservation":
         wait = tuned["priority"]["off_service_wait_hours"]
-        return [{"reserve": {"MED": m, "SURG": s, "ICU": i}, "off_service_wait_hours": wait}
-                for m, s, i in itertools.product(range(6), repeat=3)]
+        return [
+            {"reserve": {"MED": m, "SURG": s, "ICU": i}, "off_service_wait_hours": wait}
+            for m, s, i in itertools.product(range(6), repeat=3)
+        ]
     if name == "mip":
         # The off-service cost is tuned (not fixed to the reward's kappa): the myopic model
         # cannot see that off-service stays are longer and consume future capacity, so a tuned
@@ -58,9 +61,12 @@ def candidate_grid(name: str, tuned: dict[str, dict[str, Any]]) -> list[dict[str
         # with it fixed at kappa = 2 tuned only the breach cost, which proved irrelevant
         # (docs/stage4_baselines_report.md).
         base = {k: v for k, v in tuned["mip"].items() if not k.startswith("_")}
-        return [{**base, "breach_cost": b, "off_service_cost": k, "review_horizon_hours": h}
-                for b in (0.0, 10.0) for k in (2.0, 5.0, 10.0, 20.0, 40.0, 80.0)
-                for h in (1.0, 4.0)]
+        return [
+            {**base, "breach_cost": b, "off_service_cost": k, "review_horizon_hours": h}
+            for b in (0.0, 10.0)
+            for k in (2.0, 5.0, 10.0, 20.0, 40.0, 80.0)
+            for h in (1.0, 4.0)
+        ]
     raise ValueError(name)
 
 
@@ -73,6 +79,7 @@ def evaluate_one(args: tuple[str, dict[str, Any], int]) -> float:
 
 
 def tune(name: str, candidates: list[dict[str, Any]], seeds, workers: int) -> dict[str, Any]:
+    """Evaluate every candidate on the same validation seeds; pick the lowest mean J."""
     seeds = list(seeds)
     require_split(seeds, "validation")
     tasks = [(name, p, s) for p in candidates for s in seeds]
@@ -89,10 +96,13 @@ def tune(name: str, candidates: list[dict[str, Any]], seeds, workers: int) -> di
         "n_candidates": len(candidates),
     }
     if second is not None:
-        diff = matrix[second] - matrix[best]                 # paired by seed (CRN)
-        summary["runner_up"] = {"params": candidates[second], "objective_mean": float(means[second]),
-                                "paired_diff_mean": float(diff.mean()),
-                                "paired_diff_ci95": _ci(diff)}
+        diff = matrix[second] - matrix[best]  # paired by seed (CRN)
+        summary["runner_up"] = {
+            "params": candidates[second],
+            "objective_mean": float(means[second]),
+            "paired_diff_mean": float(diff.mean()),
+            "paired_diff_ci95": _ci(diff),
+        }
     summary["all"] = [{"params": candidates[i], "objective_mean": float(means[i])} for i in order]
     return summary
 
@@ -103,32 +113,47 @@ def _ci(x: np.ndarray) -> list[float]:
 
 
 def main() -> None:
+    """Command-line entry point: tune baselines and write config/baselines_tuned.json."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--policies", nargs="+",
-                        default=["fcfs", "priority", "load_balancing", "trunk_reservation", "mip"])
+    parser.add_argument(
+        "--policies",
+        nargs="+",
+        default=["fcfs", "priority", "load_balancing", "trunk_reservation", "mip"],
+    )
     parser.add_argument("--workers", type=int, default=16)
     args = parser.parse_args()
 
     tuned_file = json.loads(TUNED_PATH.read_text(encoding="utf-8")) if TUNED_PATH.exists() else {}
     for name in args.policies:
-        current = load_baseline_params(tuned=True)        # includes results of earlier policies
+        current = load_baseline_params(tuned=True)  # includes results of earlier policies
         candidates = candidate_grid(name, current)
         t0 = time.perf_counter()
         result = tune(name, candidates, VALIDATION, args.workers)
-        result["provenance"] = {"scenario": "A", "seeds": [VALIDATION.start, VALIDATION.stop - 1],
-                                "objective": "J per measured day (config/reward_default.json)",
-                                "date": date.today().isoformat(),
-                                "runtime_s": round(time.perf_counter() - t0, 1)}
+        result["provenance"] = {
+            "scenario": "A",
+            "seeds": [VALIDATION.start, VALIDATION.stop - 1],
+            "objective": "J per measured day (config/reward_default.json)",
+            "date": date.today().isoformat(),
+            "runtime_s": round(time.perf_counter() - t0, 1),
+        }
         tuned_file[name] = {k: v for k, v in result.items() if k != "all"}
-        tuned_file["_comment"] = ("Tuned on scenario A validation seeds only "
-                                  "(neurotwin.experiments.tuning). Do not edit by hand.")
+        tuned_file["_comment"] = (
+            "Tuned on scenario A validation seeds only "
+            "(neurotwin.experiments.tuning). Do not edit by hand."
+        )
         TUNED_PATH.write_text(json.dumps(tuned_file, indent=2), encoding="utf-8")
         ru = result.get("runner_up")
-        print(f"{name}: best {result['params']} J={result['objective_mean']:.2f} "
-              f"CI={[round(v, 2) for v in result['objective_ci95']]}"
-              + (f" | runner-up {ru['params']} paired diff {ru['paired_diff_mean']:.2f} "
-                 f"CI={[round(v, 2) for v in ru['paired_diff_ci95']]}" if ru else "")
-              + f" ({result['provenance']['runtime_s']} s, {len(candidates)} candidates)")
+        print(
+            f"{name}: best {result['params']} J={result['objective_mean']:.2f} "
+            f"CI={[round(v, 2) for v in result['objective_ci95']]}"
+            + (
+                f" | runner-up {ru['params']} paired diff {ru['paired_diff_mean']:.2f} "
+                f"CI={[round(v, 2) for v in ru['paired_diff_ci95']]}"
+                if ru
+                else ""
+            )
+            + f" ({result['provenance']['runtime_s']} s, {len(candidates)} candidates)"
+        )
         for row in result["all"][:6]:
             print(f"    {row['objective_mean']:9.2f}  {row['params']}")
 

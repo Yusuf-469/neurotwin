@@ -18,8 +18,14 @@ from __future__ import annotations
 import numpy as np
 
 
-def compute_gae(rewards: np.ndarray, values: np.ndarray, gammas: np.ndarray, dones: np.ndarray,
-                last_values: np.ndarray, lam: float) -> tuple[np.ndarray, np.ndarray]:
+def compute_gae(
+    rewards: np.ndarray,
+    values: np.ndarray,
+    gammas: np.ndarray,
+    dones: np.ndarray,
+    last_values: np.ndarray,
+    lam: float,
+) -> tuple[np.ndarray, np.ndarray]:
     """Arrays of shape (T, N) (steps x envs); ``last_values`` (N,) = V(s_T) after the rollout.
     Returns (advantages, returns), returns = advantages + values."""
     t_steps = rewards.shape[0]

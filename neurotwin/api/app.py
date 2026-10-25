@@ -38,12 +38,15 @@ from ..simulation.hospital import HospitalSimulation, run_until
 from ..whatif import WhatIfEngine, WhatIfRequest
 
 ROOT = Path(__file__).resolve().parents[2]
-SIMULATION_LABEL = ("SIMULATION RESULTS from a simplified research model. Not real-world or "
-                    "clinical evidence; not a medical device.")
+SIMULATION_LABEL = (
+    "SIMULATION RESULTS from a simplified research model. Not real-world or "
+    "clinical evidence; not a medical device."
+)
 # Agent 0 of final_A has a documented collapse mode under stress (Stage 6 report §5); the
 # interactive default is agent 1. This choice affects demos only, never reported results.
-AGENT_PATH = Path(os.environ.get("NEUROTWIN_PPO_AGENT",
-                                 ROOT / "results" / "ppo" / "final_A" / "agent_1.pt"))
+AGENT_PATH = Path(
+    os.environ.get("NEUROTWIN_PPO_AGENT", ROOT / "results" / "ppo" / "final_A" / "agent_1.pt")
+)
 MAX_STEP_HOURS = 24 * 14
 MAX_FUTURES = 50
 MAX_WHATIF_HOURS = 24 * 14
@@ -52,6 +55,7 @@ ALL_SCENARIOS = {**SCENARIOS, **SEVERE_SCENARIOS}
 
 
 def available_policies() -> list[str]:
+    """Baseline names, plus 'ppo' when a trained agent file exists."""
     names = list(POLICY_CLASSES)
     if AGENT_PATH.exists():
         names.append("ppo")
@@ -59,6 +63,7 @@ def available_policies() -> list[str]:
 
 
 def build_policy(name: str):
+    """Instantiate a policy by name (tuned baselines or the configured PPO agent)."""
     if name == "ppo":
         if not AGENT_PATH.exists():
             raise HTTPException(404, f"no trained PPO agent at {AGENT_PATH}")
@@ -70,6 +75,8 @@ def build_policy(name: str):
 
 @dataclass
 class Session:
+    """One interactive simulation run with its logged policy and state history."""
+
     scenario: str
     seed: int
     policy_name: str
@@ -85,17 +92,24 @@ def _new_session(scenario: str, seed: int, policy: str) -> Session:
     if scenario not in ALL_SCENARIOS:
         raise HTTPException(404, f"unknown scenario {scenario!r}")
     sim = HospitalSimulation(load_default_config(), ALL_SCENARIOS[scenario], seed=seed)
-    session = Session(scenario, seed, policy, sim, LoggingPolicy(build_policy(policy), DecisionLog()))
+    session = Session(
+        scenario, seed, policy, sim, LoggingPolicy(build_policy(policy), DecisionLog())
+    )
     session.history.append(_history_point(sim))
     return session
 
 
 def _history_point(sim: HospitalSimulation) -> dict[str, Any]:
     s = observe(sim)
-    return {"time": s.time, "occupied": s.occupied, "staffed_capacity": s.staffed_capacity,
-            "waiting": len(s.waiting_requests), "ed_count": s.ed_count,
-            "cumulative_diversions": s.cumulative_diversions,
-            "cumulative_off_service": s.cumulative_off_service}
+    return {
+        "time": s.time,
+        "occupied": s.occupied,
+        "staffed_capacity": s.staffed_capacity,
+        "waiting": len(s.waiting_requests),
+        "ed_count": s.ed_count,
+        "cumulative_diversions": s.cumulative_diversions,
+        "cumulative_off_service": s.cumulative_off_service,
+    }
 
 
 def _get(sid: str) -> Session:
@@ -106,17 +120,24 @@ def _get(sid: str) -> Session:
 
 # ---------------------------------------------------------------------- request models
 
+
 class StartRequest(BaseModel):
+    """Body of POST /api/simulation/start."""
+
     scenario: str = "A"
     seed: int = Field(0, ge=0)
     policy: str = "priority"
 
 
 class StepRequest(BaseModel):
+    """Body of POST /api/simulation/{sid}/step (bounded step length)."""
+
     hours: float = Field(24.0, gt=0, le=MAX_STEP_HOURS)
 
 
 class WhatIfBody(BaseModel):
+    """Body of POST /api/simulation/{sid}/whatif (bounded horizon and futures)."""
+
     horizon_hours: float = Field(72.0, gt=0, le=MAX_WHATIF_HOURS)
     n_futures: int = Field(20, ge=2, le=MAX_FUTURES)
     arrival_multiplier: float = Field(1.0, gt=0, le=3)
@@ -127,29 +148,43 @@ class WhatIfBody(BaseModel):
 
 # ---------------------------------------------------------------------- app
 
-app = FastAPI(title="NeuroTwin API", version="0.2.0",
-              description="Research simulation of hospital bed allocation. " + SIMULATION_LABEL)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-                   allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(
+    title="NeuroTwin API",
+    version="0.2.0",
+    description="Research simulation of hospital bed allocation. " + SIMULATION_LABEL,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
+    """Liveness check; also returns the simulation label."""
     return {"status": "ok", "label": SIMULATION_LABEL}
 
 
 @app.get("/api/policies")
 def policies() -> dict[str, Any]:
-    return {"policies": available_policies(), "ppo_agent": str(AGENT_PATH) if AGENT_PATH.exists() else None}
+    """List the policies available for sessions and what-if analysis."""
+    return {
+        "policies": available_policies(),
+        "ppo_agent": str(AGENT_PATH) if AGENT_PATH.exists() else None,
+    }
 
 
 @app.get("/api/scenarios")
 def scenarios() -> dict[str, Any]:
+    """List the study scenarios and severe-overload scenarios."""
     return {"scenarios": {k: vars(v) for k, v in ALL_SCENARIOS.items()}}
 
 
 @app.post("/api/simulation/start")
 def start(body: StartRequest) -> dict[str, Any]:
+    """Create a session: new simulation with the chosen scenario, seed and policy."""
     session = _new_session(body.scenario, body.seed, body.policy)
     sid = uuid.uuid4().hex[:12]
     SESSIONS[sid] = session
@@ -158,6 +193,7 @@ def start(body: StartRequest) -> dict[str, Any]:
 
 @app.post("/api/simulation/{sid}/step")
 def step(sid: str, body: StepRequest) -> dict[str, Any]:
+    """Advance the session by up to 14 days, recording history every 4 hours."""
     session = _get(sid)
     sim = session.sim
     if sim.finished:
@@ -172,6 +208,7 @@ def step(sid: str, body: StepRequest) -> dict[str, Any]:
 
 @app.post("/api/simulation/{sid}/reset")
 def reset(sid: str) -> dict[str, Any]:
+    """Restart the session with its original scenario, seed and policy."""
     old = _get(sid)
     SESSIONS[sid] = _new_session(old.scenario, old.seed, old.policy_name)
     return _status(SESSIONS[sid])
@@ -179,13 +216,21 @@ def reset(sid: str) -> dict[str, Any]:
 
 def _status(session: Session) -> dict[str, Any]:
     sim = session.sim
-    return {"label": SIMULATION_LABEL, "scenario": session.scenario, "seed": session.seed,
-            "policy": session.policy_name, "time": sim.now, "finished": sim.finished,
-            "horizon_hours": sim.config.horizon_hours, "warmup_hours": sim.config.warmup_hours}
+    return {
+        "label": SIMULATION_LABEL,
+        "scenario": session.scenario,
+        "seed": session.seed,
+        "policy": session.policy_name,
+        "time": sim.now,
+        "finished": sim.finished,
+        "horizon_hours": sim.config.horizon_hours,
+        "warmup_hours": sim.config.warmup_hours,
+    }
 
 
 @app.get("/api/simulation/{sid}/state")
 def state(sid: str) -> dict[str, Any]:
+    """Observable hospital state (and episode metrics once finished)."""
     session = _get(sid)
     out = {"label": SIMULATION_LABEL, **_status(session), "state": observe(session.sim).to_dict()}
     if session.sim.finished:
@@ -195,27 +240,36 @@ def state(sid: str) -> dict[str, Any]:
 
 @app.get("/api/simulation/{sid}/history")
 def history(sid: str) -> dict[str, Any]:
+    """Occupancy and queue history recorded at 4-hour resolution."""
     return {"label": SIMULATION_LABEL, "history": _get(sid).history}
 
 
 @app.get("/api/simulation/{sid}/decisions")
 def decisions(sid: str, limit: int = 50) -> dict[str, Any]:
+    """Most recent decision-log records (at most 500)."""
     records = _get(sid).policy.log.records
-    return {"label": SIMULATION_LABEL, "total": len(records),
-            "decisions": records[-max(1, min(limit, 500)):]}
+    return {
+        "label": SIMULATION_LABEL,
+        "total": len(records),
+        "decisions": records[-max(1, min(limit, 500)) :],
+    }
 
 
 @app.get("/api/simulation/{sid}/explanations/{decision_id}")
 def explanation(sid: str, decision_id: int) -> dict[str, Any]:
+    """Post-hoc template explanation of one logged decision."""
     records = _get(sid).policy.log.records
     if not 0 <= decision_id < len(records):
         raise HTTPException(404, "unknown decision")
-    return {"label": SIMULATION_LABEL,
-            "explanation": TemplateExplainer().explain(records[decision_id]).as_dict()}
+    return {
+        "label": SIMULATION_LABEL,
+        "explanation": TemplateExplainer().explain(records[decision_id]).as_dict(),
+    }
 
 
 @app.post("/api/simulation/{sid}/whatif")
 def whatif(sid: str, body: WhatIfBody) -> dict[str, Any]:
+    """Counterfactual comparison of policies from the session's current state."""
     session = _get(sid)
     if session.sim.finished:
         raise HTTPException(409, "simulation has reached its horizon")
@@ -223,16 +277,24 @@ def whatif(sid: str, body: WhatIfBody) -> dict[str, Any]:
         raise HTTPException(422, "choose 1-6 policies")
     factories = {}
     for name in body.policies:
-        build_policy(name)                       # validates the name early
-        factories[name] = (lambda n=name: build_policy(n))
+        build_policy(name)  # validates the name early
+        factories[name] = lambda n=name: build_policy(n)
     scenario = None
-    if (body.arrival_multiplier, body.staff_multiplier, body.capacity_multiplier) != (1.0, 1.0, 1.0):
+    if (body.arrival_multiplier, body.staff_multiplier, body.capacity_multiplier) != (
+        1.0,
+        1.0,
+        1.0,
+    ):
         base = session.sim.scenario
-        scenario = ScenarioConfig("what_if", base.arrival_multiplier * body.arrival_multiplier,
-                                  base.staff_multiplier * body.staff_multiplier,
-                                  base.capacity_multiplier * body.capacity_multiplier)
+        scenario = ScenarioConfig(
+            "what_if",
+            base.arrival_multiplier * body.arrival_multiplier,
+            base.staff_multiplier * body.staff_multiplier,
+            base.capacity_multiplier * body.capacity_multiplier,
+        )
     result = WhatIfEngine(factories).evaluate(
-        session.sim, WhatIfRequest(body.horizon_hours, body.n_futures, scenario))
+        session.sim, WhatIfRequest(body.horizon_hours, body.n_futures, scenario)
+    )
     return result.as_dict()
 
 
@@ -240,12 +302,14 @@ def whatif(sid: str, body: WhatIfBody) -> dict[str, Any]:
 def experiment_results() -> dict[str, Any]:
     """Pre-computed study results (Stages 6-7), served read-only with their provenance."""
     out: dict[str, Any] = {"label": SIMULATION_LABEL}
-    for key, rel in {"summary": "docs/data/stage6/summary.json",
-                     "comparisons": "docs/data/stage6/comparisons.json",
-                     "J_comparisons": "docs/data/stage6/J_comparisons.json",
-                     "robustness": "docs/data/stage7/robustness.json",
-                     "crn_check": "docs/data/stage7/crn_check.json",
-                     "structure": "docs/data/stage7/structure.json"}.items():
+    for key, rel in {
+        "summary": "docs/data/stage6/summary.json",
+        "comparisons": "docs/data/stage6/comparisons.json",
+        "J_comparisons": "docs/data/stage6/J_comparisons.json",
+        "robustness": "docs/data/stage7/robustness.json",
+        "crn_check": "docs/data/stage7/crn_check.json",
+        "structure": "docs/data/stage7/structure.json",
+    }.items():
         path = ROOT / rel
         out[key] = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
     return out

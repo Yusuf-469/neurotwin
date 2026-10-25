@@ -25,31 +25,35 @@ from typing import Any, Protocol
 
 POLICY_RULES = {
     "fcfs": "serves the request that has waited longest; places a patient off-service only "
-            "after the off-service waiting threshold",
+    "after the off-service waiting threshold",
     "priority": "serves the most urgent request first (priority 1 = most urgent), ties broken "
-                "by waiting time; off-service only after the waiting threshold",
+    "by waiting time; off-service only after the waiting threshold",
     "load_balancing": "serves the most urgent request first and places it in the other ward "
-                      "when the primary ward is much fuller than the other",
+    "when the primary ward is much fuller than the other",
     "trunk_reservation": "serves the most urgent request first but keeps a reserve of free beds "
-                         "that only priority 1-2 patients may use",
+    "that only priority 1-2 patients may use",
     "mip": "solves an exact one-step optimisation that weighs each waiting request's cost of "
-           "waiting against the cost of off-service placement",
+    "waiting against the cost of off-service placement",
     "ppo": "is a learned policy (PPO); its choice reflects patterns learned in training, not an "
-           "explicit rule",
+    "explicit rule",
 }
-LIMITATIONS = ("Post-hoc explanation of a simulated decision. It describes the policy's rule "
-               "and the logged state; it does not show that the decision was good, and it is "
-               "not clinical advice.")
+LIMITATIONS = (
+    "Post-hoc explanation of a simulated decision. It describes the policy's rule "
+    "and the logged state; it does not show that the decision was good, and it is "
+    "not clinical advice."
+)
 
 
 @dataclass
 class Explanation:
+    """A post-hoc explanation with its facts, alternatives and limitations."""
+
     decision_id: int
     timestamp: float
     policy: str
     summary: str
     reasoning: str
-    reliability_indicator: str            # qualitative grounding label, NOT a confidence
+    reliability_indicator: str  # qualitative grounding label, NOT a confidence
     facts_used: list[str]
     alternatives_considered: list[str]
     limitations: str
@@ -61,23 +65,33 @@ class Explanation:
 
 
 def _facts(record: dict[str, Any]) -> list[str]:
-    f = [f"time: {record['time']:.1f} h",
-         f"waiting requests: {record['n_waiting']} "
-         f"({record['n_waiting_high_priority']} with priority 1-2)",
-         f"longest wait: {record['oldest_wait_hours']:.1f} h",
-         "free staffed beds: " + ", ".join(f"{u} {n}" for u, n in record["free_staffed"].items())]
+    f = [
+        f"time: {record['time']:.1f} h",
+        f"waiting requests: {record['n_waiting']} "
+        f"({record['n_waiting_high_priority']} with priority 1-2)",
+        f"longest wait: {record['oldest_wait_hours']:.1f} h",
+        "free staffed beds: " + ", ".join(f"{u} {n}" for u, n in record["free_staffed"].items()),
+    ]
     if record["action"] == "PLACE":
-        f.append(f"chosen request: {record['request_type']}, priority {record['priority']}, "
-                 f"waited {record['waited_hours']:.1f} h, primary ward {record['primary_unit']}")
-        f.append(f"placed in: {record['unit']}" + (" (off-service)" if record["off_service"] else ""))
+        f.append(
+            f"chosen request: {record['request_type']}, priority {record['priority']}, "
+            f"waited {record['waited_hours']:.1f} h, primary ward {record['primary_unit']}"
+        )
+        f.append(
+            f"placed in: {record['unit']}" + (" (off-service)" if record["off_service"] else "")
+        )
     probs = record.get("policy_details", {}).get("action_probabilities")
     if probs:
-        f.append("policy action probabilities: "
-                 + ", ".join(f"{a} {p:.2f}" for a, p in sorted(probs.items(), key=lambda kv: -kv[1])))
+        f.append(
+            "policy action probabilities: "
+            + ", ".join(f"{a} {p:.2f}" for a, p in sorted(probs.items(), key=lambda kv: -kv[1]))
+        )
     return f
 
 
 class TemplateExplainer:
+    """Deterministic explainer built only from logged facts (offline)."""
+
     name = "template"
 
     def explain(self, record: dict[str, Any]) -> Explanation:
@@ -86,27 +100,47 @@ class TemplateExplainer:
         alternatives = [a for a in record.get("feasible_actions", []) if a != "HOLD"]
         if record["action"] == "PLACE":
             where = record["unit"] + (" (off-service)" if record["off_service"] else "")
-            summary = (f"Placed a priority-{record['priority']} {record['request_type'].replace('_', ' ')} "
-                       f"request that had waited {record['waited_hours']:.1f} h in {where}.")
+            request_type = record["request_type"].replace("_", " ")
+            summary = (
+                f"Placed a priority-{record['priority']} {request_type} "
+                f"request that had waited {record['waited_hours']:.1f} h in {where}."
+            )
             reasoning = f"The {policy} policy {rule}."
             if record["off_service"]:
-                reasoning += (f" The patient's primary ward ({record['primary_unit']}) had "
-                              f"{record['free_staffed'].get(record['primary_unit'], 0)} free staffed beds.")
+                reasoning += (
+                    f" The patient's primary ward ({record['primary_unit']}) had "
+                    f"{record['free_staffed'].get(record['primary_unit'], 0)} free staffed beds."
+                )
         else:
             summary = f"Held: no placement made with {record['n_waiting']} requests waiting."
-            reasoning = (f"The {policy} policy {rule}. At this moment it chose not to place any "
-                         f"further patient although {len(alternatives)} placement action(s) were feasible.")
+            reasoning = (
+                f"The {policy} policy {rule}. At this moment it chose not to place any "
+                f"further patient although {len(alternatives)} placement action(s) were feasible."
+            )
         probs = record.get("policy_details", {}).get("action_probabilities")
         if probs:
             top = max(probs, key=probs.get)
-            reasoning += (f" The learned policy assigned probability {probs[top]:.2f} to {top}; "
-                          "this is the policy's output, not a confidence in the decision's quality.")
-        return Explanation(record["decision_id"], record["time"], policy, summary, reasoning,
-                           "high (generated only from logged facts)", _facts(record),
-                           alternatives, LIMITATIONS, self.name)
+            reasoning += (
+                f" The learned policy assigned probability {probs[top]:.2f} to {top}; "
+                "this is the policy's output, not a confidence in the decision's quality."
+            )
+        return Explanation(
+            record["decision_id"],
+            record["time"],
+            policy,
+            summary,
+            reasoning,
+            "high (generated only from logged facts)",
+            _facts(record),
+            alternatives,
+            LIMITATIONS,
+            self.name,
+        )
 
 
 class LLMClient(Protocol):
+    """Minimal interface an LLM provider adapter must implement."""
+
     def complete(self, prompt: str) -> str: ...
 
 
@@ -119,7 +153,8 @@ def build_prompt(record: dict[str, Any]) -> str:
         "Write 2-3 sentences.\n\n"
         f"Policy rule: {POLICY_RULES.get(record['policy'], 'unknown')}\n"
         "Facts:\n- " + "\n- ".join(_facts(record)) + "\n\n"
-        f"Decision record (JSON): {json.dumps(record, sort_keys=True)}\n")
+        f"Decision record (JSON): {json.dumps(record, sort_keys=True)}\n"
+    )
 
 
 # A leading minus counts only when not attached to a word ("priority-1" contains 1, not -1).
@@ -134,7 +169,7 @@ def verify_numbers(text: str, record: dict[str, Any]) -> list[str]:
     for tok in _NUMBER.findall(source):
         v = float(tok)
         allowed.update({tok, f"{v:g}", f"{v:.1f}", f"{v:.2f}", str(int(round(v)))})
-    allowed.update(str(i) for i in range(1, 8))     # priorities, action counts, small ordinals
+    allowed.update(str(i) for i in range(1, 8))  # priorities, action counts, small ordinals
     return [n for n in _NUMBER.findall(text) if n not in allowed]
 
 
@@ -151,7 +186,7 @@ class LLMExplainer:
         base = self.fallback.explain(record)
         try:
             text = self.client.complete(build_prompt(record)).strip()
-        except Exception as exc:                      # provider failure: never block the system
+        except Exception as exc:  # provider failure: never block the system
             base.verification_issues = [f"LLM call failed ({type(exc).__name__}); template used"]
             return base
         unsupported = verify_numbers(text, record)

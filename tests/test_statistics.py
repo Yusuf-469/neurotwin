@@ -4,8 +4,13 @@ import numpy as np
 import pytest
 
 from neurotwin.experiments.evaluate import analyse, build_jobs, run_job
-from neurotwin.experiments.statistics import (cliffs_delta, compare, d_z, hierarchical_paired_bootstrap,
-                                              holm)
+from neurotwin.experiments.statistics import (
+    cliffs_delta,
+    compare,
+    d_z,
+    hierarchical_paired_bootstrap,
+    holm,
+)
 
 
 def test_holm_matches_manual_example():
@@ -16,7 +21,7 @@ def test_holm_matches_manual_example():
 
 
 def test_cliffs_delta_and_dz_known_values():
-    assert cliffs_delta([1, 2], [3, 4]) == 1.0          # X always smaller
+    assert cliffs_delta([1, 2], [3, 4]) == 1.0  # X always smaller
     assert cliffs_delta([3, 4], [1, 2]) == -1.0
     assert cliffs_delta([1, 2], [1, 2]) == 0.0
     assert d_z([1.0, 2.0, 3.0]) == pytest.approx(2.0)
@@ -27,7 +32,7 @@ def test_bootstrap_ci_covers_true_difference_at_nominal_rate():
     rng = np.random.default_rng(0)
     covered, trials = 0, 200
     for t in range(trials):
-        seed_effect = rng.normal(10, 3, size=40)                     # shared by CRN
+        seed_effect = rng.normal(10, 3, size=40)  # shared by CRN
         base = seed_effect + rng.normal(0, 1, 40)
         ppo = seed_effect - 1.0 + rng.normal(0, 1, (5, 40)) + rng.normal(0, 0.3, (5, 1))
         _, lo, hi, _ = hierarchical_paired_bootstrap(ppo, base, n_boot=1000, seed=t)
@@ -52,7 +57,9 @@ def test_hierarchical_bootstrap_widens_with_agent_variance():
     base = s + rng.normal(0, 1, 50)
     noise = rng.normal(0, 1, (5, 50))
     tight = hierarchical_paired_bootstrap(s + noise, base, 2000)
-    loose = hierarchical_paired_bootstrap(s + noise + np.array([[-3], [-1], [0], [1], [3]]), base, 2000)
+    loose = hierarchical_paired_bootstrap(
+        s + noise + np.array([[-3], [-1], [0], [1], [3]]), base, 2000
+    )
     assert (loose[2] - loose[1]) > 1.5 * (tight[2] - tight[1])
 
 
@@ -73,20 +80,31 @@ def test_boarding_metric_counts_patients_still_waiting():
     sim = HospitalSimulation(cfg, SCENARIOS["A"], seed=1)
     run_episode(sim, NeverPlace())
     m = episode_metrics(sim, CostWeights.load())
-    expected = [cfg.horizon_hours - r.created_at for r in sim.request_log()
-                if r.created_at >= cfg.warmup_hours and r.from_ed
-                and r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU)]
+    expected = [
+        cfg.horizon_hours - r.created_at
+        for r in sim.request_log()
+        if r.created_at >= cfg.warmup_hours
+        and r.from_ed
+        and r.rtype in (RequestType.ADMIT_GENERAL, RequestType.ADMIT_ICU)
+    ]
     assert m["mean_boarding_h"] == pytest.approx(np.mean(expected))
     assert m["censored_ed_requests"] == len(expected) > 10
-    assert np.isnan(m["mean_boarding_placed_only_h"])          # the flawed version is undefined
+    assert np.isnan(m["mean_boarding_placed_only_h"])  # the flawed version is undefined
 
 
 def test_end_to_end_on_validation_seeds(tmp_path):
     """Runner + analysis on 3 validation seeds, short episodes, untrained-free policies only."""
     from neurotwin.experiments.statistics import Comparison
+
     overrides = {"horizon_hours": 300.0, "warmup_hours": 100.0}
-    jobs = build_jobs([100_000, 100_001, 100_002], ["B"], agents=1, agent_dir=tmp_path,
-                      overrides=overrides, policies=("priority", "fcfs"))
+    jobs = build_jobs(
+        [100_000, 100_001, 100_002],
+        ["B"],
+        agents=1,
+        agent_dir=tmp_path,
+        overrides=overrides,
+        policies=("priority", "fcfs"),
+    )
     rows = [run_job(j) for j in jobs]
     # Treat 'priority' as the comparison policy to exercise analyse() without a trained agent.
     for r in rows:

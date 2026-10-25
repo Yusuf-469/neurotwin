@@ -19,6 +19,8 @@ REWARD_CONFIG = Path(__file__).resolve().parents[2] / "config" / "reward_default
 
 @dataclass(frozen=True)
 class CostWeights:
+    """Weights alpha, beta, kappa of the shared episode cost J."""
+
     alpha: float
     beta: float
     kappa: float
@@ -29,8 +31,11 @@ class CostWeights:
         return cls(**{k: v for k, v in data.items() if not k.startswith("_")})
 
     def cost(self, acc: Accumulators) -> float:
-        return (self.alpha * acc.weighted_request_hours + self.beta * acc.diversions
-                + self.kappa * acc.off_service_placements)
+        return (
+            self.alpha * acc.weighted_request_hours
+            + self.beta * acc.diversions
+            + self.kappa * acc.off_service_placements
+        )
 
 
 def measured_cost(sim: HospitalSimulation, weights: CostWeights) -> float:

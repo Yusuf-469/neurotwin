@@ -29,8 +29,9 @@ from ..hospital import HospitalSimulation, run_episode
 from .reduced import GreedyPlacement
 
 
-def occupancy_traces(config: SimulationConfig, scenario: str, seeds: range,
-                     days: int) -> tuple[np.ndarray, np.ndarray, dict]:
+def occupancy_traces(
+    config: SimulationConfig, scenario: str, seeds: range, days: int
+) -> tuple[np.ndarray, np.ndarray, dict]:
     """Hourly total occupancy (reps x hours), hourly staffed fraction, and episode metrics."""
     cfg = config.with_overrides(horizon_hours=days * 24.0, warmup_hours=min(days * 12.0, 336.0))
     totals, staffed_util = [], []
@@ -44,10 +45,17 @@ def occupancy_traces(config: SimulationConfig, scenario: str, seeds: range,
         diversion.append(res.diversion_rate_per_100)
         off_service.append(res.off_service_rate_per_100)
         staffed_util.append({u: sim.occupied(u) / max(1, sim.staffed_capacity(u)) for u in Unit})
-    metrics = {"mean_boarding_h": np.nanmean(boarding), "p90_boarding_h": np.nanmean(p90),
-               "diversion_per_100": np.nanmean(diversion),
-               "off_service_per_100": np.nanmean(off_service)}
-    return np.asarray(totals, dtype=float), np.asarray([[d[u] for u in Unit] for d in staffed_util]), metrics
+    metrics = {
+        "mean_boarding_h": np.nanmean(boarding),
+        "p90_boarding_h": np.nanmean(p90),
+        "diversion_per_100": np.nanmean(diversion),
+        "off_service_per_100": np.nanmean(off_service),
+    }
+    return (
+        np.asarray(totals, dtype=float),
+        np.asarray([[d[u] for u in Unit] for d in staffed_util]),
+        metrics,
+    )
 
 
 def welch_curve(traces: np.ndarray, window: int) -> np.ndarray:
@@ -56,17 +64,19 @@ def welch_curve(traces: np.ndarray, window: int) -> np.ndarray:
     out = np.empty_like(mean)
     for i in range(len(mean)):
         w = min(window, i, len(mean) - 1 - i)
-        out[i] = mean[i - w:i + w + 1].mean()
+        out[i] = mean[i - w : i + w + 1].mean()
     return out
 
 
 def suggest_warmup_days(curve: np.ndarray, threshold: float = 0.98) -> int:
+    """First day the smoothed curve reaches ``threshold`` of its final-third level."""
     daily = curve[: len(curve) // 24 * 24].reshape(-1, 24).mean(axis=1)
-    level = daily[2 * len(daily) // 3:].mean()
+    level = daily[2 * len(daily) // 3 :].mean()
     return int(np.argmax(daily >= threshold * level))
 
 
 def main() -> None:
+    """Command-line entry point for the Welch warm-up analysis."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--days", type=int, default=42)
     parser.add_argument("--reps", type=int, default=30)
@@ -74,8 +84,9 @@ def main() -> None:
     parser.add_argument("--window", type=int, default=84, help="moving-average half-width (h)")
     args = parser.parse_args()
 
-    traces, util, metrics = occupancy_traces(load_default_config(), args.scenario,
-                                             range(args.reps), args.days)
+    traces, util, metrics = occupancy_traces(
+        load_default_config(), args.scenario, range(args.reps), args.days
+    )
     curve = welch_curve(traces, window=args.window)
     daily = curve[: len(curve) // 24 * 24].reshape(-1, 24).mean(axis=1)
     print(f"Scenario {args.scenario}: {args.reps} replications x {args.days} days, greedy policy")
@@ -83,10 +94,13 @@ def main() -> None:
     for day, value in enumerate(daily):
         print(f"  day {day:2d}: {value:7.1f}")
     print(f"Suggested warm-up (98% of final-third level): {suggest_warmup_days(curve)} days")
-    print("End-of-run occupancy / staffed capacity (mean over reps): "
-          + ", ".join(f"{u.value}={v:.2f}" for u, v in zip(Unit, util.mean(axis=0))))
-    print("Metrics over measurement window: "
-          + ", ".join(f"{k}={v:.2f}" for k, v in metrics.items()))
+    print(
+        "End-of-run occupancy / staffed capacity (mean over reps): "
+        + ", ".join(f"{u.value}={v:.2f}" for u, v in zip(Unit, util.mean(axis=0)))
+    )
+    print(
+        "Metrics over measurement window: " + ", ".join(f"{k}={v:.2f}" for k, v in metrics.items())
+    )
 
 
 if __name__ == "__main__":

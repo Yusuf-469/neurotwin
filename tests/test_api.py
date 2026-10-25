@@ -9,7 +9,9 @@ client = TestClient(app)
 
 
 def _start(policy="priority", scenario="B"):
-    r = client.post("/api/simulation/start", json={"scenario": scenario, "seed": 1, "policy": policy})
+    r = client.post(
+        "/api/simulation/start", json={"scenario": scenario, "seed": 1, "policy": policy}
+    )
     assert r.status_code == 200
     return r.json()["session_id"]
 
@@ -27,9 +29,9 @@ def test_session_lifecycle_state_decisions_explanations():
     state = client.get(f"/api/simulation/{sid}/state").json()
     assert state["label"] == SIMULATION_LABEL
     text = str(state["state"])
-    assert "general_los" not in text and "deterioration_delay" not in text   # observable only
+    assert "general_los" not in text and "deterioration_delay" not in text  # observable only
     hist = client.get(f"/api/simulation/{sid}/history").json()["history"]
-    assert len(hist) == 13 and hist[-1]["time"] == pytest.approx(48.0)       # start + 12 x 4 h
+    assert len(hist) == 13 and hist[-1]["time"] == pytest.approx(48.0)  # start + 12 x 4 h
     dec = client.get(f"/api/simulation/{sid}/decisions?limit=5").json()
     assert dec["total"] > 5 and len(dec["decisions"]) == 5
     did = dec["decisions"][0]["decision_id"]
@@ -41,20 +43,29 @@ def test_session_lifecycle_state_decisions_explanations():
 def test_whatif_endpoint():
     sid = _start(scenario="A")
     client.post(f"/api/simulation/{sid}/step", json={"hours": 72})
-    r = client.post(f"/api/simulation/{sid}/whatif",
-                    json={"horizon_hours": 24, "n_futures": 3, "arrival_multiplier": 1.3,
-                          "policies": ["priority", "fcfs"]})
+    r = client.post(
+        f"/api/simulation/{sid}/whatif",
+        json={
+            "horizon_hours": 24,
+            "n_futures": 3,
+            "arrival_multiplier": 1.3,
+            "policies": ["priority", "fcfs"],
+        },
+    )
     assert r.status_code == 200
     body = r.json()
     assert "SIMULATION" in body["label"] and set(body["per_policy"]) == {"priority", "fcfs"}
     assert body["scenario"] == "what_if"
 
 
-@pytest.mark.parametrize("path,payload,code", [
-    ("/api/simulation/start", {"scenario": "Z"}, 404),
-    ("/api/simulation/start", {"policy": "nope"}, 404),
-    ("/api/simulation/start", {"seed": -1}, 422),
-])
+@pytest.mark.parametrize(
+    "path,payload,code",
+    [
+        ("/api/simulation/start", {"scenario": "Z"}, 404),
+        ("/api/simulation/start", {"policy": "nope"}, 404),
+        ("/api/simulation/start", {"seed": -1}, 422),
+    ],
+)
 def test_invalid_inputs_are_rejected(path, payload, code):
     assert client.post(path, json=payload).status_code == code
 

@@ -24,11 +24,14 @@ def test_streams_are_independent_of_each_other():
     assert np.array_equal(a["patient_attributes"].random(10), b["patient_attributes"].random(10))
 
 
-@pytest.mark.parametrize("spec", [
-    DistributionSpec("lognormal", 96.0, 72.0),
-    DistributionSpec("lognormal", 3.0, 1.5),
-    DistributionSpec("exponential", 10.0),
-])
+@pytest.mark.parametrize(
+    "spec",
+    [
+        DistributionSpec("lognormal", 96.0, 72.0),
+        DistributionSpec("lognormal", 3.0, 1.5),
+        DistributionSpec("exponential", 10.0),
+    ],
+)
 def test_inverse_cdf_sampling_matches_mean_and_sd(spec):
     u = np.random.default_rng(0).random(200_000)
     x = np.array([sample_duration(spec, ui) for ui in u])

@@ -13,6 +13,8 @@ from enum import Enum
 
 
 class Unit(str, Enum):
+    """Hospital units that hold beds."""
+
     MED = "MED"
     SURG = "SURG"
     ICU = "ICU"
@@ -40,11 +42,13 @@ class RequestType(Enum):
 
 @dataclass(slots=True)
 class Patient:
+    """A patient, including hidden attributes drawn at arrival (never shown to policies)."""
+
     pid: int
     arrival_time: float
     is_emergency: bool
-    priority: int                      # 1 = most urgent
-    specialty: Unit                    # primary ward: MED or SURG
+    priority: int  # 1 = most urgent
+    specialty: Unit  # primary ward: MED or SURG
     icu_first: bool
     # Hidden attributes (never exposed to policies).
     ed_treatment_time: float
@@ -52,9 +56,9 @@ class Patient:
     general_los: float
     escalation_icu_los: float
     post_icu_general_los: float
-    deterioration_delay: float         # hours after a general placement; inf = never
+    deterioration_delay: float  # hours after a general placement; inf = never
     # Dynamic state.
-    activity_start: float = math.nan   # start of the timed activity in progress (treatment/stay)
+    activity_start: float = math.nan  # start of the timed activity in progress (treatment/stay)
     location: Unit | None = None
     off_service: bool = False
     has_deteriorated: bool = False
@@ -64,6 +68,8 @@ class Patient:
 
 @dataclass(slots=True)
 class BedRequest:
+    """A request for a bed; waits until placed by a policy."""
+
     rid: int
     patient: Patient
     rtype: RequestType
@@ -83,8 +89,15 @@ class BedRequest:
         return Unit.ICU if self.rtype.needs_icu else self.patient.specialty
 
     def view(self) -> "RequestView":
-        return RequestView(self.rid, self.rtype, self.priority, self.created_at,
-                           self.primary_unit, self.eligible_units, self.from_ed)
+        return RequestView(
+            self.rid,
+            self.rtype,
+            self.priority,
+            self.created_at,
+            self.primary_unit,
+            self.eligible_units,
+            self.from_ed,
+        )
 
 
 @dataclass(frozen=True, slots=True)

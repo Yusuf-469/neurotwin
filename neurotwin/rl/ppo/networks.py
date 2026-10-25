@@ -9,8 +9,8 @@ from torch import nn
 
 
 def _layer(n_in: int, n_out: int, gain: float) -> nn.Linear:
-    # [37 details] Orthogonal initialisation with gain sqrt(2) for hidden layers, 0.01 for the policy
-    # output (near-uniform initial policy) and 1.0 for the value output; zero biases.
+    # [37 details] Orthogonal initialisation with gain sqrt(2) for hidden layers, 0.01 for the
+    # policy output (near-uniform initial policy) and 1.0 for the value output; zero biases.
     layer = nn.Linear(n_in, n_out)
     nn.init.orthogonal_(layer.weight, gain)
     nn.init.zeros_(layer.bias)

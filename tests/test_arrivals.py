@@ -3,8 +3,13 @@ import pytest
 from scipy import stats
 
 from neurotwin.simulation import SCENARIOS, load_default_config
-from neurotwin.simulation.arrivals import (HOURS_PER_WEEK, PiecewiseConstantRate,
-                                           ThinningArrivalProcess, elective_rate, emergency_rate)
+from neurotwin.simulation.arrivals import (
+    HOURS_PER_WEEK,
+    PiecewiseConstantRate,
+    ThinningArrivalProcess,
+    elective_rate,
+    emergency_rate,
+)
 
 
 def test_integral_of_piecewise_rate():
@@ -15,7 +20,10 @@ def test_integral_of_piecewise_rate():
 
 def test_base_rates_are_weekly_mean_rates():
     cfg = load_default_config()
-    for fn, base in ((emergency_rate, cfg.emergency_base_rate), (elective_rate, cfg.elective_base_rate)):
+    for fn, base in (
+        (emergency_rate, cfg.emergency_base_rate),
+        (elective_rate, cfg.elective_base_rate),
+    ):
         assert fn(cfg, SCENARIOS["A"]).rates.mean() == pytest.approx(base)
         multiplier = SCENARIOS["B"].arrival_multiplier
         assert fn(cfg, SCENARIOS["B"]).rates.mean() == pytest.approx(multiplier * base)
@@ -24,7 +32,7 @@ def test_base_rates_are_weekly_mean_rates():
 def test_electives_only_in_window():
     cfg = load_default_config()
     rates = elective_rate(cfg, SCENARIOS["A"]).rates.reshape(7, 24)
-    assert np.all(rates[5:] == 0)                  # weekend
+    assert np.all(rates[5:] == 0)  # weekend
     assert np.all(rates[:5, :8] == 0) and np.all(rates[:5, 16:] == 0)
     assert np.all(rates[:5, 8:16] > 0)
 

@@ -39,13 +39,21 @@ from .features import N_FEATURES, FeatureScales, features
 
 
 class HospitalAllocationEnv(gym.Env):
+    """Gymnasium environment: atomic, masked, semi-Markov bed-allocation decisions."""
+
     metadata = {"render_modes": []}
 
-    def __init__(self, config: SimulationConfig | None = None,
-                 scenario: ScenarioConfig | None = None, start_mode: str = "full",
-                 pool: WarmStartPool | None = None, weights: CostWeights | None = None,
-                 reward_scale: float = 0.1, scenario_sampler=None,
-                 drop_features: tuple[int, ...] = ()) -> None:
+    def __init__(
+        self,
+        config: SimulationConfig | None = None,
+        scenario: ScenarioConfig | None = None,
+        start_mode: str = "full",
+        pool: WarmStartPool | None = None,
+        weights: CostWeights | None = None,
+        reward_scale: float = 0.1,
+        scenario_sampler=None,
+        drop_features: tuple[int, ...] = (),
+    ) -> None:
         """``scenario_sampler(rng) -> ScenarioConfig`` optionally draws a scenario per episode
         (PPO-DR, RESEARCH.md §6.23); it must only produce training-range scenarios.
 
@@ -74,8 +82,7 @@ class HospitalAllocationEnv(gym.Env):
         self.scales = FeatureScales.from_config(self.config)
         # Count and wait features have no natural upper bound (e.g. mean wait / 4 h under
         # stress), so the space is [-1, inf); PPO normalises observations with running stats.
-        self.observation_space = gym.spaces.Box(-1.0, np.inf, shape=(N_FEATURES,),
-                                                dtype=np.float32)
+        self.observation_space = gym.spaces.Box(-1.0, np.inf, shape=(N_FEATURES,), dtype=np.float32)
         self.action_space = gym.spaces.Discrete(N_ACTIONS)
         self.sim: HospitalSimulation | None = None
         self._mask = np.ones(N_ACTIONS, dtype=bool)
@@ -83,11 +90,12 @@ class HospitalAllocationEnv(gym.Env):
 
     # ------------------------------------------------------------------ gym API
 
-    def reset(self, *, seed: int | None = None,
-              options: dict[str, Any] | None = None) -> tuple[np.ndarray, dict]:
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
         if seed is None:
-            seed = int(self.np_random.integers(0, 100_000))     # TRAIN range by default
+            seed = int(self.np_random.integers(0, 100_000))  # TRAIN range by default
         scenario = self.scenario
         if self.scenario_sampler is not None:
             scenario = self.scenario_sampler(np.random.default_rng(seed))
@@ -114,10 +122,11 @@ class HospitalAllocationEnv(gym.Env):
         else:
             self._advance_to_decision()
         after = sim.acc
-        cost = (self.weights.alpha * (after.weighted_request_hours - before.weighted_request_hours)
-                + self.weights.beta * (after.diversions - before.diversions)
-                + self.weights.kappa * (after.off_service_placements
-                                        - before.off_service_placements))
+        cost = (
+            self.weights.alpha * (after.weighted_request_hours - before.weighted_request_hours)
+            + self.weights.beta * (after.diversions - before.diversions)
+            + self.weights.kappa * (after.off_service_placements - before.off_service_placements)
+        )
         truncated = sim.finished
         return self._obs(), -cost * self.reward_scale, False, truncated, self._info(sim.now - t0)
 
@@ -131,7 +140,7 @@ class HospitalAllocationEnv(gym.Env):
         sim = self.sim
         if not sim.next_epoch():
             self._mask = np.zeros(N_ACTIONS, dtype=bool)
-            self._mask[0] = True                     # finished: nothing to decide
+            self._mask[0] = True  # finished: nothing to decide
             return
         self._mask = action_mask(sim)
 
