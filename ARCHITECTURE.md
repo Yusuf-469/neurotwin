@@ -101,11 +101,17 @@ Core discrete-event simulation modeling hospital operations.
 
 ### 3.3 Digital Twin Layer (`digital_twin/`)
 Maintains computational representation of simulated hospital state.
-- **State Store**: Current state of all entities and resources
-- **State History**: Time-series storage of state snapshots
-- **State Serializer**: Export/import state for reproducibility
-- **What-If Capability**: Simulate alternative futures from comparable states
-- **Counterfactual Engine**: Evaluate alternative policies from same initial conditions
+- **Observable State** (`state.py`): `HospitalState` built by `observe(sim)` from public engine
+  queries only; this is the only state policies, the API and the dashboard may see
+- **State History** (`history.py`): `StateHistory`, `RecordingPolicy` (read-only recording)
+- **Snapshots** (`snapshot_io.py` + engine `to_snapshot/from_snapshot`): complete state incl.
+  hidden attributes and RNG states; exact restore (byte-identical continuation, tested)
+- **What-If Branching** (engine `branch(seed)`): same present, new future randomness from
+  branch-namespace streams; in-progress durations re-drawn conditional on elapsed time
+- **Warm-Start Pool** (`warm_start.py`): steady-state training starts from training seeds only
+- **Counterfactual Engine**: policy comparison over many branches is Stage 8 (`whatif/`)
+
+Snapshots contain hidden information and are never passed to policies.
 
 ### 3.4 Decision Layer (`policies/`)
 Contains all allocation policies evaluated in experiments.

@@ -21,14 +21,25 @@ STREAM_NAMES: tuple[str, ...] = (
 )
 
 
-class RandomStreams:
-    """Named, independent ``numpy.random.Generator`` streams derived from one root seed."""
+#: Namespace for what-if branches. Branch streams for seed s are statistically independent of the
+#: episode streams for the same integer s, so branching can never replay an episode's future.
+BRANCH_NAMESPACE = 1
 
-    def __init__(self, seed: int) -> None:
-        if seed < 0:
-            raise ValueError("seed must be non-negative")
+
+class RandomStreams:
+    """Named, independent ``numpy.random.Generator`` streams derived from one root seed.
+
+    ``namespace`` 0 is used for episodes (and must stay the default so existing seeds keep
+    their streams); other namespaces give independent families of streams for the same seed.
+    """
+
+    def __init__(self, seed: int, namespace: int = 0) -> None:
+        if seed < 0 or namespace < 0:
+            raise ValueError("seed and namespace must be non-negative")
         self.seed = seed
-        children = np.random.SeedSequence(seed).spawn(len(STREAM_NAMES))
+        self.namespace = namespace
+        spawn_key = () if namespace == 0 else (namespace,)
+        children = np.random.SeedSequence(seed, spawn_key=spawn_key).spawn(len(STREAM_NAMES))
         self._generators = {name: np.random.default_rng(child)
                             for name, child in zip(STREAM_NAMES, children)}
 

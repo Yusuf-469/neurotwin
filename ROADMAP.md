@@ -127,11 +127,14 @@ Implement state management with history, serialization, and what-if capability.
 - Test state cloning for what-if
 
 ### Completion Criteria
-- [ ] State reflects simulation after every event
-- [ ] State serializes to JSON correctly
-- [ ] State restores from JSON
-- [ ] State history maintained
-- [ ] What-if state cloning functional
+- [x] State reflects simulation after every event (observable state built from live engine queries)
+- [x] State serializes to JSON correctly
+- [x] State restores from JSON (byte-identical continuation)
+- [x] State history maintained
+- [x] What-if state cloning functional (`clone`, `branch` with conditional resampling)
+- [x] Warm-start pool validated against full episodes (`docs/stage3_digital_twin_report.md`)
+
+**Status: complete (2026-10-25).**
 
 ---
 

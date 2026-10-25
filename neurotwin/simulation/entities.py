@@ -54,6 +54,7 @@ class Patient:
     post_icu_general_los: float
     deterioration_delay: float         # hours after a general placement; inf = never
     # Dynamic state.
+    activity_start: float = math.nan   # start of the timed activity in progress (treatment/stay)
     location: Unit | None = None
     off_service: bool = False
     has_deteriorated: bool = False

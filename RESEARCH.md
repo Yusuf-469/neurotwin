@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.1 (2026-10-25). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.2 (2026-10-25). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -495,7 +495,7 @@ These are initial values. Tuning ranges are in §6.20; the final values and the 
 - **Warm-up**: **21 days**, excluded from metrics. Determined by Welch's method on a 30 × 70-day pilot with a **one-week** smoothing window (`docs/stage2_validation_report.md` §3). The v2.0 default of 1 day was far too short: from an empty start, occupancy needs about 3 weeks to stabilise. A 1-day window also mistook the weekly elective cycle for a trend.
 - **Measurement**: days 22–35 (14 days, starting on the same weekday every episode)
 - **Termination**: truncation at 35 days. For PPO, the final step bootstraps from the value function (truncation, not a true terminal state).
-- **Option under evaluation (Stage 3/5):** start RL training episodes from saved warm states (generated with training seeds only) to avoid acting through 21 unmeasured days.
+- **RL training episodes start from a warm-start pool** (Stage 3): states at the end of the warm-up of training-seed runs under a reference greedy policy, each branched with the episode's own training seed. In-progress stays are re-drawn conditional on elapsed time. Warm-started episodes reproduce full-episode statistics (Welch t-test p ≈ 0.85), whereas a naive restart of in-progress stays nearly triples boarding, an inspection-paradox bias (`docs/stage3_digital_twin_report.md`). **Validation and test episodes do not use the pool**: they run the full 35-day protocol from an empty start.
 
 **Why empty start + warm-up:** an empty start is reproducible and identical for all policies, but it introduces **initialisation bias** (an empty hospital is atypical). The warm-up removes that bias from metrics.
 
@@ -627,7 +627,7 @@ This is a direct, non-LLM interpretability analysis grounded in queueing theory.
 
 ## 6.21 What-If Experiment Design
 
-For a cloned state S₀, each policy is run forward with identical future random streams (CRN streams are cloned together with the state). Outcomes are compared over 50 future seeds per S₀ and reported with paired CIs. All results come from actual simulation runs and are labelled as simulation results.
+For a state S₀, each future seed *f* defines a branch `S₀.branch(f)`: the present is kept, and all future randomness comes from independent branch-namespace streams. Not-yet-started durations are re-drawn, and durations already in progress are re-drawn **conditional on elapsed time** (because the true remaining time is unknown at S₀). Every policy runs on the same branches (CRN), and outcomes are compared over 50 future seeds per S₀ with paired CIs. All results come from actual simulation runs and are labelled as simulation results.
 
 ## 6.23 Extension: Domain-Randomised Training (RQ8)
 
@@ -815,6 +815,10 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.2 — 2026-10-25 (Stage 3; `docs/stage3_digital_twin_report.md`)
+- §6.11: RL training episodes start from a validated warm-start pool (training seeds only); evaluation unchanged
+- §6.21: what-if branches defined precisely (branch-namespace streams, conditional resampling of in-progress durations)
 
 ### v2.1 — 2026-10-25 (Stage 2 pilot evidence; `docs/stage2_validation_report.md`)
 - Warm-up 1 day → 21 days and horizon 14 → 35 days, from the Welch analysis (§6.11)

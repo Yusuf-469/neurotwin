@@ -30,23 +30,30 @@ Simplifying assumptions (documented, RESEARCH.md §6.1/§6.6)
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
-from typing import Iterator, Protocol
-
+import copy
 import heapq
+import math
+from collections import deque
+from dataclasses import asdict, dataclass, field
+from typing import Any, Iterator, Protocol
 
 from .arrivals import ThinningArrivalProcess, elective_rate, emergency_rate
 from .config import SCENARIOS, ScenarioConfig, SimulationConfig, round_half_up
-from .distributions import exponential_from_uniform, sample_duration
+from .distributions import conditional_residual, exponential_from_uniform, sample_duration
 from .entities import GENERAL_UNITS, BedRequest, Patient, RequestType, RequestView, Unit
 from .events import EventKind, EventQueue
-from .rng import RandomStreams
+from .rng import BRANCH_NAMESPACE, STREAM_NAMES, RandomStreams
 
 # Uniforms consumed per patient from the patient_attributes stream (fixed for CRN alignment):
 # priority, specialty, ICU pathway, ED treatment, ICU LOS, general LOS, escalation ICU LOS,
 # post-ICU general LOS, deterioration delay.
 _UNIFORMS_PER_PATIENT = 9
+# Recent-event histories (arrivals, discharges, diversions) are kept for this many hours; the
+# RL state uses 1 h, 4 h and 24 h windows (RESEARCH.md §6.5).
+RECENT_WINDOW_HOURS = 24.0
+SNAPSHOT_SCHEMA = "neurotwin.sim_snapshot/1"
+_PATIENT_EVENTS = (EventKind.DISCHARGE, EventKind.ICU_PHASE_END, EventKind.DETERIORATION,
+                   EventKind.ED_TREATMENT_END)
 
 
 @dataclass
@@ -119,6 +126,7 @@ class HospitalSimulation:
         self.config = config
         self.scenario = scenario or SCENARIOS["A"]
         self.seed = seed
+        self.branch_seed: int | None = None      # set when this run is a what-if branch
         self._streams = RandomStreams(seed)
         self._attr_rng = self._streams["patient_attributes"]
         self._staff_rng = self._streams["staffing"]
@@ -158,6 +166,8 @@ class HospitalSimulation:
         self._boarding_times: list[float] = []
         self._elective_waits: list[float] = []
         self._ed_waits: list[float] = []
+        self._recent: dict[str, deque[float]] = {
+            "arrivals": deque(), "discharges": deque(), "diversions": deque()}
 
         self._epoch_open = False
         self._finished = False
@@ -215,6 +225,25 @@ class HospitalSimulation:
         """Waiting requests in creation order (only decision-time information)."""
         return [r.view() for r in self._requests.values()]
 
+    def recent_event_times(self, kind: str) -> tuple[float, ...]:
+        """Times of recent 'arrivals' (emergency and elective, incl. diverted), 'discharges'
+        or 'diversions' within the last RECENT_WINDOW_HOURS (past information only)."""
+        self._prune_recent()
+        return tuple(self._recent[kind])
+
+    @property
+    def doctor_queue_length(self) -> int:
+        return len(self._doctor_queue)
+
+    @property
+    def doctors_busy(self) -> int:
+        return self._doctors_busy
+
+    @property
+    def off_service_in_beds(self) -> int:
+        return sum(1 for p in self._patients
+                   if p.off_service and p.location is not None and p.location is not Unit.ICU)
+
     def has_feasible_placement(self) -> bool:
         general_free = any(self.free_staffed(u) > 0 for u in GENERAL_UNITS)
         return ((self._n_waiting_general > 0 and general_free)
@@ -222,26 +251,33 @@ class HospitalSimulation:
 
     # ================================================================== public: control
 
-    def next_epoch(self) -> bool:
+    def next_epoch(self, until: float | None = None) -> bool:
         """Advance until a decision epoch opens (True) or the horizon is reached (False).
 
-        Calling this also ends the current epoch: any requests still waiting are held.
+        With ``until``, also stop (returning False, ``finished`` still False) once the next
+        event would be after ``until``; time is then advanced exactly to ``until``. Used to
+        take snapshots at a chosen time. Calling this ends the current epoch: any requests
+        still waiting are held.
         """
         self._epoch_open = False
         if self._finished:
             return False
         horizon = self.config.horizon_hours
+        limit = horizon if until is None else min(until, horizon)
+        if limit < self.now:
+            raise ValueError("cannot advance to a time in the past")
         while True:
             t_next = self._queue.peek_time()
-            if t_next is None or t_next > horizon:
+            if t_next is None or t_next > limit:
                 break
             t, kind, payload = self._queue.pop()
             self._advance_to(t)
             if self._handle(kind, payload) and self.has_feasible_placement():
                 self._epoch_open = True
                 return True
-        self._advance_to(horizon)
-        self._finished = True
+        self._advance_to(limit)
+        if limit >= horizon:
+            self._finished = True
         return False
 
     def place(self, rid: int, unit: Unit) -> None:
@@ -264,6 +300,7 @@ class HospitalSimulation:
             self._occupied[patient.location] -= 1          # source bed is freed
         self._occupied[unit] += 1
         patient.location = unit
+        patient.activity_start = self.now
 
         if unit is Unit.ICU:
             patient.off_service = False
@@ -329,6 +366,225 @@ class HospitalSimulation:
         """All patients ever generated, including diverted ones (tests and analysis only)."""
         return iter(self._patients)
 
+    # ================================================================== digital twin support
+    #
+    # The full simulation state (including hidden patient attributes, RNG stream states and the
+    # event list) can be cloned, serialised and branched. These live in the engine because they
+    # need its internals; the digital_twin package builds file I/O, observable state, history
+    # and warm-start pools on top of them (ARCHITECTURE.md §3.3).
+
+    def clone(self) -> "HospitalSimulation":
+        """Independent exact copy: continuing it reproduces this run exactly."""
+        return copy.deepcopy(self)
+
+    def to_snapshot(self) -> dict[str, Any]:
+        """Complete state as a JSON-serialisable dict (Python JSON: allows Infinity/NaN).
+
+        Restoring with ``from_snapshot`` and continuing gives results identical to continuing
+        this object (tested). Contains hidden information, so it must never be given to a policy.
+        """
+        def pid(p: Patient | None) -> int | None:
+            return None if p is None else p.pid
+
+        return {
+            "schema": SNAPSHOT_SCHEMA,
+            "config": self.config.to_dict(),
+            "scenario": asdict(self.scenario),
+            "seed": self.seed,
+            "branch_seed": self.branch_seed,
+            "now": self.now,
+            "epoch_open": self._epoch_open,
+            "finished": self._finished,
+            "rng": {name: self._streams[name].bit_generator.state for name in STREAM_NAMES},
+            "rng_namespace": self._streams.namespace,
+            "patients": [_patient_to_dict(p) for p in self._patients],
+            "requests": [_request_to_dict(r) for r in self._request_log],
+            "waiting": list(self._requests),
+            "events": [[t, int(k), s, pid(p)] for t, k, s, p in self._queue.entries()],
+            "event_next_seq": self._queue.next_seq,
+            "occupied": {u.value: n for u, n in self._occupied.items()},
+            "nurses_on_shift": {u.value: n for u, n in self._nurses_on_shift.items()},
+            "doctors_on_shift": self._doctors_on_shift,
+            "doctors_busy": self._doctors_busy,
+            "doctor_queue": [[pr, at, p_id] for pr, at, p_id, _ in self._doctor_queue],
+            "next_rid": self._next_rid,
+            "n_waiting_general": self._n_waiting_general,
+            "n_waiting_icu": self._n_waiting_icu,
+            "n_boarding": self._n_boarding,
+            "weight_sum": self._weight_sum,
+            "acc": vars(self.acc).copy(),
+            "measured": vars(self._measured).copy(),
+            "m_emergency_arrivals": self._m_emergency_arrivals,
+            "m_general_placements": self._m_general_placements,
+            "boarding_times": list(self._boarding_times),
+            "elective_waits": list(self._elective_waits),
+            "ed_waits": list(self._ed_waits),
+            "recent": {k: list(v) for k, v in self._recent.items()},
+            "trace_interval": self._trace_interval,
+            "trace": [[t, {u.value: n for u, n in occ.items()}, w] for t, occ, w in self.trace],
+        }
+
+    @classmethod
+    def from_snapshot(cls, snap: dict[str, Any]) -> "HospitalSimulation":
+        if snap.get("schema") != SNAPSHOT_SCHEMA:
+            raise ValueError(f"unsupported snapshot schema {snap.get('schema')!r}")
+        sim = cls(SimulationConfig.from_dict(snap["config"]), ScenarioConfig(**snap["scenario"]),
+                  seed=snap["seed"], trace_interval_hours=snap["trace_interval"])
+        # Everything __init__ set up dynamically is overwritten below.
+        if snap["rng_namespace"] != 0:
+            sim._set_streams(RandomStreams(snap["branch_seed"], snap["rng_namespace"]))
+        for name, state in snap["rng"].items():
+            sim._streams[name].bit_generator.state = state
+        sim.branch_seed = snap["branch_seed"]
+        sim.now = snap["now"]
+        sim._epoch_open = snap["epoch_open"]
+        sim._finished = snap["finished"]
+        patients = [_patient_from_dict(d) for d in snap["patients"]]
+        sim._patients = patients
+        sim._request_log = [_request_from_dict(d, patients) for d in snap["requests"]]
+        by_rid = {r.rid: r for r in sim._request_log}
+        sim._requests = {rid: by_rid[rid] for rid in snap["waiting"]}
+        sim._queue.replace_all(
+            [(t, EventKind(k), s, None if p_id is None else patients[p_id])
+             for t, k, s, p_id in snap["events"]], snap["event_next_seq"])
+        sim._occupied = {Unit(u): n for u, n in snap["occupied"].items()}
+        sim._nurses_on_shift = {Unit(u): n for u, n in snap["nurses_on_shift"].items()}
+        sim._doctors_on_shift = snap["doctors_on_shift"]
+        sim._doctors_busy = snap["doctors_busy"]
+        sim._doctor_queue = [(pr, at, p_id, patients[p_id]) for pr, at, p_id in snap["doctor_queue"]]
+        sim._next_rid = snap["next_rid"]
+        sim._n_waiting_general = snap["n_waiting_general"]
+        sim._n_waiting_icu = snap["n_waiting_icu"]
+        sim._n_boarding = snap["n_boarding"]
+        sim._weight_sum = snap["weight_sum"]
+        sim.acc = Accumulators(**snap["acc"])
+        sim._measured = Accumulators(**snap["measured"])
+        sim._m_emergency_arrivals = snap["m_emergency_arrivals"]
+        sim._m_general_placements = snap["m_general_placements"]
+        sim._boarding_times = list(snap["boarding_times"])
+        sim._elective_waits = list(snap["elective_waits"])
+        sim._ed_waits = list(snap["ed_waits"])
+        sim._recent = {k: deque(v) for k, v in snap["recent"].items()}
+        sim.trace = [(t, {Unit(u): n for u, n in occ.items()}, w) for t, occ, w in snap["trace"]]
+        return sim
+
+    def branch(self, seed: int, resample_in_progress: bool = True) -> "HospitalSimulation":
+        """What-if branch (RESEARCH.md §6.21): same present, new future randomness.
+
+        The returned simulation shares this run's present state but draws all *future*
+        randomness from streams for ``seed`` in the branch namespace: future arrivals, staffing
+        draws and every not-yet-started duration of patients already in the system. With
+        ``resample_in_progress`` (default), durations already in progress (ED treatment, ICU
+        stay, ward stay) are also re-drawn from their distribution *conditional on the time
+        already elapsed*, because the true remaining time is unknown at the branch point.
+
+        Branches with the same seed are identical whichever policy is later used (CRN), so
+        policies can be compared from the same state on the same futures.
+        """
+        if self._finished:
+            raise RuntimeError("cannot branch a finished simulation")
+        sim = self.clone()
+        sim.branch_seed = seed
+        sim._set_streams(RandomStreams(seed, BRANCH_NAMESPACE))
+        entries = [e for e in sim._queue.entries()
+                   if e[1] not in (EventKind.EMERGENCY_ARRIVAL, EventKind.ELECTIVE_ARRIVAL)]
+        entries = sim._redraw_hidden_attributes(entries, resample_in_progress)
+        sim._queue.replace_all(entries, sim._queue.next_seq)
+        sim._push_next_arrival(sim._em_arrivals, sim.now, EventKind.EMERGENCY_ARRIVAL)
+        sim._push_next_arrival(sim._el_arrivals, sim.now, EventKind.ELECTIVE_ARRIVAL)
+        return sim
+
+    def _set_streams(self, streams: RandomStreams) -> None:
+        self._streams = streams
+        self._attr_rng = streams["patient_attributes"]
+        self._staff_rng = streams["staffing"]
+        self._em_arrivals = ThinningArrivalProcess(emergency_rate(self.config, self.scenario),
+                                                   streams["arrivals_emergency"])
+        self._el_arrivals = ThinningArrivalProcess(elective_rate(self.config, self.scenario),
+                                                   streams["arrivals_elective"])
+
+    def _redraw_hidden_attributes(self, entries: list, resample_in_progress: bool) -> list:
+        """Re-draw future (and optionally in-progress) durations of patients in the system.
+
+        Every active patient consumes exactly _UNIFORMS_PER_PATIENT uniforms in pid order, so
+        the redraw is identical for every policy that later runs from the branch (CRN).
+        Attributes already realised (priority, specialty, pathway) and completed activities
+        are kept.
+        """
+        cfg = self.config
+        pending = {p.pid: i for i, (_, k, _, p) in enumerate(entries) if k in _PATIENT_EVENTS}
+        in_doctor_queue = {pid for _, _, pid, _ in self._doctor_queue}
+        entries = list(entries)
+        for patient in self._patients:
+            if patient.diverted or not math.isnan(patient.discharged_at):
+                continue
+            u = self._attr_rng.random(_UNIFORMS_PER_PATIENT)
+            idx = pending.get(patient.pid)
+            kind = entries[idx][1] if idx is not None else None
+            elapsed = self.now - patient.activity_start if idx is not None else 0.0
+            in_progress = resample_in_progress and idx is not None
+            loc, det = patient.location, patient.has_deteriorated
+            in_general = loc is not None and loc is not Unit.ICU
+            placed = loc is not None
+
+            def fresh(spec, ui):
+                return sample_duration(spec, ui)
+
+            # ED treatment
+            if patient.pid in in_doctor_queue and cfg.ed_treatment is not None:
+                patient.ed_treatment_time = fresh(cfg.ed_treatment, u[3])
+            elif kind is EventKind.ED_TREATMENT_END and in_progress:
+                r = conditional_residual(cfg.ed_treatment, elapsed, u[3])
+                patient.ed_treatment_time = elapsed + r
+                entries[idx] = (self.now + r,) + tuple(entries[idx][1:])
+            # Initial ICU stay (ICU-first pathway, before any deterioration)
+            if not placed:
+                patient.icu_los = fresh(cfg.icu_los, u[4])
+            elif loc is Unit.ICU and not det and kind is EventKind.ICU_PHASE_END and in_progress:
+                r = conditional_residual(cfg.icu_los, elapsed, u[4])
+                patient.icu_los = elapsed + r
+                entries[idx] = (self.now + r,) + tuple(entries[idx][1:])
+            # Escalation ICU stay
+            if not det or (det and in_general):
+                patient.escalation_icu_los = fresh(cfg.escalation_icu_los, u[6])
+            elif loc is Unit.ICU and kind is EventKind.ICU_PHASE_END and in_progress:
+                r = conditional_residual(cfg.escalation_icu_los, elapsed, u[6])
+                patient.escalation_icu_los = elapsed + r
+                entries[idx] = (self.now + r,) + tuple(entries[idx][1:])
+            # Ward stays and deterioration
+            mult = cfg.off_service_los_multiplier if patient.off_service else 1.0
+            ward_in_progress = in_general and kind in (EventKind.DISCHARGE, EventKind.DETERIORATION)
+            if not det:
+                if ward_in_progress and in_progress:
+                    base_elapsed = elapsed / mult
+                    patient.general_los = base_elapsed + conditional_residual(
+                        cfg.general_los, base_elapsed, u[5])
+                    # Constant hazard: the residual time to deterioration is memoryless.
+                    patient.deterioration_delay = elapsed + exponential_from_uniform(
+                        cfg.deterioration_hazard_per_day / 24.0, u[8])
+                    los = patient.general_los * mult
+                    if patient.deterioration_delay < los:
+                        entries[idx] = (patient.activity_start + patient.deterioration_delay,
+                                        EventKind.DETERIORATION) + tuple(entries[idx][2:])
+                    else:
+                        entries[idx] = (patient.activity_start + los,
+                                        EventKind.DISCHARGE) + tuple(entries[idx][2:])
+                elif not ward_in_progress:
+                    patient.general_los = fresh(cfg.general_los, u[5])
+                    patient.deterioration_delay = exponential_from_uniform(
+                        cfg.deterioration_hazard_per_day / 24.0, u[8])
+                patient.post_icu_general_los = fresh(cfg.post_icu_general_los, u[7])
+            else:
+                if in_general and kind is EventKind.DISCHARGE and in_progress:
+                    base_elapsed = elapsed / mult
+                    patient.post_icu_general_los = base_elapsed + conditional_residual(
+                        cfg.post_icu_general_los, base_elapsed, u[7])
+                    entries[idx] = (patient.activity_start + patient.post_icu_general_los * mult,
+                                    ) + tuple(entries[idx][1:])
+                elif not (in_general and kind is EventKind.DISCHARGE):
+                    patient.post_icu_general_los = fresh(cfg.post_icu_general_los, u[7])
+        return entries
+
     # ================================================================== internals: time
 
     def _advance_to(self, t: float) -> None:
@@ -343,6 +599,7 @@ class HospitalSimulation:
             if hi > lo:
                 self._measured.add_time(hi - lo, self._weight_sum, n_waiting, self._n_boarding)
         self.now = t
+        self._prune_recent()
 
     # ================================================================== internals: events
 
@@ -361,6 +618,7 @@ class HospitalSimulation:
             self._occupied[payload.location] -= 1
             payload.location = None
             payload.discharged_at = self.now
+            self._recent["discharges"].append(self.now)
             return True
         if kind is EventKind.ICU_PHASE_END:
             self._create_request(payload, RequestType.STEP_DOWN,
@@ -388,6 +646,7 @@ class HospitalSimulation:
     def _on_emergency_arrival(self) -> bool:
         patient = self._new_patient(is_emergency=True)
         self._push_next_arrival(self._em_arrivals, self.now, EventKind.EMERGENCY_ARRIVAL)
+        self._recent["arrivals"].append(self.now)
         measured = self.now >= self.config.warmup_hours
         if measured:
             self._m_emergency_arrivals += 1
@@ -395,6 +654,7 @@ class HospitalSimulation:
         if cap is not None and self.ed_count >= cap:
             patient.diverted = True
             self.acc.diversions += 1
+            self._recent["diversions"].append(self.now)
             if measured:
                 self._measured.diversions += 1
             return False
@@ -409,6 +669,7 @@ class HospitalSimulation:
     def _on_elective_arrival(self) -> bool:
         patient = self._new_patient(is_emergency=False)
         self._push_next_arrival(self._el_arrivals, self.now, EventKind.ELECTIVE_ARRIVAL)
+        self._recent["arrivals"].append(self.now)
         self._create_admission_request(patient, from_ed=False)
         return True
 
@@ -428,12 +689,19 @@ class HospitalSimulation:
         while self._doctor_queue and self._doctors_busy < self._doctors_on_shift:
             _, _, _, patient = heapq.heappop(self._doctor_queue)
             self._doctors_busy += 1
+            patient.activity_start = self.now
             if patient.arrival_time >= self.config.warmup_hours:
                 self._ed_waits.append(self.now - patient.arrival_time)
             self._queue.push(self.now + patient.ed_treatment_time,
                              EventKind.ED_TREATMENT_END, patient)
 
     # ================================================================== internals: entities
+
+    def _prune_recent(self) -> None:
+        cutoff = self.now - RECENT_WINDOW_HOURS
+        for times in self._recent.values():
+            while times and times[0] < cutoff:
+                times.popleft()
 
     def _push_next_arrival(self, process: ThinningArrivalProcess, t: float,
                            kind: EventKind) -> None:
@@ -502,18 +770,56 @@ class PlacementPolicy(Protocol):
     def decide(self, sim: HospitalSimulation) -> tuple[int, Unit] | None: ...
 
 
+def run_until(sim: HospitalSimulation, policy: PlacementPolicy, until: float | None = None) -> None:
+    """Run ``sim`` with ``policy`` until time ``until`` (or the horizon if None).
+
+    If an epoch is already open (e.g. a branch taken at a decision point), the policy decides
+    in it first.
+    """
+    while True:
+        if sim.epoch_open:
+            while sim.has_feasible_placement():
+                decision = policy.decide(sim)
+                if decision is None:
+                    break
+                sim.place(*decision)
+        if not sim.next_epoch(until):
+            return
+
+
 def run_episode(sim: HospitalSimulation, policy: PlacementPolicy) -> SimulationResult:
     """Run ``sim`` to its horizon with ``policy`` making every decision."""
-    while sim.next_epoch():
-        while sim.has_feasible_placement():
-            decision = policy.decide(sim)
-            if decision is None:
-                break
-            sim.place(*decision)
+    run_until(sim, policy)
     return sim.result()
 
 
 # ---------------------------------------------------------------------- helpers
+
+def _patient_to_dict(p: Patient) -> dict[str, Any]:
+    d = asdict(p)
+    d["specialty"] = p.specialty.value
+    d["location"] = None if p.location is None else p.location.value
+    return d
+
+
+def _patient_from_dict(d: dict[str, Any]) -> Patient:
+    d = dict(d)
+    d["specialty"] = Unit(d["specialty"])
+    d["location"] = None if d["location"] is None else Unit(d["location"])
+    return Patient(**d)
+
+
+def _request_to_dict(r: BedRequest) -> dict[str, Any]:
+    return {"rid": r.rid, "pid": r.patient.pid, "rtype": r.rtype.value, "priority": r.priority,
+            "created_at": r.created_at, "from_ed": r.from_ed, "placed_at": r.placed_at,
+            "unit": None if r.unit is None else r.unit.value}
+
+
+def _request_from_dict(d: dict[str, Any], patients: list[Patient]) -> BedRequest:
+    return BedRequest(d["rid"], patients[d["pid"]], RequestType(d["rtype"]), d["priority"],
+                      d["created_at"], d["from_ed"], d["placed_at"],
+                      None if d["unit"] is None else Unit(d["unit"]))
+
 
 def _categorical(probs: tuple[float, ...], u: float) -> int:
     cumulative = 0.0
