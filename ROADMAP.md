@@ -263,11 +263,13 @@ Build automated multi-seed experiment execution and statistical evaluation.
 - Test statistical functions
 
 ### Completion Criteria
-- [ ] All 5+ scenario families configurable
-- [ ] Multi-seed execution works
-- [ ] Results stored correctly
-- [ ] Statistical tests implemented
-- [ ] Results exportable
+- [x] All 5+ scenario families configurable
+- [x] Multi-seed execution works (50 test seeds × 5 scenarios × 6 policies, PPO K = 5)
+- [x] Results stored correctly (`docs/data/stage6/`)
+- [x] Statistical tests implemented (hierarchical bootstrap, Holm, d_z, Cliff's δ, Wilcoxon)
+- [x] Results exportable (CSV/JSON)
+
+**Status: complete (2026-10-26).** See `docs/stage6_evaluation_report.md`.
 
 ---
 
