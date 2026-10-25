@@ -100,8 +100,9 @@ def analyse(rows: list[dict], metrics=PRIMARY_METRICS, baselines=BASELINES) -> l
             for b in baselines:
                 base = np.array([next(r[metric] for r in sub if r["policy"] == b
                                       and int(r["seed"]) == s) for s in seeds])
-                if np.isnan(ppo).any() or np.isnan(base).any():
-                    raise ValueError(f"NaN in {metric}/{scenario}/{b}; pre-registered metrics "
+                culprit = "ppo" if np.isnan(ppo).any() else b if np.isnan(base).any() else None
+                if culprit is not None:
+                    raise ValueError(f"NaN in {metric}/{scenario}/{culprit}; primary metrics "
                                      "must be defined for every episode")
                 comparisons.append(compare(scenario, metric, b, ppo, base))
     apply_holm(comparisons)
