@@ -1,0 +1,179 @@
+{
+  "fcfs": {
+    "params": {
+      "off_service_wait_hours": 4.0
+    },
+    "objective_mean": 276.8412691884738,
+    "objective_ci95": [
+      164.82890468181745,
+      388.85363369513016
+    ],
+    "n_candidates": 4,
+    "runner_up": {
+      "params": {
+        "off_service_wait_hours": 8.0
+      },
+      "objective_mean": 284.5060908678436,
+      "paired_diff_mean": 7.6648216793698225,
+      "paired_diff_ci95": [
+        -16.803620332662195,
+        32.13326369140184
+      ]
+    },
+    "provenance": {
+      "scenario": "A",
+      "seeds": [
+        100000,
+        100019
+      ],
+      "objective": "J per measured day (config/reward_default.json)",
+      "date": "2026-10-26",
+      "runtime_s": 2.6
+    }
+  },
+  "_comment": "Tuned on scenario A validation seeds only (neurotwin.experiments.tuning). Do not edit by hand.",
+  "priority": {
+    "params": {
+      "off_service_wait_hours": 12.0
+    },
+    "objective_mean": 168.74579989201948,
+    "objective_ci95": [
+      116.71813354316045,
+      220.77346624087852
+    ],
+    "n_candidates": 4,
+    "runner_up": {
+      "params": {
+        "off_service_wait_hours": 8.0
+      },
+      "objective_mean": 172.39095164107783,
+      "paired_diff_mean": 3.6451517490583343,
+      "paired_diff_ci95": [
+        -5.949383598815455,
+        13.239687096932123
+      ]
+    },
+    "provenance": {
+      "scenario": "A",
+      "seeds": [
+        100000,
+        100019
+      ],
+      "objective": "J per measured day (config/reward_default.json)",
+      "date": "2026-10-26",
+      "runtime_s": 2.6
+    }
+  },
+  "load_balancing": {
+    "params": {
+      "imbalance_threshold": 0.1
+    },
+    "objective_mean": 164.35321015650192,
+    "objective_ci95": [
+      109.39101124406093,
+      219.3154090689429
+    ],
+    "n_candidates": 4,
+    "runner_up": {
+      "params": {
+        "imbalance_threshold": 0.05
+      },
+      "objective_mean": 169.05745869532853,
+      "paired_diff_mean": 4.704248538826678,
+      "paired_diff_ci95": [
+        -4.593726548058052,
+        14.002223625711409
+      ]
+    },
+    "provenance": {
+      "scenario": "A",
+      "seeds": [
+        100000,
+        100019
+      ],
+      "objective": "J per measured day (config/reward_default.json)",
+      "date": "2026-10-26",
+      "runtime_s": 2.9
+    }
+  },
+  "trunk_reservation": {
+    "params": {
+      "reserve": {
+        "MED": 0,
+        "SURG": 0,
+        "ICU": 0
+      },
+      "off_service_wait_hours": 12.0
+    },
+    "objective_mean": 168.74579989201948,
+    "objective_ci95": [
+      116.71813354316045,
+      220.77346624087852
+    ],
+    "n_candidates": 216,
+    "runner_up": {
+      "params": {
+        "reserve": {
+          "MED": 0,
+          "SURG": 0,
+          "ICU": 1
+        },
+        "off_service_wait_hours": 12.0
+      },
+      "objective_mean": 178.01271607673655,
+      "paired_diff_mean": 9.266916184717044,
+      "paired_diff_ci95": [
+        -0.8047786728411452,
+        19.338611042275232
+      ]
+    },
+    "provenance": {
+      "scenario": "A",
+      "seeds": [
+        100000,
+        100019
+      ],
+      "objective": "J per measured day (config/reward_default.json)",
+      "date": "2026-10-26",
+      "runtime_s": 92.2
+    }
+  },
+  "mip": {
+    "params": {
+      "review_horizon_hours": 4.0,
+      "breach_threshold_hours": 4.0,
+      "breach_cost": 10.0,
+      "off_service_cost": 20.0
+    },
+    "objective_mean": 179.7554390770907,
+    "objective_ci95": [
+      114.64121027733881,
+      244.86966787684258
+    ],
+    "n_candidates": 24,
+    "runner_up": {
+      "params": {
+        "review_horizon_hours": 4.0,
+        "breach_threshold_hours": 4.0,
+        "breach_cost": 0.0,
+        "off_service_cost": 10.0
+      },
+      "objective_mean": 182.50011885343483,
+      "paired_diff_mean": 2.744679776344102,
+      "paired_diff_ci95": [
+        -2.417815130021783,
+        7.907174682709988
+      ]
+    },
+    "provenance": {
+      "scenario": "A",
+      "seeds": [
+        100000,
+        100019
+      ],
+      "objective": "J per measured day (config/reward_default.json)",
+      "date": "2026-10-26",
+      "runtime_s": 158.7
+    }
+  }
+}

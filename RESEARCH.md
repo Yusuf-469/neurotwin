@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.2 (2026-10-25). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.3 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -33,6 +33,8 @@ There is no statistically significant difference in the primary metrics between 
 
 **Structure Hypothesis (RQ4):**
 The learned policy will hold low-priority patients when free staffed beds fall below a small threshold, i.e. it will approximate a trunk-reservation policy.
+
+*Note added in v2.3, without changing the hypothesis:* the tuned trunk-reservation baseline chose zero reserve in scenario A. This is consistent with the cμ rule for delay systems (§6.8), so theory predicts holding behaviour mainly where diversion is frequent. The hypothesis is kept as pre-registered and will be tested as stated. Reporting will distinguish holding in A from holding under stress.
 
 **Important:**
 - All hypotheses must be tested through controlled experiments
@@ -406,6 +408,18 @@ All baselines process requests through the same primitives as the PPO actions. E
 | **PPO** | In-house PPO (§6.18) |
 | **PPO-Lagrangian** | Extension (§6.19) |
 
+**Tuning results (scenario A, validation seeds 100000–100019, objective J per measured day; `config/baselines_tuned.json`, `docs/stage4_baselines_report.md`):**
+
+| Policy | Tuned parameters | J (95% CI over seeds) |
+|---|---|---|
+| FCFS | W_os = 4 h | 276.8 [164.8, 388.9] |
+| Priority | W_os = 12 h | 168.7 [116.7, 220.8] |
+| Load-Balancing | θ_lb = 0.10 | 164.4 [109.4, 219.3] |
+| Trunk-Reservation | r = (0, 0, 0), W_os = 12 h | 168.7 (identical to Priority) |
+| MIP | κ_MIP = 20, Δ = 4 h, β_b = 10 | 179.8 [114.6, 244.9] |
+
+**Trunk reservation tunes to zero reserve in scenario A.** This is consistent with queueing theory rather than a failure of the baseline. Miller (1969) shows that reservation is optimal in *loss* systems, where turned-away customers are gone. In a *delay* system with class-dependent waiting costs and equal service rates, the cμ rule (serve the highest weighted class first, never idle) is optimal, and that is the Priority policy. Diversion is rare in A (0.1 per 100), so A behaves as a delay system. Reservation can only pay where losses (diversions) are common. Per protocol, the baseline keeps its A-tuned parameters on the stress scenarios, and the PPO policy-structure analysis (§6.20) tests whether learned holding behaviour appears where theory predicts it can help.
+
 ## 6.9 Myopic Assignment Formulation (MIP baseline)
 
 At each decision epoch, the MIP decides all placements for the current epoch at once (it does not use atomic steps).
@@ -444,6 +458,9 @@ c_i = ω_{p(i)} · (e_i + Δ) + β_b · 1[ e_i + Δ > W_max ]
 - Solver: `scipy.optimize.milp` (HiGHS) with integrality constraints. SciPy is already a dependency of scikit-learn, so no new dependency is added.
 - **Test oracles:** (a) the LP relaxation (`scipy.optimize.linprog`) must return the same objective value with integral `x`; (b) expanding each unit into `cap_k` identical slots gives an assignment problem whose `scipy.optimize.linear_sum_assignment` optimum must match.
 - Staffing is folded into `cap_k` because nurses are ward-specific in V1. If a float-nurse pool is added later, it introduces a coupling side constraint that breaks total unimodularity, and the MILP solver is then required. The code keeps the MILP path for that reason.
+
+### Tuned off-service cost κ_MIP (v2.3)
+`κ` in the MIP objective is a **tuning parameter** (κ_MIP ∈ {2, 5, 10, 20, 40, 80}), not fixed to the reward's κ = 2. Reason: the myopic model cannot see that off-service stays are longer (`m_os`) and consume future capacity, so with κ_MIP = 2 it overflowed almost every waiting patient, which scored J = 213. A tuned surrogate cost gives the MIP the same tuning budget as the heuristics, and it tuned to κ_MIP = 20 (J = 180). It still trails Priority and Load-Balancing (J ≈ 164–169): **an exactly solved one-step optimiser, even with a tuned surrogate, does not beat simple rules here**. This is the gap RQ1 asks whether learned look-ahead can close.
 
 ### Why myopic, and what the comparison means
 The MIP is the **best possible one-epoch decision** given current information. Since every `c_i > 0`, it always fills a free primary bed when there is a request for it. It therefore **never reserves beds**, and it chooses off-service only when the waiting cost exceeds `κ`. PPO, by contrast, optimises discounted future cost. **PPO vs MIP therefore isolates the value of look-ahead**, which is RQ1. (v1 justified myopia by claiming "RL is also myopic", which is incorrect; see changelog.)
@@ -490,12 +507,12 @@ These are initial values. Tuning ranges are in §6.20; the final values and the 
 
 ## 6.11 Episode Design
 
-- **Horizon**: 35 simulated days (840 h)
+- **Horizon**: 49 simulated days (1,176 h)
 - **Start**: empty hospital, nominal staffing (the first shift's absences are drawn at t = 0)
-- **Warm-up**: **21 days**, excluded from metrics. Determined by Welch's method on a 30 × 70-day pilot with a **one-week** smoothing window (`docs/stage2_validation_report.md` §3). The v2.0 default of 1 day was far too short: from an empty start, occupancy needs about 3 weeks to stabilise. A 1-day window also mistook the weekly elective cycle for a trend.
-- **Measurement**: days 22–35 (14 days, starting on the same weekday every episode)
-- **Termination**: truncation at 35 days. For PPO, the final step bootstraps from the value function (truncation, not a true terminal state).
-- **RL training episodes start from a warm-start pool** (Stage 3): states at the end of the warm-up of training-seed runs under a reference greedy policy, each branched with the episode's own training seed. In-progress stays are re-drawn conditional on elapsed time. Warm-started episodes reproduce full-episode statistics (Welch t-test p ≈ 0.85), whereas a naive restart of in-progress stays nearly triples boarding, an inspection-paradox bias (`docs/stage3_digital_twin_report.md`). **Validation and test episodes do not use the pool**: they run the full 35-day protocol from an empty start.
+- **Warm-up**: **35 days**, excluded from metrics. Rule: Welch's method with a **one-week** smoothing window, 30 replications, suggestion = first day reaching 98% of the final-third level, **rounded up to whole weeks**. At the v2.3 calibrated load (ρ = 0.93) the suggestion was 29 days, giving 35. (At the v2.1 load of 0.88 it was 21 days; heavier load relaxes more slowly.) The v2.0 default of 1 day was far too short. See `docs/stage2_validation_report.md` §3 and `docs/stage4_baselines_report.md` §2.
+- **Measurement**: days 36–49 (14 days, starting on the same weekday every episode)
+- **Termination**: truncation at 49 days. For PPO, the final step bootstraps from the value function (truncation, not a true terminal state).
+- **RL training episodes start from a warm-start pool** (Stage 3) of **at least 200 distinct states** (near saturation the state is very persistent: a 10-state pool misrepresented the stationary distribution, with mean boarding 5.9 h vs 3.9 h). The states come from the end of the warm-up of training-seed runs under a reference greedy policy, and each is branched with the episode's own training seed. In-progress stays are re-drawn conditional on elapsed time. Warm-started episodes reproduce full-episode statistics (Welch t-test p ≈ 0.85), whereas a naive restart of in-progress stays nearly triples boarding, an inspection-paradox bias (`docs/stage3_digital_twin_report.md`). **Validation and test episodes do not use the pool**: they run the full 35-day protocol from an empty start.
 
 **Why empty start + warm-up:** an empty start is reproducible and identical for all policies, but it introduces **initialisation bias** (an empty hospital is atypical). The warm-up removes that bias from metrics.
 
@@ -635,11 +652,15 @@ For a state S₀, each future seed *f* defines a branch `S₀.branch(f)`: the pr
 
 | Multiplier | PPO-DR training range | Nearest test scenario value |
 |---|---|---|
-| Arrivals | 0.9 – 1.15 | B: 1.35, E: 1.25 |
-| Staff | 0.85 – 1.0 | C: 0.65, E: 0.7 |
-| Physical capacity | 0.85 – 1.0 | D, E: 0.6 |
+| Arrivals | 0.95 – 1.04 | E: 1.08, B: 1.10 |
+| Staff | 0.97 – 1.0 | E: 0.90, C: 0.88 |
+| Physical capacity | 0.97 – 1.0 | E: 0.90, D: 0.88 |
 
-**Leakage control:** every test scenario B–E lies strictly outside the training range on every perturbed axis. RQ8 therefore measures **extrapolation** to more severe stress, not interpolation. Tuning still uses scenario A validation seeds only. This is the "experiment that explicitly studies that setting" exception in AGENTS.md rule 12, and it is documented as such.
+**Leakage control (two conditions, both checked):**
+1. Every test scenario B–E lies strictly outside the training range on every perturbed axis.
+2. The **worst corner** of the training range (arrivals 1.04, staff and capacity 0.97) has offered load 0.981 (general) and 0.854 (ICU), **below the mildest test scenario** (D: 1.020 / 0.878).
+
+Condition 2 is needed because axis-wise milder ranges can still combine into a test-level load. An earlier candidate range (arrivals up to 1.05, staff and capacity down to 0.95) passed condition 1 but had a corner load of 1.046, heavier than B and D. RQ8 therefore measures **extrapolation** to more severe stress, not interpolation. Tuning still uses scenario A validation seeds only. This is the "experiment that explicitly studies that setting" exception in AGENTS.md rule 12, and it is documented as such.
 
 **Comparison:** PPO vs PPO-DR on A–E using the same paired test seeds, with degradation (§6.15) and the Robustness Index. A possible outcome is that PPO-DR is more robust but slightly worse on A. That trade-off is reported either way.
 
@@ -671,6 +692,7 @@ PPO is **trained** on scenario A training seeds only.
 | Experiment | Policies |
 |---|---|
 | Stress sweep (arrival ×1.1 … ×1.6; staff ×0.9 … ×0.6; capacity ×0.9 … ×0.5) | All |
+| Severe overload: v2.0 scenario values (ρ 1.19–1.77) | All |
 | Ablations A–G | PPO |
 | Sensitivity: `m_os` ∈ {1.0, 1.1, 1.25}; `h_det` ×{0.5, 1, 2} | All |
 | PPO-Lagrangian | PPO, PPO-Lagrangian |
@@ -679,14 +701,21 @@ PPO is **trained** on scenario A training seeds only.
 | Policy structure | PPO vs Trunk-Reservation |
 | What-if | All |
 
-### Scenarios
-| Scenario | Arrivals | Staff | Physical capacity | Use |
-|---|---|---|---|---|
-| A – Normal | 1.0× | 1.0× | 1.0× | Train, validate, test |
-| B – High demand | 1.35× | 1.0× | 1.0× | Test |
-| C – Staff shortage | 1.0× | 0.65× | 1.0× | Test |
-| D – Capacity loss | 1.0× | 1.0× | 0.6× | Test |
-| E – Combined | 1.25× | 0.7× | 0.6× | Test |
+### Scenarios (v2.3: calibrated on analytical offered load)
+
+**Calibration criteria (stated before any policy result was examined):** analytical offered load ρ on the general wards (`neurotwin.experiments.load`, policy-independent): A ≈ 0.93 (heavily loaded but stable); single-factor stress B, C, D ≈ 1.02 (just past saturation, where allocation decisions matter most); combined stress E ≈ 1.10.
+
+| Scenario | Arrivals | Staff | Physical capacity | ρ general | ρ ICU | Use |
+|---|---|---|---|---|---|---|
+| A – Normal | 1.0× | 1.0× | 1.0× | 0.930 | 0.821 | Train, validate, test |
+| B – High demand | 1.10× | 1.0× | 1.0× | 1.023 | 0.903 | Test |
+| C – Staff shortage | 1.0× | 0.88× | 1.0× | 1.068 | 0.985 | Test |
+| D – Capacity loss | 1.0× | 1.0× | 0.88× | 1.020 | 0.878 | Test |
+| E – Combined | 1.08× | 0.90× | 0.90× | 1.098 | 1.064 | Test |
+
+C's load is the closest achievable to 1.02: nurse counts are integers, so 0.90× leaves the hospital below saturation (0.989) and anything from 0.84× to 0.89× removes the same nurse (1.068).
+
+**Why v2.0's values were replaced:** v2.0 used B 1.35×, C 0.65×, D 0.6×, E (1.25, 0.7, 0.6), chosen without calibration. Their offered loads are 1.19–1.77. A pilot showed every policy diverting 42–59% of arrivals in E, so differences between policies were swamped and robustness comparisons would have been uninformative. These values are **retained as a "severe overload" extension** (`SEVERE_SCENARIOS`) and reported separately.
 
 ### Metrics
 | Metric | Direction | Role |
@@ -714,7 +743,7 @@ PPO is **trained** on scenario A training seeds only.
 3. **Action space**: 7 masked actions (§6.3)
 4. **State**: 21 features (§6.5)
 5. **Reward**: time-integrated priority-weighted waiting + diversion + off-service cost (§6.10)
-6. **Episodes**: 35 days = 21-day warm-up (Welch, 1-week window) + 14 measured days, empty start, truncation bootstrapping
+6. **Episodes**: 49 days = 35-day warm-up (Welch, 1-week window, rounded up to whole weeks) + 14 measured days, empty start, truncation bootstrapping; RL training starts from a ≥200-state warm-start pool
 7. **Separation**: train and tune on A only; test on A (held-out seeds) and B–E
 8. **CRN**: independent RNG streams per source; attributes drawn at arrival
 9. **Seeds**: 50 test seeds; K = 5 PPO agents; disjoint seed ranges
@@ -769,8 +798,8 @@ PPO is **trained** on scenario A training seeds only.
 | Nurses on shift MED / SURG / ICU (nominal) | 15 / 14 / 6 | — |
 | ED doctors on shift (nominal) | 5 | — |
 | Staff absence probability per shift | 0.05 | — |
-| Emergency base rate (patients needing a bed) | 0.875 / h (21 / day) | — |
-| Elective base rate (weekly mean) | 0.375 / h (9 / day, weekdays 08–16) | — |
+| Emergency base rate (patients needing a bed) | 0.9258 / h (22.2 / day) | — |
+| Elective base rate (weekly mean) | 0.3968 / h (9.5 / day, weekdays 08–16) | — |
 | General LOS mean | 4 days | 3 – 5 days |
 | ICU LOS mean | 3 days | 2 – 4 days |
 | ED treatment time mean | 3 h | 2 – 4 h |
@@ -779,7 +808,13 @@ PPO is **trained** on scenario A training seeds only.
 | Deterioration hazard `h_det` | 0.01 / day | ×0.5 – ×2 |
 | Off-service LOS multiplier `m_os` | 1.1 | 1.0 – 1.25 |
 
-Defaults are set so that scenario A runs at a staffed occupancy of roughly 85%. **Pilot (30 × 70 days, greedy policy):** staffed occupancy MED 0.88, SURG 0.80, ICU 0.85; mean boarding 1.36 h; diversion 0.01 per 100 arrivals; off-service 16.7 per 100 general placements (`docs/stage2_validation_report.md` §4). v2.0 listed 40/30/12 beds at 2.5 arrivals/h, which would have run at far above 100% load; those numbers were placeholders and were replaced by this calibration.
+**v2.3 calibration:** base rates are set so that scenario A has analytical offered load **ρ = 0.93** on the general wards (policy-independent; see §6.22).
+
+**Pilot (30 × 84 days, greedy reference policy):** staffed occupancy MED 0.94, SURG 0.88, ICU 0.80; mean boarding 3.99 h; 90th percentile 9.15 h; diversion 0.12 per 100 arrivals; off-service 29.4 per 100 general placements (`docs/stage4_baselines_report.md` §2).
+
+History of this table:
+- v2.1 calibrated on occupancy under the greedy policy (ρ = 0.88). Under sensible policies that left almost no congestion (mean boarding 0.03–0.19 h), so allocation decisions barely mattered.
+- v2.0 listed 40/30/12 beds at 2.5 arrivals/h, which would have run far above 100% load.
 
 Defaults live in `config/simulation_default.json`.
 
@@ -815,6 +850,14 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.3 — 2026-10-26 (Stage 4; `docs/stage4_baselines_report.md`)
+- **Scenario recalibration (§6.22)** on analytical, policy-independent offered load, with criteria stated before examining policy results. A: ρ 0.88 → 0.93 (base rates raised 5.8%). B–E: from ρ 1.19–1.77 to 1.02–1.10. The old values are kept as a severe-overload extension
+- Warm-up 21 → 35 days and horizon 35 → 49 days (Welch re-run at the new load, rounded up to whole weeks)
+- PPO-DR range shrunk so its worst corner is below every test scenario's load (§6.23)
+- Warm-start pool: minimum 200 distinct states (§6.11)
+- MIP off-service cost is a tuned surrogate (§6.9); tuning results recorded (§6.8)
+- RQ4 note: trunk reservation tunes to zero in A, consistent with the cμ rule (hypothesis unchanged)
 
 ### v2.2 — 2026-10-25 (Stage 3; `docs/stage3_digital_twin_report.md`)
 - §6.11: RL training episodes start from a validated warm-start pool (training seeds only); evaluation unchanged

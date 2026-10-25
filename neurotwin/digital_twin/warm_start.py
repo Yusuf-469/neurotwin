@@ -12,6 +12,12 @@ Leakage control: pool states may only be generated from TRAINING seeds (asserted
 does not use the pool: test episodes run the full protocol from an empty start, so reported
 results do not depend on the reference warm-up policy (RESEARCH.md §6.11).
 
+Pool size matters: near saturation the hospital state is very persistent, so a small pool
+represents a few particular states rather than the stationary distribution. In a 200-run
+diagnostic, a 10-state pool gave mean boarding 5.9 h vs 3.9 h for full episodes, while 200
+distinct states gave 3.86 vs 3.85. Training pools therefore use at least MIN_TRAINING_POOL
+distinct states.
+
 Known limitation: the warm states reflect the reference policy's steady state (greedy
 placement). An agent's own steady state may differ somewhat; the measured part of a training
 episode therefore begins slightly off the agent's stationary distribution.
@@ -28,6 +34,9 @@ from ..experiments.seeds import require_split
 from ..simulation.config import ScenarioConfig, SimulationConfig
 from ..simulation.hospital import HospitalSimulation, PlacementPolicy, run_until
 from .snapshot_io import load_snapshot, save_snapshot
+
+#: Minimum number of distinct warm states for a training pool (see pool-size note above).
+MIN_TRAINING_POOL = 200
 
 
 @dataclass

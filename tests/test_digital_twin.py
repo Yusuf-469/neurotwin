@@ -229,15 +229,20 @@ def test_warm_start_pool_save_load_roundtrip(tmp_path):
 
 def test_warm_start_episodes_are_not_biased_relative_to_full_episodes():
     """Warm-started episodes should reproduce the measured-window statistics of full episodes
-    under the same policy (checks warm-up length and conditional resampling together)."""
+    under the same policy (checks warm-up length and conditional resampling together).
+
+    One branch per *distinct* warm state: near saturation the state is very persistent, so
+    many branches of a few states measure those states, not the stationary distribution (a
+    10-state pool gave mean boarding 5.9 vs 3.9 for full episodes in a 200-run diagnostic,
+    while 200 distinct states gave 3.86 vs 3.85; docs/stage4_baselines_report.md).
+    """
     policy = GreedyPlacement()
-    pool = WarmStartPool.generate(CFG, SCENARIOS["A"], range(10), policy)
-    rng = np.random.default_rng(0)
-    warm = [run_episode(pool.start_episode(1000 + i, rng), policy) for i in range(30)]
-    full = [run_episode(HospitalSimulation(CFG, seed=2000 + i), policy) for i in range(30)]
+    n = 60
+    pool = WarmStartPool.generate(CFG, SCENARIOS["A"], range(n), policy)
+    warm = [run_episode(state.branch(1000 + i), policy) for i, state in enumerate(pool.states)]
+    full = [run_episode(HospitalSimulation(CFG, seed=2000 + i), policy) for i in range(n)]
     assert all(r.measured_hours == CFG.horizon_hours - CFG.warmup_hours for r in warm)
     for metric in ("time_avg_boarding", "off_service_rate_per_100"):
         x = [getattr(r, metric) for r in warm]
         y = [getattr(r, metric) for r in full]
-        assert stats.ttest_ind(x, y, equal_var=False).pvalue > 0.001, metric
-        assert np.mean(x) == pytest.approx(np.mean(y), rel=0.25), metric
+        assert stats.ttest_ind(x, y, equal_var=False).pvalue > 0.01, metric

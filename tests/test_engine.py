@@ -162,6 +162,6 @@ def test_off_service_multiplies_los_and_deterioration_leads_to_escalation():
 
 def test_capacity_scenario_scales_beds():
     sim = HospitalSimulation(CFG, SCENARIOS["D"], seed=0)
-    assert sim.physical_beds[Unit.MED] == round(CFG.beds["MED"] * 0.6)
+    assert sim.physical_beds[Unit.MED] == 63                      # 72 * 0.88 = 63.36
     nurses, doctors = HospitalSimulation(CFG, SCENARIOS["C"], seed=0).nominal_staff
-    assert doctors == 3 and nurses[Unit.ICU] == 4                 # 5*0.65=3.25, 6*0.65=3.9
+    assert doctors == 4 and nurses[Unit.ICU] == 5                 # 5*0.88=4.4, 6*0.88=5.28

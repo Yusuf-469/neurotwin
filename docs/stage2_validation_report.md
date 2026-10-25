@@ -5,6 +5,8 @@
 **Environment:** Python 3.11.9, numpy 2.4.6, scipy 1.17.1, Windows 11
 **Scope:** Evidence that the discrete-event engine implements its stochastic model correctly (RESEARCH.md v2 §6.17), plus the pilot study that sets the warm-up length and checks the load calibration (§6.11, §6.20).
 
+> **Superseded in part (2026-10-26):** §3 (warm-up) and §4 (load calibration) describe the v2.1 calibration (ρ = 0.88, 21-day warm-up). The model was recalibrated in Stage 4 to ρ = 0.93 with a 35-day warm-up; see `docs/stage4_baselines_report.md` §2. The analytical validation in §2 is unaffected, because it uses reduced configurations independent of the default load.
+>
 > These checks show **implementation correctness** in reduced configurations. They do **not** show that the model resembles any real hospital. All numbers below are simulation outputs.
 
 ## 1. How to reproduce

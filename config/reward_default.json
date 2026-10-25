@@ -1,0 +1,6 @@
+{
+  "_comment": "Cost weights shared by the RL reward and the baseline tuning objective (RESEARCH.md v2 §6.10). Priority weights omega live in simulation_default.json (priority_weights) because the engine integrates them exactly.",
+  "alpha": 1.0,
+  "beta": 20.0,
+  "kappa": 2.0
+}

@@ -51,12 +51,24 @@ def test_invalid_values_are_rejected(override):
 
 
 def test_scenarios_match_research_spec():
-    # RESEARCH.md v2 §6.22 scenario table.
-    assert SCENARIOS["B"].arrival_multiplier == 1.35
-    assert SCENARIOS["C"].staff_multiplier == 0.65
-    assert SCENARIOS["D"].capacity_multiplier == 0.6
+    # RESEARCH.md v2.3 §6.22 scenario table.
+    assert SCENARIOS["B"].arrival_multiplier == 1.10
+    assert SCENARIOS["C"].staff_multiplier == 0.88
+    assert SCENARIOS["D"].capacity_multiplier == 0.88
     e = SCENARIOS["E"]
-    assert (e.arrival_multiplier, e.staff_multiplier, e.capacity_multiplier) == (1.25, 0.7, 0.6)
+    assert (e.arrival_multiplier, e.staff_multiplier, e.capacity_multiplier) == (1.08, 0.9, 0.9)
+
+
+def test_scenarios_hit_their_offered_load_targets():
+    """Calibration criteria stated before any policy result (RESEARCH.md §6.22)."""
+    from neurotwin.experiments.load import offered_load
+    cfg = load_default_config()
+    rho = {k: offered_load(cfg, s)["rho_general"] for k, s in SCENARIOS.items()}
+    assert rho["A"] == pytest.approx(0.93, abs=0.005)
+    for k in "BD":
+        assert rho[k] == pytest.approx(1.02, abs=0.01)
+    assert rho["C"] == pytest.approx(1.068, abs=0.005)       # closest achievable (integer nurses)
+    assert rho["E"] == pytest.approx(1.10, abs=0.01)
 
 
 def test_round_half_up():
