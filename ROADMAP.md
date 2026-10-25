@@ -170,14 +170,18 @@ Implement all baseline policies for comparison.
 - Test decision logging
 
 ### Completion Criteria
-- [ ] All allocator classes functional
-- [ ] FCFS assigns oldest patient first
-- [ ] Priority assigns by severity
-- [ ] Load balancing respects the θ_lb rule
-- [ ] Trunk reservation never places P3-5 when free beds <= r_k
-- [ ] MIP objective equals LP-relaxation and Hungarian oracle objectives on random instances
-- [ ] Optimization policy implements selected formulation
-- [ ] Policies swappable in simulation
+- [x] All allocator classes functional
+- [x] FCFS assigns oldest patient first
+- [x] Priority assigns by severity
+- [x] Load balancing respects the θ_lb rule
+- [x] Trunk reservation never places P3-5 when free beds <= r_k
+- [x] MIP objective equals LP-relaxation and Hungarian oracle objectives on random instances
+- [x] Optimization policy implements selected formulation
+- [x] Policies swappable in simulation
+- [x] Baselines tuned on scenario A validation seeds (`config/baselines_tuned.json`)
+- [x] Scenarios recalibrated on analytical offered load (`docs/stage4_baselines_report.md`)
+
+**Status: complete (2026-10-26).** 94 tests passing.
 
 ---
 

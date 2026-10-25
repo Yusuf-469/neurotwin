@@ -17,7 +17,8 @@ def test_base_rates_are_weekly_mean_rates():
     cfg = load_default_config()
     for fn, base in ((emergency_rate, cfg.emergency_base_rate), (elective_rate, cfg.elective_base_rate)):
         assert fn(cfg, SCENARIOS["A"]).rates.mean() == pytest.approx(base)
-        assert fn(cfg, SCENARIOS["B"]).rates.mean() == pytest.approx(1.35 * base)
+        multiplier = SCENARIOS["B"].arrival_multiplier
+        assert fn(cfg, SCENARIOS["B"]).rates.mean() == pytest.approx(multiplier * base)
 
 
 def test_electives_only_in_window():

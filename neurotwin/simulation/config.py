@@ -65,14 +65,28 @@ class ScenarioConfig:
     capacity_multiplier: float = 1.0
 
 
-# Scenario values are fixed by RESEARCH.md v2 §6.22. A is the only training scenario.
+# Scenario values are fixed by RESEARCH.md v2.3 §6.22. They were calibrated on analytical
+# offered load (policy-independent; neurotwin.experiments.load) against targets stated before
+# any policy result: A ~0.93, single-factor stress ~1.02, combined ~1.10. Integer nurse counts
+# make C's closest achievable load 1.068. A is the only training scenario.
 SCENARIOS: dict[str, ScenarioConfig] = {
     "A": ScenarioConfig("A_normal"),
-    "B": ScenarioConfig("B_high_demand", arrival_multiplier=1.35),
-    "C": ScenarioConfig("C_staff_shortage", staff_multiplier=0.65),
-    "D": ScenarioConfig("D_capacity_loss", capacity_multiplier=0.6),
-    "E": ScenarioConfig("E_combined", arrival_multiplier=1.25, staff_multiplier=0.7,
-                        capacity_multiplier=0.6),
+    "B": ScenarioConfig("B_high_demand", arrival_multiplier=1.10),
+    "C": ScenarioConfig("C_staff_shortage", staff_multiplier=0.88),
+    "D": ScenarioConfig("D_capacity_loss", capacity_multiplier=0.88),
+    "E": ScenarioConfig("E_combined", arrival_multiplier=1.08, staff_multiplier=0.90,
+                        capacity_multiplier=0.90),
+}
+
+# The v2.0 values, retained as the "severe overload" extension (offered load 1.3-1.9): every
+# policy diverts a large share of arrivals there, so they are reported separately rather than
+# used as the headline robustness test.
+SEVERE_SCENARIOS: dict[str, ScenarioConfig] = {
+    "B_severe": ScenarioConfig("B_severe_demand", arrival_multiplier=1.35),
+    "C_severe": ScenarioConfig("C_severe_staff", staff_multiplier=0.65),
+    "D_severe": ScenarioConfig("D_severe_capacity", capacity_multiplier=0.6),
+    "E_severe": ScenarioConfig("E_severe_combined", arrival_multiplier=1.25,
+                               staff_multiplier=0.7, capacity_multiplier=0.6),
 }
 
 

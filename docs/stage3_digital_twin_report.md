@@ -1,5 +1,7 @@
 # Stage 3 Report: Digital Twin State Management
 
+> **Update (2026-10-26):** the warm-up is now 35 days (Stage 4 recalibration), and training pools need ≥ 200 distinct states, because a 10-state pool misrepresented the stationary distribution at the heavier load. The bias test now uses one branch per distinct state. See `docs/stage4_baselines_report.md` §2. The mutation table below was produced at the v2.1 load. At the v2.3 load the naive-restart bias is larger: boarding 10.5 h vs 3.3 h, p ≈ 10⁻¹³.
+
 **Date:** 2026-10-25
 **Code:** `neurotwin/digital_twin/`, plus snapshot, branch and clone support in `neurotwin/simulation/hospital.py`
 **Tests:** `tests/test_digital_twin.py` (20 tests). Full suite: 70 passing.

@@ -1,0 +1,10 @@
+{
+  "_comment": "Untuned starting parameters for the baselines (RESEARCH.md v2 §6.8-§6.9). Tuned values are written to config/baselines_tuned.json by neurotwin.experiments.tuning using scenario A validation seeds only.",
+  "fcfs": {"off_service_wait_hours": 4.0},
+  "priority": {"off_service_wait_hours": 4.0},
+  "load_balancing": {"imbalance_threshold": 0.2},
+  "trunk_reservation": {"reserve": {"MED": 1, "SURG": 1, "ICU": 1}, "off_service_wait_hours": 4.0},
+  "mip": {"review_horizon_hours": 4.0, "breach_threshold_hours": 4.0, "breach_cost": 10.0,
+          "_off_service_cost": "starts at the reward's kappa; tuned as a surrogate for the downstream capacity cost of off-service stays, which the myopic model cannot see",
+          "off_service_cost": 2.0}
+}
