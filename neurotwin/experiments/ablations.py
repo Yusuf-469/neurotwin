@@ -124,7 +124,7 @@ def evaluate_all(workers: int) -> None:
     for c in comps:
         if c.metric == "J_per_day":
             print(
-                f"{c.scenario} {c.baseline:40s} ablated-full ΔJ {c.diff_mean:8.1f} "
+                f"{c.scenario} {c.baseline:40s} ablated-full dJ {c.diff_mean:8.1f} "
                 f"[{c.ci_low:8.1f}, {c.ci_high:8.1f}] {'*' if c.significant_holm else ''}"
             )
 

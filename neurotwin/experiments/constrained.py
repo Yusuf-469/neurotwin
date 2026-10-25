@@ -97,7 +97,7 @@ def evaluate_all(workers: int) -> None:
     for c in comps:
         flag = "*" if c.significant_holm else ""
         print(
-            f"{c.scenario} {c.metric:20s} λ-PPO - PPO {c.diff_mean:9.2f} "
+            f"{c.scenario} {c.metric:20s} lambda-PPO - PPO {c.diff_mean:9.2f} "
             f"[{c.ci_low:9.2f}, {c.ci_high:9.2f}] {flag}"
         )
     print(json.dumps(budget, indent=1))
