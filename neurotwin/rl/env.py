@@ -65,10 +65,8 @@ class HospitalAllocationEnv(gym.Env):
             raise ValueError("start_mode must be 'full' or 'warm'")
         if start_mode == "warm" and pool is None:
             raise ValueError("warm start needs a WarmStartPool")
-        if start_mode == "warm" and scenario_sampler is not None:
-            # Pool states were generated under scenario A; re-scenario-ing a branched state is
-            # not implemented yet (needed only for the PPO-DR extension).
-            raise NotImplementedError("scenario sampling with warm starts is not supported yet")
+        # With warm starts and a scenario sampler (PPO-DR), the pool state (generated under A) is
+        # branched into the sampled operating conditions (HospitalSimulation.branch(scenario=)).
         self.config = config or load_default_config()
         self.scenario = scenario or SCENARIOS["A"]
         self.start_mode = start_mode
@@ -97,11 +95,14 @@ class HospitalAllocationEnv(gym.Env):
         if seed is None:
             seed = int(self.np_random.integers(0, 100_000))  # TRAIN range by default
         scenario = self.scenario
+        sampled = None
         if self.scenario_sampler is not None:
-            scenario = self.scenario_sampler(np.random.default_rng(seed))
+            # Separate stream from the pool choice, so scenario and start state are independent.
+            sampled = self.scenario_sampler(np.random.default_rng([seed, 1]))
+            scenario = sampled
         if self.start_mode == "warm":
             self._pool_rng = np.random.default_rng(seed)
-            self.sim = self.pool.start_episode(seed, self._pool_rng)
+            self.sim = self.pool.start_episode(seed, self._pool_rng, scenario=sampled)
         else:
             self.sim = HospitalSimulation(self.config, scenario, seed=seed)
         self._advance_to_decision()

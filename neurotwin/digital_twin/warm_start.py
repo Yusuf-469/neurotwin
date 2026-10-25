@@ -60,11 +60,17 @@ class WarmStartPool:
             states.append(sim)
         return cls(states, seeds)
 
-    def start_episode(self, episode_seed: int, rng: np.random.Generator) -> HospitalSimulation:
-        """A training episode: a random warm state, branched with ``episode_seed``."""
+    def start_episode(
+        self,
+        episode_seed: int,
+        rng: np.random.Generator,
+        scenario: ScenarioConfig | None = None,
+    ) -> HospitalSimulation:
+        """A training episode: a random warm state, branched with ``episode_seed`` (and, for
+        domain-randomised training, switched to ``scenario`` from the branch point on)."""
         require_split([episode_seed], "train")
         base = self.states[int(rng.integers(len(self.states)))]
-        return base.branch(episode_seed, resample_in_progress=True)
+        return base.branch(episode_seed, resample_in_progress=True, scenario=scenario)
 
     def save(self, directory: str | Path) -> None:
         directory = Path(directory)

@@ -27,6 +27,36 @@ def test_dropped_features_are_always_zero():
         HospitalAllocationEnv(SHORT, drop_features=(21,))
 
 
+def test_ppo_dr_range_is_milder_than_every_test_scenario():
+    from neurotwin.experiments.ppo_dr import check_training_range, sample_scenario
+
+    guard = check_training_range()
+    assert guard["worst_corner"]["rho_general"] < guard["mildest_test"]["rho_general"]
+    rng = np.random.default_rng(0)
+    for _ in range(200):
+        s = sample_scenario(rng)
+        assert 0.95 <= s.arrival_multiplier <= 1.04 and 0.97 <= s.staff_multiplier <= 1.0
+        assert 0.97 <= s.capacity_multiplier <= 1.0
+
+
+def test_warm_start_with_sampled_scenario():
+    from neurotwin.digital_twin import WarmStartPool
+    from neurotwin.experiments.ppo_dr import sample_scenario
+    from neurotwin.simulation.validation.reduced import GreedyPlacement
+
+    pool = WarmStartPool.generate(SHORT, SCENARIOS["A"], [0, 1], GreedyPlacement())
+    env = HospitalAllocationEnv(
+        SHORT, start_mode="warm", pool=pool, scenario_sampler=sample_scenario
+    )
+    env.reset(seed=5)
+    first = env.sim.scenario
+    assert first.name == "dr_train" and 0.95 <= first.arrival_multiplier <= 1.04
+    env.reset(seed=6)
+    assert env.sim.scenario != first  # a new draw per episode
+    env.reset(seed=5)
+    assert env.sim.scenario == first  # reproducible from the episode seed
+
+
 def test_isotonic_decreasing_fit():
     y = np.array([0.1, 0.12, 0.05, 0.06, 0.01])
     fit = isotonic_decreasing(y, np.ones(5))
