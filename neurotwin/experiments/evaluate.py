@@ -48,6 +48,10 @@ def run_job(job: tuple[str, int, str, int, str, dict]) -> dict[str, Any]:
     )
     if policy_name == "ppo":
         policy = PPOPolicy.load(Path(agent_dir) / f"agent_{agent}.pt")
+    elif policy_name == "ppo_lagrangian":
+        from ..policies.constrained_ppo import ConstrainedPPOPolicy
+
+        policy = ConstrainedPPOPolicy.load(Path(agent_dir) / f"agent_{agent}.pt")
     else:
         policy = make_policy(policy_name, load_baseline_params()[policy_name])
     sim = HospitalSimulation(config, SCENARIOS[scenario], seed=seed)
@@ -61,6 +65,11 @@ def run_job(job: tuple[str, int, str, int, str, dict]) -> dict[str, Any]:
         "runtime_s": time.perf_counter() - t0,
     }
     row.update(episode_metrics(sim, CostWeights.load()))
+    trace = getattr(policy, "lambda_trace", None)
+    if trace:  # constrained PPO: how the multiplier moved during the measured window
+        measured = [lam for t, lam in trace if t >= config.warmup_hours] or [trace[-1][1]]
+        row["lambda_mean_measured"] = float(np.mean(measured))
+        row["lambda_final"] = float(trace[-1][1])
     return row
 
 

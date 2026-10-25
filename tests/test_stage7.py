@@ -87,3 +87,79 @@ def test_degradation_on_a_known_case():
         d = res["degradation"][p]["B:diversion_per_100"]
         assert d["unit"].startswith("abs") and d["estimate"] > 0
     assert res["ppo_minus_baseline_RI"]["fcfs"]["estimate"] == pytest.approx(0.0)
+
+
+def test_dual_ascent_step_moves_toward_budget_and_is_projected():
+    from neurotwin.rl.constrained import BUDGET_PER_100, ETA, LAMBDA_MAX, dual_ascent_step
+
+    assert dual_ascent_step(20.0, BUDGET_PER_100) == 20.0  # on budget: unchanged
+    assert dual_ascent_step(20.0, BUDGET_PER_100 + 2) == 20.0 + 2 * ETA
+    assert dual_ascent_step(20.0, 0.0) == 20.0 - BUDGET_PER_100 * ETA
+    assert dual_ascent_step(1.0, 0.0) == 0.0  # projected onto [0, LAMBDA_MAX]
+    assert dual_ascent_step(LAMBDA_MAX - 1, 50.0) == LAMBDA_MAX
+
+
+def test_lambda_conditioned_env_obs_and_reward():
+    from neurotwin.rl.constrained import LAMBDA_MAX
+    from neurotwin.rl.features import N_FEATURES
+
+    env = HospitalAllocationEnv(SHORT, SCENARIOS["E"], lambda_conditioned=True)
+    assert env.observation_space.shape == (N_FEATURES + 1,)
+    obs, info = env.reset(seed=7)
+    lam = env._lam
+    assert 0.0 <= lam <= LAMBDA_MAX and obs.shape == (N_FEATURES + 1,)
+    assert obs[-1] == pytest.approx(lam / LAMBDA_MAX)
+    env.reset(seed=8)
+    assert env._lam != lam  # a new draw per episode
+    env.reset(seed=7)
+    assert env._lam == lam  # reproducible from the episode seed
+
+    # Reward uses λ in place of β: total return equals -(αW + λD + κO) over the episode.
+    w = env.weights
+    total, truncated = 0.0, False
+    while not truncated:  # always HOLD: forces diversions, so λ enters the return
+        obs, r, _, truncated, info = env.step(0)
+        assert obs[-1] == pytest.approx(lam / LAMBDA_MAX)
+        total += r
+    acc = env.sim.acc
+    expected = (
+        -(
+            w.alpha * acc.weighted_request_hours
+            + lam * acc.diversions
+            + w.kappa * acc.off_service_placements
+        )
+        * env.reward_scale
+    )
+    assert acc.diversions > 0  # λ actually matters
+    assert total == pytest.approx(expected, rel=1e-6)
+
+
+class _RecordingAgent:
+    """Stub agent: always HOLD, records observations."""
+
+    meta: dict = {}
+
+    def __init__(self):
+        self.obs = []
+
+    def act(self, obs, mask=None, deterministic=True):
+        self.obs.append(obs)
+        return 0
+
+
+def test_constrained_policy_updates_lambda_daily():
+    from neurotwin.policies.constrained_ppo import ConstrainedPPOPolicy
+    from neurotwin.rl.constrained import LAMBDA0, LAMBDA_MAX
+    from neurotwin.rl.features import N_FEATURES
+    from neurotwin.simulation.hospital import HospitalSimulation, run_episode
+
+    agent = _RecordingAgent()
+    policy = ConstrainedPPOPolicy(agent)
+    sim = HospitalSimulation(SHORT, SCENARIOS["E"], seed=2)
+    run_episode(sim, policy)  # always HOLD -> many diversions -> λ must rise
+    assert all(o.shape == (N_FEATURES + 1,) for o in agent.obs)
+    times = [t for t, _ in policy.lambda_trace]
+    assert policy.lambda_trace[0][1] == LAMBDA0
+    assert len(times) >= SHORT.horizon_hours // 24 - 1
+    assert policy.lam > LAMBDA0 and policy.lam <= LAMBDA_MAX
+    assert agent.obs[-1][-1] == pytest.approx(policy.lam / LAMBDA_MAX)

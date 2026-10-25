@@ -113,6 +113,7 @@ def train_agent(args: tuple) -> dict[str, Any]:
                 weights=weights,
                 drop_features=drop,
                 scenario_sampler=sampler,
+                lambda_conditioned=bool(env_opts.get("lambda_conditioned")),
             )
         ]
         * config.n_envs,
@@ -134,7 +135,12 @@ def train_agent(args: tuple) -> dict[str, Any]:
         json.dumps({"updates": log.updates, "episode_returns": log.episode_returns}),
         encoding="utf-8",
     )
-    costs = evaluate(PPOPolicy(agent))
+    if env_opts.get("lambda_conditioned"):
+        from ..policies.constrained_ppo import ConstrainedPPOPolicy  # 22-input policy + controller
+
+        costs = evaluate(ConstrainedPPOPolicy(agent))
+    else:
+        costs = evaluate(PPOPolicy(agent))
     return {
         "agent_seed": agent_seed,
         "validation_J": costs,

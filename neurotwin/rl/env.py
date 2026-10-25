@@ -35,6 +35,7 @@ from ..experiments.objective import CostWeights
 from ..simulation.config import SCENARIOS, ScenarioConfig, SimulationConfig, load_default_config
 from ..simulation.hospital import HospitalSimulation
 from .actions import N_ACTIONS, action_mask, action_to_placement
+from .constrained import LAMBDA_MAX
 from .features import N_FEATURES, FeatureScales, features
 
 
@@ -53,13 +54,18 @@ class HospitalAllocationEnv(gym.Env):
         reward_scale: float = 0.1,
         scenario_sampler=None,
         drop_features: tuple[int, ...] = (),
+        lambda_conditioned: bool = False,
     ) -> None:
         """``scenario_sampler(rng) -> ScenarioConfig`` optionally draws a scenario per episode
         (PPO-DR, RESEARCH.md §6.23); it must only produce training-range scenarios.
 
         ``drop_features`` (0-based indices) are set to 0 in every observation (ablations,
         RESEARCH.md §6.16). A constant input carries no information, so this is equivalent to
-        removing the feature while keeping the network shape fixed."""
+        removing the feature while keeping the network shape fixed.
+
+        ``lambda_conditioned`` (constrained PPO, RESEARCH.md v2.6 §6.19): each episode draws a
+        diversion multiplier λ ~ U[0, LAMBDA_MAX] that replaces β in the reward and is appended
+        to the observation as λ / LAMBDA_MAX (22 inputs)."""
         super().__init__()
         if start_mode not in ("full", "warm"):
             raise ValueError("start_mode must be 'full' or 'warm'")
@@ -80,7 +86,10 @@ class HospitalAllocationEnv(gym.Env):
         self.scales = FeatureScales.from_config(self.config)
         # Count and wait features have no natural upper bound (e.g. mean wait / 4 h under
         # stress), so the space is [-1, inf); PPO normalises observations with running stats.
-        self.observation_space = gym.spaces.Box(-1.0, np.inf, shape=(N_FEATURES,), dtype=np.float32)
+        self.lambda_conditioned = lambda_conditioned
+        self._lam = 0.0
+        n_obs = N_FEATURES + (1 if lambda_conditioned else 0)
+        self.observation_space = gym.spaces.Box(-1.0, np.inf, shape=(n_obs,), dtype=np.float32)
         self.action_space = gym.spaces.Discrete(N_ACTIONS)
         self.sim: HospitalSimulation | None = None
         self._mask = np.ones(N_ACTIONS, dtype=bool)
@@ -100,6 +109,8 @@ class HospitalAllocationEnv(gym.Env):
             # Separate stream from the pool choice, so scenario and start state are independent.
             sampled = self.scenario_sampler(np.random.default_rng([seed, 1]))
             scenario = sampled
+        if self.lambda_conditioned:
+            self._lam = float(np.random.default_rng([seed, 2]).uniform(0.0, LAMBDA_MAX))
         if self.start_mode == "warm":
             self._pool_rng = np.random.default_rng(seed)
             self.sim = self.pool.start_episode(seed, self._pool_rng, scenario=sampled)
@@ -123,9 +134,10 @@ class HospitalAllocationEnv(gym.Env):
         else:
             self._advance_to_decision()
         after = sim.acc
+        beta = self._lam if self.lambda_conditioned else self.weights.beta
         cost = (
             self.weights.alpha * (after.weighted_request_hours - before.weighted_request_hours)
-            + self.weights.beta * (after.diversions - before.diversions)
+            + beta * (after.diversions - before.diversions)
             + self.weights.kappa * (after.off_service_placements - before.off_service_placements)
         )
         truncated = sim.finished
@@ -149,6 +161,8 @@ class HospitalAllocationEnv(gym.Env):
         obs = features(self.sim, self.scales)
         if self.drop_features:
             obs[list(self.drop_features)] = 0.0
+        if self.lambda_conditioned:
+            obs = np.append(obs, np.float32(self._lam / LAMBDA_MAX))
         return obs
 
     def _info(self, dt: float) -> dict[str, Any]:
