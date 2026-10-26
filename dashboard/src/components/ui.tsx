@@ -6,12 +6,15 @@ interface CardProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  /** Plain-language "what am I looking at" line shown under the title. */
+  explain?: ReactNode;
   children: ReactNode;
+  className?: string;
 }
 
-export function Card({ title, subtitle, actions, children }: CardProps) {
+export function Card({ title, subtitle, actions, explain, children, className = "" }: CardProps) {
   return (
-    <section className="card">
+    <section className={`card ${className}`}>
       <div className="card-head">
         <div>
           <h2 className="card-title">{title}</h2>
@@ -20,6 +23,7 @@ export function Card({ title, subtitle, actions, children }: CardProps) {
         <div className="spacer" />
         {actions}
       </div>
+      {explain && <p className="explain-line"><span aria-hidden="true">👀</span> {explain}</p>}
       {children}
     </section>
   );
@@ -27,17 +31,54 @@ export function Card({ title, subtitle, actions, children }: CardProps) {
 
 interface StatProps {
   label: string;
-  value: string;
-  note?: string;
+  value: ReactNode;
+  note?: ReactNode;
+  icon?: string;
+  accent?: string;
 }
 
-export function Stat({ label, value, note }: StatProps) {
+export function Stat({ label, value, note, icon, accent }: StatProps) {
   return (
-    <div className="card stat">
-      <span className="stat-label">{label}</span>
+    <div className="card stat" style={accent ? { ["--stat-accent" as string]: accent } : undefined}>
+      <span className="stat-label">{icon && <span className="stat-icon" aria-hidden="true">{icon}</span>}{label}</span>
       <span className="stat-value">{value}</span>
       {note && <span className="stat-note">{note}</span>}
     </div>
+  );
+}
+
+/** Highlighted one-sentence conclusion for a chart or section. */
+export function Takeaway({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "good" | "warn" }) {
+  return (
+    <div className={`takeaway ${tone}`}>
+      <span className="takeaway-icon" aria-hidden="true">{tone === "good" ? "✓" : tone === "warn" ? "!" : "→"}</span>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+/** Collapsible technical detail: the full statistics stay one click away. */
+export function TechDetails({ children, label = "Technical detail" }: { children: ReactNode; label?: string }) {
+  return (
+    <details className="tech">
+      <summary>{label}</summary>
+      <div className="tech-body">{children}</div>
+    </details>
+  );
+}
+
+/** Numbered chapter heading for long, story-like pages. */
+export function SectionHeader({ id, num, kicker, title, lead }: {
+  id?: string; num?: string; kicker?: string; title: string; lead?: ReactNode;
+}) {
+  return (
+    <header className="section-head" id={id}>
+      {(num || kicker) && (
+        <span className="kicker">{num && <span className="kicker-num">{num}</span>}{kicker}</span>
+      )}
+      <h2>{title}</h2>
+      {lead && <p>{lead}</p>}
+    </header>
   );
 }
 

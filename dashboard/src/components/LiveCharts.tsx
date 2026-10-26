@@ -4,7 +4,7 @@ import {
   Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import type { HistoryPoint } from "@/lib/api";
-import { UNIT_COLORS } from "@/lib/policies";
+import { UNIT_COLORS, UNIT_LABELS } from "@/lib/policies";
 import { Card, Legend, useViewToggle } from "./ui";
 
 interface Props {
@@ -49,8 +49,9 @@ export default function LiveCharts({ history, warmupHours }: Props) {
 
   return (
     <div className="grid grid-2">
-      <Card title="Bed occupancy by unit" subtitle="% of staffed capacity" actions={occToggle}>
-        <Legend items={["MED", "SURG", "ICU"].map((u) => ({ label: u, color: UNIT_COLORS[u] }))} />
+      <Card title="How full each ward is" subtitle="% of beds that have nurses to staff them" actions={occToggle}
+        explain="The shaded strip is the warm-up: the hospital starts empty and fills up before measurement begins.">
+        <Legend items={["MED", "SURG", "ICU"].map((u) => ({ label: UNIT_LABELS[u], color: UNIT_COLORS[u] }))} />
         {occTable ? (
           <div className="scroll" style={{ maxHeight: 260, marginTop: 8 }}>
             <table><thead><tr><th>day</th><th>MED %</th><th>SURG %</th><th>ICU %</th></tr></thead>
@@ -78,7 +79,8 @@ export default function LiveCharts({ history, warmupHours }: Props) {
           </div>
         )}
       </Card>
-      <Card title="Patients waiting for a bed" subtitle="queue length over time" actions={qToggle}>
+      <Card title="Patients waiting for a bed" subtitle="queue length over time" actions={qToggle}
+        explain="Spikes mean demand briefly outran discharges. A steadily rising line means the hospital is overwhelmed.">
         {qTable ? (
           <div className="scroll" style={{ maxHeight: 260 }}>
             <table><thead><tr><th>day</th><th>waiting</th><th>diversions (cum.)</th><th>off-service (cum.)</th></tr></thead>

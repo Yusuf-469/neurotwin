@@ -121,6 +121,8 @@ export interface Comparison {
   p_holm: number;
   significant_holm: boolean;
   d_z: number;
+  ppo_mean: number;
+  baseline_mean: number;
 }
 
 export interface JComparison {
@@ -142,6 +144,12 @@ export interface StudyResults {
   robustness: { robustness_index: Record<string, { estimate: number; ci: [number, number] }> } | null;
   crn_check: { metric: string; baseline: string; width_ratio_independent_over_paired: number; variance_reduction: number }[] | null;
   structure: Record<string, { n_states: number; spearman_rho: number; bins: { free_beds: string | number; mean_p_hold: number }[] }> | null;
+  /** Stage 7: ablated variant vs full PPO (baseline field = "full_vs_<variant>"; diff = ablated - full). */
+  ablations: Comparison[] | null;
+  /** Stage 7: PPO-DR vs PPO (diff = PPO-DR - PPO). */
+  ppo_dr: Comparison[] | null;
+  /** Stage 7: lambda-conditioned constrained PPO vs PPO, plus budget-satisfaction shares. */
+  constrained: { comparisons: Comparison[]; budget: Record<string, number> } | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
