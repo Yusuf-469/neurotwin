@@ -89,6 +89,9 @@ def test_cors_origins_from_environment(monkeypatch):
     import neurotwin.api.app as app_module
 
     monkeypatch.setenv("NEUROTWIN_CORS_ORIGINS", "https://neurotwin.vercel.app/, https://x.dev")
+    monkeypatch.setenv(
+        "NEUROTWIN_CORS_ORIGIN_REGEX", r"https://neurotwin-[a-z0-9-]+-me\.vercel\.app"
+    )
     try:
         reloaded = importlib.reload(app_module)
         assert "https://neurotwin.vercel.app" in reloaded.CORS_ORIGINS
@@ -96,8 +99,12 @@ def test_cors_origins_from_environment(monkeypatch):
         c = TestClient(reloaded.app)
         r = c.get("/api/health", headers={"Origin": "https://neurotwin.vercel.app"})
         assert r.headers.get("access-control-allow-origin") == "https://neurotwin.vercel.app"
+        preview = "https://neurotwin-git-main-me.vercel.app"
+        r = c.get("/api/health", headers={"Origin": preview})
+        assert r.headers.get("access-control-allow-origin") == preview
         r = c.get("/api/health", headers={"Origin": "https://evil.example"})
         assert "access-control-allow-origin" not in r.headers
     finally:
         monkeypatch.delenv("NEUROTWIN_CORS_ORIGINS")
+        monkeypatch.delenv("NEUROTWIN_CORS_ORIGIN_REGEX")
         importlib.reload(app_module)
