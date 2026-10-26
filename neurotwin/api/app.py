@@ -158,10 +158,19 @@ def _llm_budget_available() -> bool:
         return True
 
 
-def _new_session(scenario: str, seed: int, policy: str) -> Session:
-    if scenario not in ALL_SCENARIOS:
+def _new_session(
+    scenario: str, seed: int, policy: str, custom: CustomConditions | None = None
+) -> Session:
+    if scenario == "custom":
+        c = custom or CustomConditions()
+        conditions = ScenarioConfig(
+            "custom", c.arrival_multiplier, c.staff_multiplier, c.capacity_multiplier
+        )
+    elif scenario in ALL_SCENARIOS:
+        conditions = ALL_SCENARIOS[scenario]
+    else:
         raise HTTPException(404, f"unknown scenario {scenario!r}")
-    sim = HospitalSimulation(load_default_config(), ALL_SCENARIOS[scenario], seed=seed)
+    sim = HospitalSimulation(load_default_config(), conditions, seed=seed)
     session = Session(
         scenario, seed, policy, sim, LoggingPolicy(build_policy(policy), DecisionLog())
     )
@@ -192,12 +201,22 @@ def _get(sid: str) -> Session:
 # ---------------------------------------------------------------------- request models
 
 
+class CustomConditions(BaseModel):
+    """User-defined operating conditions for scenario "custom" (multipliers on scenario A).
+    Bounds keep a single run's cost predictable on a small server."""
+
+    arrival_multiplier: float = Field(1.0, ge=0.5, le=1.6)
+    staff_multiplier: float = Field(1.0, ge=0.6, le=1.4)
+    capacity_multiplier: float = Field(1.0, ge=0.6, le=1.4)
+
+
 class StartRequest(BaseModel):
-    """Body of POST /api/simulation/start."""
+    """Body of POST /api/simulation/start. scenario "custom" uses ``custom``."""
 
     scenario: str = "A"
     seed: int = Field(0, ge=0)
     policy: str = "priority"
+    custom: CustomConditions | None = None
 
 
 class StepRequest(BaseModel):
@@ -257,7 +276,7 @@ def scenarios() -> dict[str, Any]:
 @app.post("/api/simulation/start")
 def start(body: StartRequest) -> dict[str, Any]:
     """Create a session: new simulation with the chosen scenario, seed and policy."""
-    session = _new_session(body.scenario, body.seed, body.policy)
+    session = _new_session(body.scenario, body.seed, body.policy, body.custom)
     sid = uuid.uuid4().hex[:12]
     _store(sid, session)
     return {"session_id": sid, **_status(session)}
@@ -271,18 +290,31 @@ def step(sid: str, body: StepRequest) -> dict[str, Any]:
     if sim.finished:
         raise HTTPException(409, "simulation has reached its horizon")
     target = min(sim.now + body.hours, sim.config.horizon_hours)
+    t0, n0, h0 = time.perf_counter(), len(session.policy.log.records), sim.now
     # Advance in 4-hour chunks so the history has a usable resolution.
     while sim.now < target and not sim.finished:
         run_until(sim, session.policy, until=min(sim.now + 4.0, target))
         session.history.append(_history_point(sim))
-    return _status(session)
+    # Work done by this request, so the dashboard can show that results are computed live.
+    work = {
+        "compute_ms": round(1000 * (time.perf_counter() - t0), 1),
+        "decisions_made": len(session.policy.log.records) - n0,
+        "simulated_hours": sim.now - h0,
+    }
+    return {**_status(session), "step": work}
 
 
 @app.post("/api/simulation/{sid}/reset")
 def reset(sid: str) -> dict[str, Any]:
     """Restart the session with its original scenario, seed and policy."""
     old = _get(sid)
-    _store(sid, _new_session(old.scenario, old.seed, old.policy_name))
+    sc = old.sim.scenario
+    custom = CustomConditions(
+        arrival_multiplier=sc.arrival_multiplier,
+        staff_multiplier=sc.staff_multiplier,
+        capacity_multiplier=sc.capacity_multiplier,
+    )
+    _store(sid, _new_session(old.scenario, old.seed, old.policy_name, custom))
     return _status(SESSIONS[sid])
 
 
@@ -297,6 +329,11 @@ def _status(session: Session) -> dict[str, Any]:
         "finished": sim.finished,
         "horizon_hours": sim.config.horizon_hours,
         "warmup_hours": sim.config.warmup_hours,
+        "conditions": {
+            "arrival_multiplier": sim.scenario.arrival_multiplier,
+            "staff_multiplier": sim.scenario.staff_multiplier,
+            "capacity_multiplier": sim.scenario.capacity_multiplier,
+        },
     }
 
 

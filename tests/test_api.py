@@ -115,3 +115,37 @@ def test_cors_origins_from_environment(monkeypatch):
         monkeypatch.delenv("NEUROTWIN_CORS_ORIGINS")
         monkeypatch.delenv("NEUROTWIN_CORS_ORIGIN_REGEX")
         importlib.reload(app_module)
+
+
+def test_custom_conditions_run_and_report_live_work():
+    r = client.post(
+        "/api/simulation/start",
+        json={
+            "scenario": "custom",
+            "seed": 2,
+            "policy": "priority",
+            "custom": {
+                "arrival_multiplier": 1.3,
+                "staff_multiplier": 0.8,
+                "capacity_multiplier": 1.0,
+            },
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["scenario"] == "custom"
+    assert body["conditions"] == {
+        "arrival_multiplier": 1.3,
+        "staff_multiplier": 0.8,
+        "capacity_multiplier": 1.0,
+    }
+    step = client.post(f"/api/simulation/{body['session_id']}/step", json={"hours": 48}).json()
+    assert step["step"]["simulated_hours"] == 48 and step["step"]["decisions_made"] > 0
+    assert step["step"]["compute_ms"] > 0
+    reset = client.post(f"/api/simulation/{body['session_id']}/reset").json()
+    assert reset["conditions"]["arrival_multiplier"] == 1.3  # reset keeps the custom conditions
+    bad = client.post(
+        "/api/simulation/start",
+        json={"scenario": "custom", "custom": {"arrival_multiplier": 9}},
+    )
+    assert bad.status_code == 422
