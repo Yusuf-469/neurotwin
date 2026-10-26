@@ -21,8 +21,13 @@ const BASELINES = ["load_balancing", "priority", "trunk_reservation", "mip", "fc
 const axis = { stroke: "var(--axis)", tick: { fill: "var(--text-muted)", fontSize: 11 }, tickLine: false } as const;
 const tip = {
   contentStyle: { background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" },
+  itemStyle: { color: "var(--text-primary)" },
+  labelStyle: { color: "var(--text-muted)", fontWeight: 600 },
   cursor: { fill: "var(--surface-2)" },
 };
+/** Tooltip rows sorted by value: ascending (best first) where lower is better, else descending. */
+const ascending = (item: { value?: unknown }) => Number(item.value ?? 0);
+const descending = (item: { value?: unknown }) => -Number(item.value ?? 0);
 const scenShort = (s: string) => SCENARIO_INFO[s]?.short ?? s;
 
 const ABLATION_NAMES: Record<string, string> = {
@@ -253,7 +258,7 @@ export default function ExperimentsPage() {
                       <CartesianGrid stroke="var(--grid)" vertical={false} />
                       <XAxis dataKey="scenario" {...axis} tickFormatter={(s) => scenShort(s)} />
                       <YAxis {...axis} />
-                      <Tooltip {...tip} labelFormatter={(s) => SCENARIO_LABELS[String(s)] ?? String(s)}
+                      <Tooltip {...tip} itemSorter={ascending} labelFormatter={(s) => `${SCENARIO_LABELS[String(s)] ?? String(s)} (best first)`}
                         formatter={(v, name) => [typeof v === "number" ? `${v.toFixed(meta.digits)} ${meta.unit}` : "–", policyMeta(String(name)).label]} />
                       {POLICIES.map((p, i) => (
                         <Bar key={p.key} dataKey={p.key} fill={p.color} radius={[4, 4, 0, 0]} animationDuration={900} animationBegin={i * 80}>
@@ -374,7 +379,7 @@ export default function ExperimentsPage() {
               <Takeaway tone="good">The agent deteriorates <b>clearly less</b> than the most-urgent-first rule, and about as much as the best rules.</Takeaway>
               <Takeaway tone="warn">
                 First-come-first-served looks &quot;steady&quot; only because it is already bad on a normal day: there is less room to get worse.
-                Always read this together with chapter 1.
+                Always read this together with the overall results in &quot;Who does best?&quot; at the top of this page.
               </Takeaway>
               <TechDetails>
                 <p>Robustness index = mean relative degradation (stress − A)/A over scenarios B–E and four metrics (cost, mean and 90th-percentile boarding,
@@ -402,7 +407,7 @@ export default function ExperimentsPage() {
                       <CartesianGrid stroke="var(--grid)" vertical={false} />
                       <XAxis dataKey="free" {...axis} label={{ value: "free beds in the ward", position: "insideBottom", offset: -2, fill: "var(--text-muted)", fontSize: 11 }} height={36} />
                       <YAxis {...axis} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
-                      <Tooltip {...tip} cursor={{ stroke: "var(--axis)" }} formatter={(v, n) => [typeof v === "number" ? `${(v * 100).toFixed(1)}% of the time` : "–", n === "A" ? "normal day" : "everything at once"]} />
+                      <Tooltip {...tip} itemSorter={descending} cursor={{ stroke: "var(--axis)" }} formatter={(v, n) => [typeof v === "number" ? `${(v * 100).toFixed(1)}% of the time` : "–", n === "A" ? "normal day" : "everything at once"]} />
                       <RLegend verticalAlign="top" height={28} formatter={(v) => (v === "A" ? "Normal day (trained on)" : "Everything at once (never seen)")} wrapperStyle={{ fontSize: 12 }} />
                       <Line dataKey="A" stroke="var(--series-1)" strokeWidth={2.5} dot={{ r: 4 }} animationDuration={1400} />
                       <Line dataKey="E" stroke="var(--series-2)" strokeWidth={2.5} dot={{ r: 4 }} animationDuration={1400} animationBegin={300} />
@@ -488,7 +493,7 @@ export default function ExperimentsPage() {
                           <CartesianGrid stroke="var(--grid)" vertical={false} />
                           <XAxis dataKey="scenario" {...axis} tickFormatter={(s) => String(s).split(" · ")[1]} />
                           <YAxis {...axis} unit="%" domain={[0, 100]} />
-                          <Tooltip {...tip} formatter={(v, n) => [typeof v === "number" ? `${v.toFixed(0)}% of runs` : "–", n === "ppo" ? "original agent" : "agent with budget controller"]} />
+                          <Tooltip {...tip} itemSorter={descending} formatter={(v, n) => [typeof v === "number" ? `${v.toFixed(0)}% of runs` : "–", n === "ppo" ? "original agent" : "agent with budget controller"]} />
                           <RLegend verticalAlign="top" height={26} formatter={(v) => (v === "ppo" ? "Original agent" : "Agent + budget controller")} wrapperStyle={{ fontSize: 12 }} />
                           <Bar dataKey="ppo" fill="var(--series-1)" radius={[4, 4, 0, 0]} animationDuration={900} />
                           <Bar dataKey="constrained" fill="var(--violet)" radius={[4, 4, 0, 0]} animationDuration={900} animationBegin={200} />
