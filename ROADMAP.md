@@ -307,12 +307,17 @@ Evaluate policy generalization and robustness under stress.
 - Validate robustness metrics
 
 ### Completion Criteria
-- [ ] Policy-structure analysis reported (threshold present, absent, or state-dependent)
-- [ ] RL trained only on normal scenario
-- [ ] Evaluation covers all stress scenarios
-- [ ] No retraining per scenario
-- [ ] Robustness degradation measured
-- [ ] Ablations documented (if conducted)
+- [x] Policy-structure analysis reported (threshold present, absent, or state-dependent)
+- [x] RL trained only on normal scenario
+- [x] Evaluation covers all stress scenarios
+- [x] No retraining per scenario
+- [x] Robustness degradation measured
+- [x] Ablations documented (if conducted)
+
+**Status: complete except the sensitivity analysis (2026-10-26).** See
+`docs/stage7_analysis_report.md`: robustness, CRN, policy structure, ablations (K = 3, disclosed),
+PPO-DR and the λ-conditioned constrained PPO (RESEARCH.md v2.6; a negative result). The
+sensitivity analysis (off-service LOS multiplier, deterioration hazard) has **not** been run.
 
 ---
 
