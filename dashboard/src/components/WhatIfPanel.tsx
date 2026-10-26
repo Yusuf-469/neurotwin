@@ -54,7 +54,7 @@ export default function WhatIfPanel({ sessionId, policies, disabled }: Props) {
   }));
 
   return (
-    <Card title="🔮 What if…? Compare decision-makers from this exact moment"
+    <Card title="What if…? Compare decision-makers from this exact moment"
       subtitle="Copies the hospital as it is right now and plays out many possible futures under each decision-maker"
       explain="Pick who to compare and change the conditions (e.g. 1.3 = 30% more patients). Every decision-maker faces exactly the same futures, so the comparison is fair.">
       <div className="row" style={{ marginBottom: 10 }}>

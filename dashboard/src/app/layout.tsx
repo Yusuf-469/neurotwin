@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import NavBar from "@/components/NavBar";
-import { ScrollProgress } from "@/components/motion";
+import { HospitalBackdrop, PointerFX, ScrollProgress } from "@/components/motion";
 import "./globals.css";
 
 // next/font downloads the fonts at build time and serves them from this site (no runtime calls to
@@ -20,6 +20,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body>
+        <HospitalBackdrop />
+        <PointerFX />
         <ScrollProgress />
         <div className="banner">
           Research simulation: every number comes from a simplified model, not a real hospital.

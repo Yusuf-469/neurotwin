@@ -27,7 +27,7 @@ export default function DecisionLog({ sessionId, decisions, total }: Props) {
   };
 
   return (
-    <Card title="💬 Every decision, explained"
+    <Card title="Every decision, explained"
       subtitle={`${total} decisions so far`}
       explain="Click any decision on the left to see why it was made. Explanations are written afterwards from logged facts and never change what happens.">
       <div className="grid grid-2">
@@ -47,7 +47,7 @@ export default function DecisionLog({ sessionId, decisions, total }: Props) {
                   <span className="muted">waited {d.waited_hours?.toFixed(1)} h</span>
                 </>
               ) : (
-                <><span>⏸ Kept beds free for now</span><span className="spacer" /><span className="muted">{d.n_waiting} waiting</span></>
+                <><span>Kept beds free for now</span><span className="spacer" /><span className="muted">{d.n_waiting} waiting</span></>
               )}
             </div>
           ))}
