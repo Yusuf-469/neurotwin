@@ -29,6 +29,7 @@ from ..policies import load_baseline_params, make_policy
 from ..policies.ppo_policy import PPOPolicy
 from ..rl.env import HospitalAllocationEnv
 from ..rl.ppo import PPOConfig, train
+from ..rl.ppo.agent import PPOAgent
 from ..simulation.config import SCENARIOS, load_default_config
 from ..simulation.hospital import HospitalSimulation, run_episode
 from ..simulation.validation.reduced import GreedyPlacement
@@ -79,7 +80,8 @@ def train_agent(args: tuple) -> dict[str, Any]:
 
     env_opts (ablations, RESEARCH.md §6.16): ``drop_features`` (0-based indices), ``beta``,
     ``kappa`` (reward weights) and ``uniform_omega`` (all priority weights 1 in the *training*
-    reward). Evaluation always uses the standard cost J.
+    reward). Evaluation always uses the standard cost J. ``init_from`` (path to a saved agent)
+    starts PPO from that agent instead of a fresh network (RESEARCH.md §6.26).
     """
     name, agent_seed, overrides = args[:3]
     env_opts = args[3] if len(args) > 3 else {}
@@ -103,6 +105,7 @@ def train_agent(args: tuple) -> dict[str, Any]:
     pool = WarmStartPool.generate(
         sim_config, SCENARIOS["A"], range(MIN_TRAINING_POOL), GreedyPlacement()
     )
+    init = PPOAgent.load(env_opts["init_from"]) if env_opts.get("init_from") else None
     t0 = time.perf_counter()
     agent, log = train(
         [
@@ -119,6 +122,7 @@ def train_agent(args: tuple) -> dict[str, Any]:
         * config.n_envs,
         config,
         episode_seeds(agent_seed),
+        init_agent=init,
     )
     train_s = time.perf_counter() - t0
     agent.meta.update(
