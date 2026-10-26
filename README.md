@@ -130,7 +130,7 @@ The Python backend cannot run on Vercel, for three reasons:
 Only the static dashboard goes there:
 1. On vercel.com, choose **Add New → Project**, import the GitHub repository and set **Root Directory** to `dashboard`.
 2. Add the environment variable `NEXT_PUBLIC_API_URL` = your Space URL, e.g. `https://<user>-neurotwin.hf.space` (no trailing slash), then deploy.
-3. In the Space's *Settings → Variables and secrets*, add the variable `NEUROTWIN_CORS_ORIGINS` = your Vercel URL, e.g. `https://neurotwin.vercel.app`, so the browser may call the API cross-site.
+3. In the Space's *Settings → Variables and secrets*, add the variable `NEUROTWIN_CORS_ORIGINS` = your Vercel URL, e.g. `https://neurotwin.vercel.app`, so the browser may call the API cross-site. To also admit the project's preview and Git-branch URLs, set `NEUROTWIN_CORS_ORIGIN_REGEX`, e.g. `https://neurotwin(-[a-z0-9-]+-<team>)?\.vercel\.app`.
 
 A free Space sleeps after inactivity. The first request then takes a minute while it wakes, and the dashboard shows the error until the API responds.
 

@@ -83,7 +83,10 @@ MAX_SESSIONS = 200
 LLM_MAX_PER_HOUR = int(os.environ.get("NEUROTWIN_LLM_MAX_PER_HOUR", "60"))
 # Browser origins allowed to call the API cross-site: the local dev server, plus any origins in
 # NEUROTWIN_CORS_ORIGINS (comma-separated), e.g. a dashboard hosted separately on Vercel while
-# the API runs on a Hugging Face Space. Same-origin use (the bundled dashboard) needs none.
+# the API runs on another host. Same-origin use (the bundled dashboard) needs none.
+# NEUROTWIN_CORS_ORIGIN_REGEX optionally admits a family of origins, e.g. every deployment URL
+# of one Vercel project (preview URLs change per build). The API has no auth or cookies.
+CORS_ORIGIN_REGEX = os.environ.get("NEUROTWIN_CORS_ORIGIN_REGEX") or None
 CORS_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"] + [
     o.strip().rstrip("/")
     for o in os.environ.get("NEUROTWIN_CORS_ORIGINS", "").split(",")
@@ -223,6 +226,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_methods=["*"],
     allow_headers=["*"],
 )
