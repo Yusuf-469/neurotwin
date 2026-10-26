@@ -10,8 +10,9 @@ TRAIN = range(0, 100_000)  # environment seeds for training (scenario A only)
 VALIDATION = range(100_000, 100_020)  # tuning and early stopping (scenario A only)
 TEST = range(200_000, 200_050)  # final evaluation, A-E
 CRN_INDEPENDENT = range(300_000, 300_050)  # §6.24 variance-reduction check only
+FRESH_TEST = range(400_000, 400_050)  # §6.26 one-time final test of the selected candidate
 
-_ALL = {"train": TRAIN, "validation": VALIDATION, "test": TEST, "crn_independent": CRN_INDEPENDENT}
+_ALL = {"train": TRAIN, "validation": VALIDATION, "test": TEST, "crn_independent": CRN_INDEPENDENT, "fresh_test": FRESH_TEST}
 
 
 def split_of(seed: int) -> str:

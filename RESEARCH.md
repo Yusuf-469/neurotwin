@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.7 (2026-10-27). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.8 (2026-10-27). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -720,6 +720,32 @@ the simulator is deterministic given the seed, so re-running them would reproduc
 
 Reported as it comes out, including if the shield fails or costs performance.
 
+## 6.26 Extension: Imitation-Initialised PPO and Ensembles (pre-registered 2026-10-27, before any run)
+
+**Question:** can a learned policy *beat* Load-Balancing, the strongest tuned baseline, which PPO ties on the Stage 6
+test seeds? The Stage 6 test seeds have been opened, so they are not reused for this question.
+
+**Candidates** (all built from scenario A training seeds only):
+1. **BC:** behaviour cloning of Load-Balancing into the PPO actor network. Load-Balancing decisions are mapped to the
+   7-action space (a decision is used if exactly reproduced by some valid action; 97% are, measured on three training
+   episodes before this registration). Observation normaliser fitted on the cloned data. K = 5 (agent seeds 0-4, each
+   cloning from its own block of training seeds).
+2. **BC+PPO:** PPO fine-tuning initialised from BC: learning rate 1e-4 (else as config/ppo_default.json), observation
+   normaliser frozen, critic-only updates for the first 30 updates, 3M steps. K = 5, same agent and episode seed blocks.
+3. **ENS(PPO):** soft-vote ensemble of the five final_A agents (mean of masked action probabilities, argmax).
+4. **ENS(BC+PPO):** soft-vote ensemble of the five BC+PPO agents.
+
+**Selection (validation only):** mean cost J per measured day on the 20 validation seeds, scenario A. The candidate
+among 2-4 with the lowest mean J is selected. All candidates' validation scores are reported.
+
+**Final test (once):** a fresh, previously unused seed block FRESH_TEST = 400,000-400,049, scenarios A-E. The selected
+candidate vs Load-Balancing (primary, J per day, hierarchical paired bootstrap for K-agent candidates, paired
+bootstrap otherwise, Holm over 5 scenarios); vs final_A PPO (secondary); collapse counts reported. Original Stage 6
+results are unchanged.
+
+**Outcome rule:** "beats Load-Balancing" is claimed only for scenarios where the Holm-adjusted comparison is
+significant in its favour. A tie or a loss is reported as such.
+
 ## 6.22 Experiment Matrix
 
 ### Primary
@@ -898,6 +924,9 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.8 — 2026-10-27 (imitation-initialised PPO and ensembles; §6.26)
+- **Pre-registered before any run.** Adds BC, BC+PPO and soft-vote ensembles, selected on validation seeds only and tested once on a fresh seed block (400,000-400,049), because the Stage 6 test seeds are already used. Stage 6 results are unchanged.
 
 ### v2.7 — 2026-10-27 (safety shield; §6.25)
 - **Pre-registered before any run.** Adds a parameter-free shield (no HOLD while the ED is full and a placement is feasible) evaluated on the five final agents, motivated by the Stage 6 collapse finding and disclosed as post-hoc in motivation. Stage 6 results are unchanged.
