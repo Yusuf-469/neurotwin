@@ -90,7 +90,7 @@ const SPEC: { k: string; v: string; d: string; icon: IconName }[] = [
   { k: "Training", v: "3 million decisions", d: "8 simulated hospitals in parallel, normal days only, trained on an ordinary CPU (no GPU needed).", icon: "repeat" },
   { k: "Time-aware", v: "γ = 0.95 / hour", d: "Rewards are discounted by real simulated time between decisions (semi-Markov GAE, λ = 0.9).", icon: "clock" },
   { k: "Safe by design", v: "Action masking", d: "It can only pick choices that are physically possible at that moment.", icon: "shield" },
-  { k: "Models", v: "45 trained", d: "5 final agents (11,656 parameters each: actor 6,023 + critic 5,633), 6 for tuning, 24 for ablations, 10 for follow-up studies.", icon: "layers" },
+  { k: "The model", v: "1 network, 5 copies", d: "One small neural network (about 11,700 learned numbers). The results use 5 copies of it trained from different random starts, so one lucky run can't decide the outcome.", icon: "layers" },
   { k: "Verified", v: "vs stable-baselines3", d: "My PPO was checked against the reference PPO (stable-baselines3) and MaskablePPO (sb3-contrib) on CartPole and on this hospital.", icon: "check" },
 ];
 
