@@ -199,19 +199,32 @@ export default function FloorPlan({ state, newDecisions, newDiversions, playing,
       {Array.from({ length: ED_CAPACITY }, (_, i) => {
         const x = 150 + (i % 6) * 46;
         const y = 106 + Math.floor(i / 6) * 38;
-        const on = i < state.ed_count;
-        return <circle key={i} cx={x} cy={y} r={on ? 10 : 9} className={on ? "fp-ed on" : "fp-ed"} />;
+        const treat = state.ed_in_treatment;
+        const docWait = treat + state.ed_waiting_for_doctor;
+        const cls = i < treat ? "fp-ed treat" : i < docWait ? "fp-ed docwait" : i < state.ed_count ? "fp-ed board" : "fp-ed";
+        return <circle key={i} cx={x} cy={y} r={i < state.ed_count ? 10 : 9} className={cls} />;
       })}
-      <text x="132" y="316" className="fp-sub">Doctors on shift</text>
+      <text x="132" y="316" className="fp-sub strong">
+        Doctors: {state.ed_in_treatment} of {state.doctors_on_shift} treating
+      </text>
       {Array.from({ length: state.doctors_on_shift }, (_, i) => {
         const busy = i < state.ed_in_treatment;
         return (
-          <g key={i} transform={`translate(${142 + i * 34}, 332)`} className={busy ? "fp-doc busy" : "fp-doc"}>
+          <g key={i} transform={`translate(${142 + i * 34}, 326)`} className={busy ? "fp-doc busy" : "fp-doc"}>
             <circle cx="10" cy="6" r="6" /><path d="M0 26c0-7 4.5-11 10-11s10 4 10 11z" />
           </g>
         );
       })}
-      <text x="420" y="316" className="fp-sub" textAnchor="end">{state.ed_waiting_for_doctor} waiting for a doctor</text>
+      <text x="420" y="316" className={edFull && state.ed_in_treatment < state.doctors_on_shift ? "fp-sub alert" : "fp-sub"} textAnchor="end">
+        {edFull && state.ed_in_treatment < state.doctors_on_shift
+          ? "Doctors free, but no ward beds"
+          : `${state.ed_waiting_for_doctor} waiting for a doctor`}
+      </text>
+      <g className="fp-edlegend" transform="translate(134, 370)">
+        <circle cx="5" cy="-4" r="5" className="fp-ed treat" /><text x="14" y="0">being treated</text>
+        <circle cx="105" cy="-4" r="5" className="fp-ed docwait" /><text x="114" y="0">waiting for doctor</text>
+        <circle cx="228" cy="-4" r="5" className="fp-ed board" /><text x="237" y="0">needs a bed</text>
+      </g>
 
       <rect x="128" y="384" width="294" height="230" rx="12" className="fp-bay" />
       <text x="142" y="410" className="fp-sub strong">Waiting for a ward bed · {state.waiting_requests.length}</text>

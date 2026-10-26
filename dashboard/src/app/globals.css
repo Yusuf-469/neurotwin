@@ -678,3 +678,10 @@ main, .footer, .banner { position: relative; z-index: 1; }
 .slider-head b { margin-left: auto; color: var(--accent); font-variant-numeric: tabular-nums; }
 .slider input[type="range"] { width: 100%; accent-color: var(--accent); padding: 0; background: transparent; border: 0; }
 .slider-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+
+/* ---------- ED patient states ---------- */
+.fp-ed.treat { fill: color-mix(in srgb, var(--series-3) 60%, var(--surface-2)); stroke: var(--series-3); }
+.fp-ed.docwait { fill: color-mix(in srgb, var(--status-warning) 70%, var(--surface-2)); stroke: var(--status-warning); animation: blink 1.2s ease-in-out infinite; }
+.fp-ed.board { fill: color-mix(in srgb, var(--accent) 55%, var(--surface-2)); stroke: var(--accent); }
+.fp-edlegend text { fill: var(--text-muted); font-size: 11px; }
+.fp-sub.alert { fill: var(--status-critical); font-weight: 700; }
