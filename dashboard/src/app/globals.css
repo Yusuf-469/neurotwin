@@ -654,3 +654,11 @@ main, .footer, .banner { position: relative; z-index: 1; }
 @keyframes door { 0%, 100% { opacity: .15; } 50% { opacity: .7; } }
 @keyframes chipFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 @keyframes barFill { 0% { width: 70%; } 50% { width: 96%; } 100% { width: 70%; } }
+
+/* ---------- safety guard result tiles ---------- */
+.shield-card { margin-top: 16px; }
+.shield-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.shield-tile { border-radius: 14px; padding: 16px 18px; background: color-mix(in srgb, var(--tile) 12%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--tile) 40%, var(--border)); }
+.shield-num { font-family: var(--font-display, inherit); font-size: 44px; font-weight: 800; letter-spacing: -0.04em; color: var(--tile); line-height: 1; }
+.shield-lbl { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }

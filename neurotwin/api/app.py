@@ -98,19 +98,20 @@ ALL_SCENARIOS = {**SCENARIOS, **SEVERE_SCENARIOS}
 
 
 def available_policies() -> list[str]:
-    """Baseline names, plus 'ppo' when a trained agent file exists."""
+    """Baseline names, plus 'ppo' and 'ppo_shielded' (RESEARCH.md §6.25) when a trained agent
+    file exists."""
     names = list(POLICY_CLASSES)
     if AGENT_PATH.exists():
-        names.append("ppo")
+        names += ["ppo", "ppo_shielded"]
     return names
 
 
 def build_policy(name: str):
     """Instantiate a policy by name (tuned baselines or the configured PPO agent)."""
-    if name == "ppo":
+    if name in ("ppo", "ppo_shielded"):
         if not AGENT_PATH.exists():
             raise HTTPException(404, f"no trained PPO agent at {AGENT_PATH}")
-        return PPOPolicy.load(AGENT_PATH)
+        return PPOPolicy.load(AGENT_PATH, shield=name == "ppo_shielded")
     if name not in POLICY_CLASSES:
         raise HTTPException(404, f"unknown policy {name!r}")
     return make_policy(name, load_baseline_params()[name])
@@ -397,6 +398,7 @@ def experiment_results() -> dict[str, Any]:
         "ablations": "docs/data/stage7/ablation_comparisons.json",
         "ppo_dr": "docs/data/stage7/ppo_dr_comparisons.json",
         "constrained": "docs/data/stage7/constrained_comparisons.json",
+        "shield": "docs/data/stage7/shield_comparisons.json",
     }.items():
         path = ROOT / rel
         out[key] = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None

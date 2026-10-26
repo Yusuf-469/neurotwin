@@ -9,7 +9,7 @@ import { Reveal } from "@/components/motion";
 import { Segmented, TechDetails } from "@/components/ui";
 import WhatIfPanel from "@/components/WhatIfPanel";
 import { api, type DecisionRecord, type HistoryPoint, type HospitalState, type StateResponse } from "@/lib/api";
-import { POLICIES, PRIORITY_COLORS, PRIORITY_NAMES, SCENARIO_INFO, SCENARIO_LABELS, UNIT_LABELS, policyMeta } from "@/lib/policies";
+import { LIVE_POLICIES, PRIORITY_COLORS, PRIORITY_NAMES, SCENARIO_INFO, SCENARIO_LABELS, UNIT_LABELS, policyMeta } from "@/lib/policies";
 
 // Live "control room": the animated floor plan is driven by the real simulation state; every
 // tick advances the simulator by `speed` simulated hours and animates what happened in between
@@ -207,7 +207,7 @@ export default function SimulationPage() {
             </label>
             <label className="field">Decision-maker
               <select value={policy} onChange={(e) => setPolicy(e.target.value)}>
-                {POLICIES.filter((p) => policies.includes(p.key)).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                {LIVE_POLICIES.filter((p) => policies.includes(p.key)).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
               </select>
             </label>
             <label className="field">Run number<input type="number" min={0} value={seed} onChange={(e) => setSeed(+e.target.value)} /></label>

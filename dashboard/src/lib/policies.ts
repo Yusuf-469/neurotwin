@@ -26,8 +26,19 @@ export const POLICIES: PolicyMeta[] = [
     desc: "Whoever has waited longest gets the next bed, regardless of urgency." },
 ];
 
+/** The RL agent with the safety guard (RESEARCH.md §6.25). Not part of the original six-way
+ *  study, so it is kept out of POLICIES; it shares the agent's colour because it is the same
+ *  trained network, and is always shown with its own label. */
+export const SHIELDED: PolicyMeta = {
+  key: "ppo_shielded", label: "RL agent + safety guard", tech: "PPO with a no-hold-while-ED-full guard", color: "var(--series-1)",
+  desc: "The same agent, but it may never keep a bed empty while ambulances are being turned away.",
+};
+
+/** Decision-makers offered in the live hospital and what-if tools. */
+export const LIVE_POLICIES: PolicyMeta[] = [POLICIES[0], SHIELDED, ...POLICIES.slice(1)];
+
 export const policyMeta = (key: string): PolicyMeta =>
-  POLICIES.find((p) => p.key === key) ??
+  LIVE_POLICIES.find((p) => p.key === key) ??
   { key, label: key, tech: key, color: "var(--text-muted)", desc: "" };
 
 export const UNIT_COLORS: Record<string, string> = {

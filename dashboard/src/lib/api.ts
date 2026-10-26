@@ -150,6 +150,8 @@ export interface StudyResults {
   ppo_dr: Comparison[] | null;
   /** Stage 7: lambda-conditioned constrained PPO vs PPO, plus budget-satisfaction shares. */
   constrained: { comparisons: Comparison[]; budget: Record<string, number> } | null;
+  /** Stage 7: safety shield (RESEARCH.md §6.25); collapses out of 1,250 test episodes. */
+  shield: { collapses: Record<string, number>; n_episodes: number; comparisons: Comparison[] } | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
