@@ -81,6 +81,11 @@ def test_results_endpoint_serves_stage6_data_with_label():
     body = client.get("/api/experiments/results").json()
     assert body["label"] == SIMULATION_LABEL
     assert body["summary"] is not None and len(body["comparisons"]) == 100
+    assert len(body["ablations"]) == 80 and len(body["ppo_dr"]) == 25
+    assert (
+        len(body["constrained"]["comparisons"]) == 25
+        and "E:lambda_mean" in body["constrained"]["budget"]
+    )
 
 
 def test_cors_origins_from_environment(monkeypatch):

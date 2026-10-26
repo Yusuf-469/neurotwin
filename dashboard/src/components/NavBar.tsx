@@ -6,8 +6,8 @@ import { ThemeToggle } from "./ui";
 
 const LINKS = [
   { href: "/", label: "Overview" },
-  { href: "/simulation/", label: "Live twin" },
-  { href: "/experiments/", label: "Study results" },
+  { href: "/simulation/", label: "Live hospital" },
+  { href: "/experiments/", label: "Results" },
 ];
 
 export default function NavBar() {

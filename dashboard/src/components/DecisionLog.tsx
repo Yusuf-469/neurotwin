@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api, type DecisionRecord, type Explanation } from "@/lib/api";
-import { PRIORITY_COLORS } from "@/lib/policies";
+import { PRIORITY_COLORS, PRIORITY_NAMES, UNIT_LABELS } from "@/lib/policies";
 import { Card } from "./ui";
 
 interface Props {
@@ -27,8 +27,9 @@ export default function DecisionLog({ sessionId, decisions, total }: Props) {
   };
 
   return (
-    <Card title="Decision log & explanations"
-      subtitle={`${total} decisions so far. Select one to see why it was made (post-hoc, from logged facts only).`}>
+    <Card title="💬 Every decision, explained"
+      subtitle={`${total} decisions so far`}
+      explain="Click any decision on the left to see why it was made. Explanations are written afterwards from logged facts and never change what happens.">
       <div className="grid grid-2">
         <div className="feed">
           {[...decisions].reverse().map((d) => (
@@ -40,13 +41,13 @@ export default function DecisionLog({ sessionId, decisions, total }: Props) {
               {d.action === "PLACE" ? (
                 <>
                   <i className="dot" style={{ background: PRIORITY_COLORS[d.priority ?? 5] }} />
-                  <span>P{d.priority} → <strong>{d.unit}</strong>
-                    {d.off_service && <span className="muted"> (off-service)</span>}</span>
+                  <span>{PRIORITY_NAMES[d.priority ?? 5]} patient → <strong>{UNIT_LABELS[d.unit ?? ""] ?? d.unit}</strong>
+                    {d.off_service && <span className="muted"> (wrong ward: own ward full)</span>}</span>
                   <span className="spacer" />
                   <span className="muted">waited {d.waited_hours?.toFixed(1)} h</span>
                 </>
               ) : (
-                <><span>Hold</span><span className="spacer" /><span className="muted">{d.n_waiting} waiting</span></>
+                <><span>⏸ Kept beds free for now</span><span className="spacer" /><span className="muted">{d.n_waiting} waiting</span></>
               )}
             </div>
           ))}

@@ -54,8 +54,9 @@ export default function WhatIfPanel({ sessionId, policies, disabled }: Props) {
   }));
 
   return (
-    <Card title="What-if: compare policies from this exact moment"
-      subtitle="Every policy faces the same random futures (common random numbers); stays in progress are re-drawn given time already spent.">
+    <Card title="🔮 What if…? Compare decision-makers from this exact moment"
+      subtitle="Copies the hospital as it is right now and plays out many possible futures under each decision-maker"
+      explain="Pick who to compare and change the conditions (e.g. 1.3 = 30% more patients). Every decision-maker faces exactly the same futures, so the comparison is fair.">
       <div className="row" style={{ marginBottom: 10 }}>
         {POLICIES.filter((p) => policies.includes(p.key)).map((p) => (
           <label key={p.key} className="chip" style={{ cursor: "pointer" }}>
@@ -66,13 +67,13 @@ export default function WhatIfPanel({ sessionId, policies, disabled }: Props) {
         ))}
       </div>
       <div className="row">
-        <label className="field">horizon (h)<input type="number" value={horizon} min={1} max={336} onChange={(e) => setHorizon(+e.target.value)} /></label>
-        <label className="field">futures<input type="number" value={futures} min={2} max={50} onChange={(e) => setFutures(+e.target.value)} /></label>
-        <label className="field">arrivals ×<input type="number" step={0.05} value={arrivals} onChange={(e) => setArrivals(+e.target.value)} /></label>
+        <label className="field">look ahead (hours)<input type="number" value={horizon} min={1} max={336} onChange={(e) => setHorizon(+e.target.value)} /></label>
+        <label className="field">possible futures<input type="number" value={futures} min={2} max={50} onChange={(e) => setFutures(+e.target.value)} /></label>
+        <label className="field">patients ×<input type="number" step={0.05} value={arrivals} onChange={(e) => setArrivals(+e.target.value)} /></label>
         <label className="field">staff ×<input type="number" step={0.05} value={staff} onChange={(e) => setStaff(+e.target.value)} /></label>
         <label className="field">beds ×<input type="number" step={0.05} value={capacity} onChange={(e) => setCapacity(+e.target.value)} /></label>
         <button className="btn" onClick={run} disabled={disabled || busy || ordered.length < 2}>
-          {busy ? "Simulating futures…" : "Run what-if"}
+          {busy ? "Simulating futures… (up to ~30 s on the free server)" : "Run what-if"}
         </button>
       </div>
       {ordered.length < 2 && <p className="muted">Select at least two policies.</p>}
@@ -85,8 +86,8 @@ export default function WhatIfPanel({ sessionId, policies, disabled }: Props) {
             {viewToggle}
           </div>
           <span className="muted">
-            Difference from <strong>{policyMeta(reference).label}</strong> in {meta.label.toLowerCase()} ({meta.unit}),
-            mean over {result.n_futures} futures with 95% CI. Below 0 = better than the reference. {result.label}
+            How much higher or lower each one's {meta.label.toLowerCase()} is than <strong>{policyMeta(reference).label}</strong> ({meta.unit}),
+            averaged over {result.n_futures} futures. <b>Left of the line = better.</b> Whiskers show the uncertainty range. {result.label}
           </span>
           {asTable ? (
             <div className="scroll">
