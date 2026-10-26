@@ -35,7 +35,6 @@ export default function HeroScene() {
           </linearGradient>
           <filter id="hs-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3" result="b" />
             <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-          <path id="hs-heli" d="M-80 40 C 120 10, 330 30, 470 92" />
         </defs>
 
         {/* clouds */}
@@ -108,12 +107,12 @@ export default function HeroScene() {
           <Ambulance tag />
         </g>
 
-        {/* helicopter landing on the helipad */}
+        {/* helicopter */}
         <g>
-          <animateMotion dur="14s" repeatCount="indefinite" keyPoints="0;1;1;0.0" keyTimes="0;0.45;0.75;1" calcMode="linear">
-            <mpath href="#hs-heli" />
-          </animateMotion>
-          <animate attributeName="opacity" dur="14s" repeatCount="indefinite" values="0;1;1;1;0" keyTimes="0;0.06;0.75;0.94;1" />
+          <animateMotion dur="14s" repeatCount="indefinite" calcMode="spline"
+            values="-90,40; 150,24; 330,48; 440,88; 470,101; 470,101; 500,86; 600,40; 700,6"
+            keyTimes="0; 0.14; 0.28; 0.38; 0.44; 0.66; 0.74; 0.88; 1"
+            keySplines="0 0 1 1; 0 0 1 1; 0 0 1 1; 0 0 0.4 1; 0 0 1 1; 0.6 0 1 1; 0 0 1 1; 0 0 1 1" />
           <g transform="translate(0,-8)">
             <ellipse cx="0" cy="0" rx="22" ry="9" fill="var(--accent)" />
             <ellipse cx="9" cy="-1" rx="8" ry="5" fill="#bfe0ff" />
