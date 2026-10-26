@@ -81,6 +81,14 @@ MAX_FUTURES = 50
 MAX_WHATIF_HOURS = 24 * 14
 MAX_SESSIONS = 200
 LLM_MAX_PER_HOUR = int(os.environ.get("NEUROTWIN_LLM_MAX_PER_HOUR", "60"))
+# Browser origins allowed to call the API cross-site: the local dev server, plus any origins in
+# NEUROTWIN_CORS_ORIGINS (comma-separated), e.g. a dashboard hosted separately on Vercel while
+# the API runs on a Hugging Face Space. Same-origin use (the bundled dashboard) needs none.
+CORS_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"] + [
+    o.strip().rstrip("/")
+    for o in os.environ.get("NEUROTWIN_CORS_ORIGINS", "").split(",")
+    if o.strip()
+]
 STATIC_DIR = Path(os.environ.get("NEUROTWIN_STATIC_DIR", ROOT / "dashboard" / "out"))
 
 ALL_SCENARIOS = {**SCENARIOS, **SEVERE_SCENARIOS}
@@ -214,7 +222,7 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
