@@ -13,6 +13,15 @@ export interface Status {
   finished: boolean;
   horizon_hours: number;
   warmup_hours: number;
+  conditions?: Conditions;
+  /** Work done by the last step request (only on step responses). */
+  step?: { compute_ms: number; decisions_made: number; simulated_hours: number };
+}
+
+export interface Conditions {
+  arrival_multiplier: number;
+  staff_multiplier: number;
+  capacity_multiplier: number;
 }
 
 export interface StartResponse extends Status {
@@ -178,8 +187,10 @@ export const api = {
   health: () => request<{ status: string; label: string }>("/api/health"),
   policies: () => request<{ policies: string[] }>("/api/policies"),
   scenarios: () => request<{ scenarios: Record<string, Record<string, number | string>> }>("/api/scenarios"),
-  start: (scenario: string, seed: number, policy: string) =>
-    request<StartResponse>("/api/simulation/start", { method: "POST", body: JSON.stringify({ scenario, seed, policy }) }),
+  start: (scenario: string, seed: number, policy: string, custom?: Conditions) =>
+    request<StartResponse>("/api/simulation/start", {
+      method: "POST", body: JSON.stringify({ scenario, seed, policy, ...(custom ? { custom } : {}) }),
+    }),
   step: (sid: string, hours: number) =>
     request<Status>(`/api/simulation/${sid}/step`, { method: "POST", body: JSON.stringify({ hours }) }),
   reset: (sid: string) => request<Status>(`/api/simulation/${sid}/reset`, { method: "POST" }),

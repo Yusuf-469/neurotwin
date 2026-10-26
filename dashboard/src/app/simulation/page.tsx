@@ -8,7 +8,7 @@ import LiveCharts from "@/components/LiveCharts";
 import { Reveal } from "@/components/motion";
 import { Segmented, TechDetails } from "@/components/ui";
 import WhatIfPanel from "@/components/WhatIfPanel";
-import { api, type DecisionRecord, type HistoryPoint, type HospitalState, type StateResponse } from "@/lib/api";
+import { api, type Conditions, type DecisionRecord, type HistoryPoint, type HospitalState, type StateResponse } from "@/lib/api";
 import { LIVE_POLICIES, PRIORITY_COLORS, PRIORITY_NAMES, SCENARIO_INFO, SCENARIO_LABELS, UNIT_LABELS, policyMeta } from "@/lib/policies";
 
 // Live "control room": the animated floor plan is driven by the real simulation state; every
@@ -37,6 +37,16 @@ function clock(hours: number) {
 }
 
 type Tab = "trends" | "decisions" | "whatif";
+type Server = "checking" | "online" | "waking" | "offline";
+
+/** "+30% patients, 20% fewer staff" style summary of custom conditions. */
+function describe(c: Conditions): string {
+  const part = (m: number, more: string, fewer: string) =>
+    Math.abs(m - 1) < 0.005 ? "" : m > 1 ? `${Math.round((m - 1) * 100)}% ${more}` : `${Math.round((1 - m) * 100)}% ${fewer}`;
+  const parts = [part(c.arrival_multiplier, "more patients", "fewer patients"),
+    part(c.staff_multiplier, "more staff", "fewer staff"), part(c.capacity_multiplier, "more beds", "fewer beds")].filter(Boolean);
+  return parts.length ? parts.join(", ") : "same as a normal day";
+}
 
 export default function SimulationPage() {
   const [policies, setPolicies] = useState<string[]>([]);
@@ -54,9 +64,42 @@ export default function SimulationPage() {
   const [tab, setTab] = useState<Tab>("trends");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
+  const [server, setServer] = useState<Server>("checking");
+  const [ping, setPing] = useState<number | null>(null);
+  const [work, setWork] = useState({ steps: 0, decisions: 0, lastMs: 0, roundTripMs: 0 });
+  const [warmMode, setWarmMode] = useState<"skip" | "empty">("skip");
+  const [custom, setCustom] = useState<Conditions>({ arrival_multiplier: 1.3, staff_multiplier: 0.9, capacity_multiplier: 1.0 });
   const busy = useRef(false);
   const lastId = useRef(-1);
   const lastDiv = useRef(0);
+
+  // Server status, measured: a health request every 30 s with its round-trip time.
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      const t0 = performance.now();
+      const slow = setTimeout(() => alive && setServer((s) => (s === "online" ? s : "waking")), 2500);
+      try {
+        await api.health();
+        if (!alive) return;
+        setServer("online");
+        setPing(Math.round(performance.now() - t0));
+      } catch {
+        if (alive) setServer("offline");
+      } finally {
+        clearTimeout(slow);
+      }
+    };
+    check();
+    const t = setInterval(check, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  const record = (r: Awaited<ReturnType<typeof api.step>>, t0: number) => {
+    if (!r.step) return;
+    setWork((w) => ({ steps: w.steps + 1, decisions: w.decisions + r.step!.decisions_made, lastMs: r.step!.compute_ms,
+      roundTripMs: Math.round(performance.now() - t0) }));
+  };
 
   useEffect(() => {
     api.policies().then((p) => {
@@ -91,7 +134,8 @@ export default function SimulationPage() {
     if (!sid || busy.current) return;
     busy.current = true;
     try {
-      await api.step(sid, hours);
+      const t0 = performance.now();
+      record(await api.step(sid, hours), t0);
       const s = await refresh(sid, true);
       if (s.finished) setPlaying(false);
     } catch (e) {
@@ -102,21 +146,26 @@ export default function SimulationPage() {
     }
   }, [sid, refresh]);
 
-  const begin = useCallback(async (sc: string, sd: number, pol: string, warm: boolean) => {
+  const begin = useCallback(async (sc: string, sd: number, pol: string, warm: boolean, cond?: Conditions) => {
     setError("");
     setPlaying(false);
     setEvents([]);
+    setWork({ steps: 0, decisions: 0, lastMs: 0, roundTripMs: 0 });
     lastId.current = -1;
     lastDiv.current = 0;
-    setLoading("Starting the simulator…");
+    setLoading("Connecting to the simulation server…");
     try {
-      const r = await api.start(sc, sd, pol);
+      const r = await api.start(sc, sd, pol, sc === "custom" ? cond : undefined);
       setSid(r.session_id);
       if (warm) {
-        // Fast-forward through the 35-day warm-up in steps within the API's 14-day limit.
-        for (let h = 0; h < 24 * 35; h += 336) {
-          setLoading(`Filling the hospital (warm-up day ${Math.round(h / 24)} of 35)…`);
-          await api.step(r.session_id, Math.min(336, 24 * 35 - h));
+        // Simulate the 35-day warm-up on the server one week at a time, reporting real progress.
+        let decided = 0;
+        for (let h = 0; h < 24 * 35; h += 168) {
+          setLoading(`Simulating the warm-up on the server: day ${Math.round(h / 24)} of 35 · ${decided.toLocaleString()} bed decisions so far`);
+          const t0 = performance.now();
+          const res = await api.step(r.session_id, Math.min(168, 24 * 35 - h));
+          record(res, t0);
+          decided += res.step?.decisions_made ?? 0;
         }
       }
       await refresh(r.session_id, false);
@@ -157,6 +206,13 @@ export default function SimulationPage() {
   const urgent = st.waiting_requests.filter((r) => r.priority <= 2).length;
   const longest = st.waiting_requests.reduce((m, r) => Math.max(m, now - r.created_at), 0);
 
+  const phase = loading ? "busy" : !sid ? "idle" : status?.finished ? "finished" : playing ? "running" : "paused";
+  const phaseLabel = { busy: loading.startsWith("Connecting") ? "Connecting to the server" : "Simulating warm-up on the server",
+    idle: "Not started", finished: "Run finished", running: "Running live", paused: "Paused" }[phase];
+  const phaseDot = phase === "running" || phase === "busy" ? "live-dot" : phase === "paused" ? "live-dot amber" : "live-dot wait";
+  const serverLabel = server === "online" ? `Server online${ping !== null ? ` · ${ping} ms` : ""}`
+    : server === "waking" ? "Server waking up (free tier, up to a minute)" : server === "offline" ? "Server unreachable" : "Checking server…";
+
   const kpis: { k: string; v: string; icon: IconName; color?: string }[] = [
     { k: "Beds in use", v: `${totalStaffed ? Math.round((100 * totalOcc) / totalStaffed) : 0}%`, icon: "bed" },
     { k: "Waiting for a bed", v: String(st.waiting_requests.length), icon: "hourglass" },
@@ -173,8 +229,10 @@ export default function SimulationPage() {
           <span className="blob b1" /><span className="blob b2" />
           <div className="row" style={{ alignItems: "center", gap: 18 }}>
             <div style={{ flex: "1 1 360px" }}>
-              <span className="pill"><i className={sid ? (playing ? "live-dot" : "live-dot wait") : "live-dot wait"} />
-                {sid ? (playing ? "Simulation running" : "Paused") : "Ready when you are"}</span>
+              <div className="row" style={{ gap: 8 }}>
+                <span className="pill"><i className={phaseDot} />{phaseLabel}</span>
+                <span className="pill"><i className={server === "online" ? "live-dot" : server === "offline" ? "live-dot off" : "live-dot amber"} />{serverLabel}</span>
+              </div>
               <h1 style={{ fontSize: "clamp(26px, 3.4vw, 40px)", margin: "10px 0 6px" }}>The live hospital</h1>
               <p className="secondary" style={{ margin: 0, maxWidth: 640 }}>
                 A real simulation running on the server. Patients arrive, wait, get a bed or are turned away, and every bed
@@ -203,6 +261,7 @@ export default function SimulationPage() {
               <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
                 {Object.keys(SCENARIO_LABELS).map((k) => <option key={k} value={k}>{k} · {SCENARIO_INFO[k].short}</option>)}
                 {EXTRA_SCENARIOS.map((k) => <option key={k} value={k}>{k[0]} · {SCENARIO_INFO[k[0]].short}, extreme overload</option>)}
+                <option value="custom">Custom: set your own conditions</option>
               </select>
             </label>
             <label className="field">Decision-maker
@@ -211,7 +270,13 @@ export default function SimulationPage() {
               </select>
             </label>
             <label className="field">Run number<input type="number" min={0} value={seed} onChange={(e) => setSeed(+e.target.value)} /></label>
-            <button className="btn" onClick={() => begin(scenario, seed, policy, true)} disabled={!!loading}>
+            <label className="field">Start from
+              <select value={warmMode} onChange={(e) => setWarmMode(e.target.value as "skip" | "empty")}>
+                <option value="skip">Busy hospital (simulate 35-day warm-up first)</option>
+                <option value="empty">Empty hospital (watch it fill from day 1)</option>
+              </select>
+            </label>
+            <button className="btn" onClick={() => begin(scenario, seed, policy, warmMode === "skip", custom).then((id) => id && setPlaying(true))} disabled={!!loading}>
               <Icon name={sid ? "reset" : "play"} size={15} /> {sid ? "Restart" : "Start"}
             </button>
             <span className="spacer" />
@@ -224,13 +289,43 @@ export default function SimulationPage() {
               <Icon name="forward" size={15} /> +1 week
             </button>
           </div>
+          {scenario === "custom" && (
+            <div className="custom-panel">
+              {([
+                ["arrival_multiplier", "Patients arriving", 0.5, 1.6, "users"],
+                ["staff_multiplier", "Nurses and doctors", 0.6, 1.4, "staff"],
+                ["capacity_multiplier", "Beds available", 0.6, 1.4, "bed"],
+              ] as [keyof Conditions, string, number, number, IconName][]).map(([key, label, lo, hi, icon]) => (
+                <label key={key} className="slider">
+                  <span className="slider-head"><Icon name={icon} size={15} />{label}
+                    <b>{custom[key] === 1 ? "normal" : `${custom[key] > 1 ? "+" : "−"}${Math.round(Math.abs(custom[key] - 1) * 100)}%`}</b></span>
+                  <input type="range" min={lo} max={hi} step={0.05} value={custom[key]}
+                    onChange={(e) => setCustom((c) => ({ ...c, [key]: +e.target.value }))} />
+                  <span className="slider-scale"><span>{Math.round(lo * 100)}%</span><span>normal</span><span>{Math.round(hi * 100)}%</span></span>
+                </label>
+              ))}
+              <p className="muted" style={{ margin: 0 }}>
+                Your situation: <b>{describe(custom)}</b>. Press Start to simulate it. The agent never trained on this, so it is a genuine test.
+              </p>
+            </div>
+          )}
           {error && <p className="error" style={{ marginBottom: 0 }}>{error}</p>}
           {status && (
             <p className="muted" style={{ margin: "10px 0 0" }}>
               <i className="dot" style={{ background: policyMeta(status.policy).color, marginRight: 6 }} />
-              <b>{policyMeta(status.policy).label}</b> is deciding · {SCENARIO_LABELS[status.scenario] ?? status.scenario} · run {status.seed}
+              <b>{policyMeta(status.policy).label}</b> is deciding · {status.scenario === "custom" && status.conditions
+                ? `Custom: ${describe(status.conditions)}` : SCENARIO_LABELS[status.scenario] ?? status.scenario} · run {status.seed}
               {" · "}each step = {speed} simulated hours
             </p>
+          )}
+          {work.steps > 0 && (
+            <div className="proof">
+              <Icon name="cpu" size={14} />
+              <span>Computed live on the server:</span>
+              <b>{work.steps}</b><span>steps</span>
+              <b>{work.decisions.toLocaleString()}</b><span>bed decisions</span>
+              <span>· last step <b>{work.lastMs.toFixed(0)} ms</b> of simulation, <b>{work.roundTripMs} ms</b> round trip</span>
+            </div>
           )}
         </section>
       </Reveal>
@@ -254,8 +349,10 @@ export default function SimulationPage() {
                   <div className="icon-badge" style={{ margin: "0 auto 12px" }}><Icon name={loading ? "hourglass" : "play"} size={24} /></div>
                   <h2 className="card-title" style={{ fontSize: 20 }}>{loading || "Choose a situation and press Start"}</h2>
                   <p className="secondary" style={{ maxWidth: 440, margin: "8px auto 0" }}>
-                    {loading ? "The free server can take up to a minute to wake up on the first visit." :
-                      "The first 35 simulated days are a warm-up while the hospital fills; Start skips straight past it."}
+                    {loading ? (server === "online"
+                      ? "Every day is being simulated event by event on the server right now; this takes a few seconds."
+                      : "The free server sleeps when unused and can take up to a minute to wake up.")
+                      : "The hospital starts empty. Choose \"Busy hospital\" to simulate the 35-day warm-up first (the study measures only after it), or \"Empty hospital\" to watch it fill from day 1."}
                   </p>
                 </div>
               </div>
