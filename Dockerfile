@@ -28,4 +28,5 @@ COPY --from=dashboard --chown=user /dashboard/out ./dashboard/out
 USER user
 ENV PYTHONPATH=/app HOME=/home/user
 EXPOSE 7860
-CMD ["uvicorn", "neurotwin.api.app:app", "--host", "0.0.0.0", "--port", "7860"]
+# Hosts such as Render set PORT; Hugging Face and local runs use the default 7860.
+CMD ["sh", "-c", "exec uvicorn neurotwin.api.app:app --host 0.0.0.0 --port ${PORT:-7860}"]
