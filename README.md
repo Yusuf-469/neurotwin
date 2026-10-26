@@ -121,6 +121,19 @@ dashboard's PPO policy uses agent 1; agent 0 has the documented collapse mode.
 
 Never put keys in code or commit them. Explanations stay fact-checked against the decision log, capped at `NEUROTWIN_LLM_MAX_PER_HOUR` (default 60) and cached. If the provider fails or the cap is reached, the template is used.
 
+### Optional: dashboard on Vercel (API stays on the Space)
+The Python backend cannot run on Vercel, for three reasons:
+- PyTorch exceeds Vercel's function size limit.
+- Simulation sessions live in server memory.
+- What-if runs exceed its free time limits.
+
+Only the static dashboard goes there:
+1. On vercel.com, choose **Add New → Project**, import the GitHub repository and set **Root Directory** to `dashboard`.
+2. Add the environment variable `NEXT_PUBLIC_API_URL` = your Space URL, e.g. `https://<user>-neurotwin.hf.space` (no trailing slash), then deploy.
+3. In the Space's *Settings → Variables and secrets*, add the variable `NEUROTWIN_CORS_ORIGINS` = your Vercel URL, e.g. `https://neurotwin.vercel.app`, so the browser may call the API cross-site.
+
+A free Space sleeps after inactivity. The first request then takes a minute while it wakes, and the dashboard shows the error until the API responds.
+
 ## Documents
 
 - [PROJECT_SPEC.md](PROJECT_SPEC.md): goals and scope

@@ -81,3 +81,23 @@ def test_results_endpoint_serves_stage6_data_with_label():
     body = client.get("/api/experiments/results").json()
     assert body["label"] == SIMULATION_LABEL
     assert body["summary"] is not None and len(body["comparisons"]) == 100
+
+
+def test_cors_origins_from_environment(monkeypatch):
+    import importlib
+
+    import neurotwin.api.app as app_module
+
+    monkeypatch.setenv("NEUROTWIN_CORS_ORIGINS", "https://neurotwin.vercel.app/, https://x.dev")
+    try:
+        reloaded = importlib.reload(app_module)
+        assert "https://neurotwin.vercel.app" in reloaded.CORS_ORIGINS
+        assert "https://x.dev" in reloaded.CORS_ORIGINS
+        c = TestClient(reloaded.app)
+        r = c.get("/api/health", headers={"Origin": "https://neurotwin.vercel.app"})
+        assert r.headers.get("access-control-allow-origin") == "https://neurotwin.vercel.app"
+        r = c.get("/api/health", headers={"Origin": "https://evil.example"})
+        assert "access-control-allow-origin" not in r.headers
+    finally:
+        monkeypatch.delenv("NEUROTWIN_CORS_ORIGINS")
+        importlib.reload(app_module)
