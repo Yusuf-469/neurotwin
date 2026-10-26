@@ -1,17 +1,8 @@
----
-title: NeuroTwin
-emoji: 🏥
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
-short_description: Hospital digital twin comparing RL, optimisation and rules
----
-
 # NeuroTwin V2
 
 **A hospital digital twin for evaluating reinforcement-learning bed allocation under operational stress.**
+
+**Live demo:** https://neurotwin-swart.vercel.app (the API sleeps when idle; the first load can take about a minute)
 
 NeuroTwin simulates patient flow through an emergency department, medical and surgical wards and an ICU. Capacity is limited by nurse staffing, and the model includes off-service placement, ICU step-down and deterioration. It compares a reinforcement-learning policy (PPO, **implemented from scratch** in PyTorch) with rule-based policies and an exactly solved optimisation model. Comparisons use normal conditions and stress conditions the agent never saw in training, with pre-registered statistics.
 
@@ -26,7 +17,7 @@ NeuroTwin simulates patient flow through an emergency department, medical and su
 | Baselines | FCFS, Priority, Load-Balancing, Trunk-Reservation, and an exact myopic MIP checked against LP and Hungarian oracles; tuned on validation seeds with the RL cost | [Stage 4](docs/stage4_baselines_report.md) |
 | RL | Gymnasium env (7 masked actions, semi-Markov reward); in-house PPO with γ^Δt GAE, checked against stable-baselines3 and MaskablePPO | [Stage 5](docs/stage5_rl_report.md) |
 | Evaluation | 2,500 test episodes; hierarchical paired bootstrap; Holm over 100 comparisons; protocol committed before the test run | [Stage 6](docs/stage6_evaluation_report.md) |
-| Robustness | Degradation index, CRN variance reduction, learned bed-reservation structure, ablations | Stage 7 (in progress) |
+| Robustness | Degradation index, CRN variance reduction, learned bed-reservation structure, ablations, domain randomisation, constrained PPO | [Stage 7](docs/stage7_analysis_report.md) |
 | Platform | What-if engine, post-hoc explanation layer with fact-check guard, FastAPI backend, Next.js dashboard | [Stages 8–11](docs/stage8_11_platform_report.md) |
 
 ## Main findings (simulation, test seeds)
@@ -109,14 +100,31 @@ cd dashboard; npm install; npm run dev                                     # htt
 The five final PPO agents (`results/ppo/final_A/agent_*.pt`, 52 KB each) are committed. The
 dashboard's PPO policy uses agent 1; agent 0 has the documented collapse mode.
 
-## Deploying free on Hugging Face Spaces
-1. Create a free account at huggingface.co and click **New Space**: SDK **Docker**, hardware **CPU basic (free)**, visibility **Public**.
-2. Push this repository to the Space (Hugging Face shows the exact `git remote add` command; use an access token with *write* permission as the password).
-3. The Space builds the `Dockerfile` and serves the app on its URL.
+## Deploying for free
 
-**Optional LLM explanations at zero cost:** the offline template explainer is the default and needs nothing. To use a free-tier LLM instead, add three **secrets** under the Space's *Settings → Variables and secrets*:
+The live demo runs on two free tiers:
 
-| Secret | Example (Google Gemini free tier) | Example (Groq free tier) |
+| Part | Host | What it runs |
+|---|---|---|
+| API and simulator | Render (free web service, Docker) | this repository's `Dockerfile`; the port comes from `PORT` |
+| Dashboard | Vercel (root directory `dashboard`) | the static Next.js export |
+
+1. **Render:** create a *Web Service* from this repository, runtime **Docker**, plan **Free**, health check `/api/health`.
+2. **Vercel:** import the repository, set **Root Directory** to `dashboard` and the environment variable
+   `NEXT_PUBLIC_API_URL` to the Render URL (no trailing slash).
+3. **CORS:** on Render, set `NEUROTWIN_CORS_ORIGINS` to the Vercel URL. To also admit the project's preview
+   URLs, set `NEUROTWIN_CORS_ORIGIN_REGEX`, e.g. `https://neurotwin(-[a-z0-9-]+-<team>)?\.vercel\.app`.
+
+The Python backend cannot run on Vercel itself, for three reasons:
+- PyTorch exceeds Vercel's function size limit.
+- Simulation sessions live in server memory.
+- What-if runs exceed its free time limits.
+
+A free Render service sleeps after 15 idle minutes; the first request then takes about a minute.
+
+**Optional LLM explanations at zero cost:** the offline template explainer is the default and needs nothing. To use a free-tier LLM instead, set three **secret environment variables** on the API host:
+
+| Variable | Example (Google Gemini free tier) | Example (Groq free tier) |
 |---|---|---|
 | `NEUROTWIN_LLM_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` | `https://api.groq.com/openai/v1` |
 | `NEUROTWIN_LLM_MODEL` | a Gemini model name listed in AI Studio | a model name listed in the Groq console |
@@ -124,26 +132,12 @@ dashboard's PPO policy uses agent 1; agent 0 has the documented collapse mode.
 
 Never put keys in code or commit them. Explanations stay fact-checked against the decision log, capped at `NEUROTWIN_LLM_MAX_PER_HOUR` (default 60) and cached. If the provider fails or the cap is reached, the template is used.
 
-### Optional: dashboard on Vercel (API stays on the Space)
-The Python backend cannot run on Vercel, for three reasons:
-- PyTorch exceeds Vercel's function size limit.
-- Simulation sessions live in server memory.
-- What-if runs exceed its free time limits.
-
-Only the static dashboard goes there:
-1. On vercel.com, choose **Add New → Project**, import the GitHub repository and set **Root Directory** to `dashboard`.
-2. Add the environment variable `NEXT_PUBLIC_API_URL` = your Space URL, e.g. `https://<user>-neurotwin.hf.space` (no trailing slash), then deploy.
-3. In the Space's *Settings → Variables and secrets*, add the variable `NEUROTWIN_CORS_ORIGINS` = your Vercel URL, e.g. `https://neurotwin.vercel.app`, so the browser may call the API cross-site. To also admit the project's preview and Git-branch URLs, set `NEUROTWIN_CORS_ORIGIN_REGEX`, e.g. `https://neurotwin(-[a-z0-9-]+-<team>)?\.vercel\.app`.
-
-A free Space sleeps after inactivity. The first request then takes a minute while it wakes, and the dashboard shows the error until the API responds.
-
 ## Documents
 
 - [PROJECT_SPEC.md](PROJECT_SPEC.md): goals and scope
 - [RESEARCH.md](RESEARCH.md): research questions, verified literature, the locked experimental design, and a changelog of every design change with its reason
 - [ARCHITECTURE.md](ARCHITECTURE.md): components and interfaces
 - [ROADMAP.md](ROADMAP.md): stages and completion criteria
-- [AGENTS.md](AGENTS.md): rules for AI coding agents working on this repository
 - `docs/`: one report per stage, with the evidence behind every claim
 
 ## Limitations

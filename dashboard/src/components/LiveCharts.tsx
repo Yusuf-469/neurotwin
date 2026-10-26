@@ -24,6 +24,7 @@ const tooltipStyle = {
     fontSize: 12, color: "var(--text-primary)", boxShadow: "var(--shadow)",
   },
   labelStyle: { color: "var(--text-muted)" },
+  itemStyle: { color: "var(--text-primary)" },
   cursor: { stroke: "var(--axis)", strokeWidth: 1 },
 };
 
@@ -69,7 +70,9 @@ export default function LiveCharts({ history, warmupHours }: Props) {
                 {/* Can exceed 100%: a shift change may remove nurses while beds stay occupied. */}
                 <YAxis domain={[0, (max: number) => Math.max(100, Math.ceil(max / 25) * 25)]}
                   allowDecimals={false} unit="%" {...axisProps} />
-                <Tooltip {...tooltipStyle} formatter={(v) => (v === undefined ? "–" : `${v}%`)} labelFormatter={(d) => `day ${d}`} />
+                <Tooltip {...tooltipStyle} itemSorter={(i) => -Number(i.value ?? 0)}
+                  formatter={(v, n) => [v === undefined ? "–" : `${v}%`, UNIT_LABELS[String(n)] ?? String(n)]}
+                  labelFormatter={(d) => `day ${d} (fullest first)`} />
                 {(["MED", "SURG", "ICU"] as const).map((u) => (
                   <Line key={u} type="monotone" dataKey={u} stroke={UNIT_COLORS[u]} strokeWidth={2} dot={false}
                     isAnimationActive={false} />

@@ -700,12 +700,12 @@ CRN is claimed to tighten policy comparisons; this is measured, not assumed.
 ### Primary
 | Policy | A (held-out seeds) | B | C | D | E |
 |---|---|---|---|---|---|
-| FCFS | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Priority | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Load-Balancing | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Trunk-Reservation | ✓ | ✓ | ✓ | ✓ | ✓ |
-| MIP (myopic) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| PPO (K = 5) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| FCFS | yes | yes | yes | yes | yes |
+| Priority | yes | yes | yes | yes | yes |
+| Load-Balancing | yes | yes | yes | yes | yes |
+| Trunk-Reservation | yes | yes | yes | yes | yes |
+| MIP (myopic) | yes | yes | yes | yes | yes |
+| PPO (K = 5) | yes | yes | yes | yes | yes |
 
 PPO is **trained** on scenario A training seeds only.
 

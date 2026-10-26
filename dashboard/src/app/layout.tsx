@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <footer className="footer">
           <div className="footer-inner">
             <strong style={{ color: "var(--text-primary)" }}>NeuroTwin</strong>
-            <span>Final-year research project: a digital twin for hospital bed allocation.</span>
+            <span>A digital twin for hospital bed allocation.</span>
             <span className="spacer" />
             <a href="https://github.com/Yusuf-469/neurotwin" target="_blank" rel="noreferrer">Source code &amp; reports ↗</a>
           </div>

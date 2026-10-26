@@ -85,9 +85,9 @@ Constraint 6 should also count staff already committed to occupied beds, not jus
 
 ### A7. PPO is never evaluated on the Normal scenario, but the robustness metric needs it
 
-The experiment matrix (§6.16) marks PPO × Normal(A) as "✗ (TRAIN)". The degradation metric (§6.13) needs `Metric(p, normal)` for every policy, including PPO.
+The experiment matrix (§6.16) marks PPO × Normal(A) as "excluded (TRAIN)". The degradation metric (§6.13) needs `Metric(p, normal)` for every policy, including PPO.
 
-**Proposed fix:** Evaluate PPO on scenario A using **held-out test seeds** that are disjoint from training and validation seeds. This is an in-distribution test and is not training on the test scenario. Mark the cell "✓ (held-out seeds)".
+**Proposed fix:** Evaluate PPO on scenario A using **held-out test seeds** that are disjoint from training and validation seeds. This is an in-distribution test and is not training on the test scenario. Mark the cell "included (held-out seeds)".
 
 ### A8. Degradation formula takes an absolute value, then claims a sign (§6.13)
 

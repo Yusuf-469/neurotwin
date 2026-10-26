@@ -2,44 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import HeroScene from "@/components/HeroScene";
 import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene } from "@/components/motion";
 import { SectionHeader, TechDetails } from "@/components/ui";
 import { api, type StudyResults } from "@/lib/api";
-import { POLICIES, PRIORITY_COLORS, SCENARIO_INFO } from "@/lib/policies";
+import { POLICIES, SCENARIO_INFO } from "@/lib/policies";
 
 // Story-style overview. Plain language first; each claim keeps its technical backing one click
 // away. Numbers marked "live" are read from /api/experiments/results (Stage 6-7 data); the rest
 // are fixed facts of the study design taken from the stage reports and the code
 // (config/ppo_default.json, neurotwin/rl/features.py, neurotwin/rl/actions.py).
-
-/** Decorative animated hospital: beds fill and empty, patients queue, decisions appear. */
-function MiniHospital() {
-  const ward = (n: number, full: number, offset: number) =>
-    Array.from({ length: n }, (_, i) => (
-      <i key={i} className={`mh-bed${i < full ? " full" : ""}`}
-        style={{ animationDelay: `${((i * 0.73 + offset) % 9).toFixed(2)}s` }} />
-    ));
-  return (
-    <div className="mini-hosp lift" aria-hidden="true">
-      <div className="mh-head"><span className="live-dot" /> scaled illustration · the real one is in Live hospital</div>
-      <div className="mh-ward"><div className="mh-name"><span>Medical ward</span><span>72 beds</span></div>
-        <div className="mh-beds">{ward(24, 14, 0)}</div></div>
-      <div className="mh-ward"><div className="mh-name"><span>Surgical ward</span><span>70 beds</span></div>
-        <div className="mh-beds">{ward(24, 12, 3)}</div></div>
-      <div className="mh-ward"><div className="mh-name"><span>Intensive care</span><span>12 beds</span></div>
-        <div className="mh-beds">{ward(12, 7, 5)}</div></div>
-      <div className="mh-name"><span>Waiting for a bed</span></div>
-      <div className="mh-queue">
-        {[1, 3, 3, 4, 5, 2, 4].map((p, i) => (
-          <i key={i} className="mh-q" style={{ background: PRIORITY_COLORS[p], animationDelay: `${i * 0.25}s` }} />
-        ))}
-      </div>
-      <div className="mh-decision"><Icon name="cpu" size={16} style={{ color: "var(--accent)" }} /><span className="typing">
-        RL agent: <b>Critical patient → Intensive care</b></span></div>
-    </div>
-  );
-}
 
 /** Animated architecture of the RL agent: inputs -> actor network -> masked actions -> hospital
  *  -> reward -> back into training. Layer sizes and counts are the real ones. */
@@ -72,7 +45,8 @@ function AgentDiagram() {
       <text x="330" y="365" textAnchor="middle" className="ad-muted">21 inputs</text>
       <text x="450" y="365" textAnchor="middle" className="ad-muted">64 neurons</text>
       <text x="570" y="365" textAnchor="middle" className="ad-muted">64 neurons</text>
-      <text x="690" y="365" textAnchor="middle" className="ad-muted">7 choices</text>
+      <text x="690" y="365" textAnchor="middle" className="ad-muted">7 scores</text>
+      <text x="510" y="385" textAnchor="middle" className="ad-text">21 numbers in → one score per possible move → blocked moves removed → highest score wins</text>
       <text x="510" y="22" textAnchor="middle" className="ad-title">Policy network (actor)</text>
 
       <path d="M705 185 C 730 185, 740 185, 768 185" className="ad-flow" />
@@ -116,7 +90,8 @@ const SPEC: { k: string; v: string; d: string; icon: IconName }[] = [
   { k: "Training", v: "3 million decisions", d: "8 simulated hospitals in parallel, normal days only, trained on an ordinary CPU (no GPU needed).", icon: "repeat" },
   { k: "Time-aware", v: "γ = 0.95 / hour", d: "Rewards are discounted by real simulated time between decisions (semi-Markov GAE, λ = 0.9).", icon: "clock" },
   { k: "Safe by design", v: "Action masking", d: "It can only pick choices that are physically possible at that moment.", icon: "shield" },
-  { k: "Verified", v: "5 agents", d: "Five independently trained agents; the implementation was checked against stable-baselines3.", icon: "check" },
+  { k: "Models", v: "45 trained", d: "5 final agents (11,656 parameters each: actor 6,023 + critic 5,633), 6 for tuning, 24 for ablations, 10 for follow-up studies.", icon: "layers" },
+  { k: "Verified", v: "vs stable-baselines3", d: "My PPO was checked against the reference PPO (stable-baselines3) and MaskablePPO (sb3-contrib) on CartPole and on this hospital.", icon: "check" },
 ];
 
 export default function Overview() {
@@ -166,7 +141,7 @@ export default function Overview() {
                 </div>
               </Reveal>
             </div>
-            <Reveal kind="zoom" delay={200}><MiniHospital /></Reveal>
+            <Reveal kind="zoom" delay={200}><HeroScene /></Reveal>
           </div>
           <Reveal delay={300}>
             <div className="ribbon">
@@ -242,7 +217,10 @@ export default function Overview() {
         </div>
         <Reveal>
           <TechDetails label="How training works, step by step">
-            <p>1. The agent watches the 21 numbers and picks one of the 7 choices (impossible ones are masked out).</p>
+            <p>1. The 21 numbers are inputs, the 7 moves are outputs: it does not pick 7 of the 21. The network reads all 21
+              numbers and outputs one score for each of the 7 possible moves. Moves that are impossible right now (for example,
+              no free ICU bed) are masked out, the scores become probabilities, and in use it takes the most likely move.
+              During training it samples from the probabilities instead, which is how it explores.</p>
             <p>2. The simulator advances to the next decision moment and returns a reward: minus the urgency-weighted waiting
               accumulated in between, minus a penalty per turned-away ambulance and per wrong-ward placement.</p>
             <p>3. After 2,048 decisions across 8 parallel hospitals, advantages are computed with semi-Markov GAE (discount γ^Δt per

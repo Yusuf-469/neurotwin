@@ -111,7 +111,8 @@ export default function WhatIfPanel({ sessionId, policies, disabled }: Props) {
                     tick={{ fill: "var(--text-secondary)", fontSize: 12 }} tickLine={false} />
                   <ReferenceLine x={0} stroke="var(--text-muted)" />
                   <Tooltip cursor={{ fill: "var(--surface-2)" }}
-                    contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 }}
+                    contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" }}
+                    itemStyle={{ color: "var(--text-primary)" }} labelStyle={{ color: "var(--text-muted)" }}
                     formatter={(v, _n, item) => {
                       const p = item.payload as { lo: number; hi: number };
                       const val = typeof v === "number" ? v.toFixed(meta.digits) : "–";

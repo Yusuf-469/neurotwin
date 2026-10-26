@@ -615,3 +615,42 @@ main, .footer, .banner { position: relative; z-index: 1; }
 .tab-panel .card { box-shadow: none; border: 0; padding: 0; background: transparent; transform: none; }
 .tab-panel .grid-2 > .card { border: 1px solid var(--border); padding: 16px; border-radius: 14px; }
 .tab-panel .card::after { display: none; }
+
+/* ---------- hero scene (animated hospital illustration) ---------- */
+.hero-scene-wrap { position: relative; border-radius: 22px; padding: 10px 10px 34px; background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+  border: 1px solid var(--border); box-shadow: 0 24px 70px rgba(0,0,0,.18); backdrop-filter: blur(8px); }
+.hero-scene { width: 100%; height: auto; display: block; overflow: hidden; border-radius: 16px; }
+.hs-cloud { fill: color-mix(in srgb, var(--text-muted) 16%, transparent); animation: cloud linear infinite; }
+.hs-win { fill: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); stroke: var(--border); animation: win 11s ease-in-out infinite; }
+.hs-label { fill: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+.hs-tag { fill: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; }
+.hs-h { fill: var(--text-secondary); font-size: 11px; font-weight: 800; }
+.hs-ring { fill: none; stroke: #d03b3b; stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: ring 2.4s ease-out infinite; }
+.hs-siren { fill: #3987e5; animation: siren .6s steps(2) infinite; }
+.hs-rotor { transform-box: fill-box; transform-origin: center; animation: rotor .18s linear infinite; }
+.hs-lane { stroke: var(--axis); stroke-width: 3; stroke-dasharray: 22 18; animation: hslane 1s linear infinite; }
+.hs-door { fill: color-mix(in srgb, var(--status-warning) 30%, transparent); animation: door 4s ease-in-out infinite; }
+.hs-chip { position: absolute; display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 8px 12px; border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent); border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,.18);
+  color: var(--text-secondary); white-space: nowrap; animation: chipFloat 6s ease-in-out infinite; backdrop-filter: blur(6px); }
+.hs-chip b { color: var(--text-primary); }
+.hs-chip .icon { color: var(--accent); }
+.hs-chip.c1 { top: 8%; left: -6%; }
+.hs-chip.c2 { top: 50%; right: -7%; animation-delay: -2s; }
+.hs-chip.c3 { bottom: 24%; right: -5%; animation-delay: -4s; }
+.hs-chip.bad { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 40%, var(--border)); }
+.hs-chip.bad .icon { color: var(--status-critical); }
+.hs-bar { width: 48px; height: 5px; border-radius: 3px; background: var(--grid); overflow: hidden; display: inline-block; }
+.hs-bar i { display: block; height: 100%; width: 94%; background: var(--grad); animation: barFill 5s ease-in-out infinite; }
+.hs-caption { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-size: 12px; color: var(--text-muted); }
+@media (max-width: 900px) { .hs-chip.c1 { left: 2%; } .hs-chip.c2 { right: 2%; } .hs-chip.c3 { right: 2%; } }
+@keyframes cloud { from { transform: translateX(-160px); } to { transform: translateX(700px); } }
+@keyframes win { 0%, 18% { fill: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); }
+  30%, 85% { fill: color-mix(in srgb, var(--series-4) 70%, var(--surface-1)); } 100% { fill: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); } }
+@keyframes ring { from { transform: scale(.8); opacity: 1; } to { transform: scale(1.9); opacity: 0; } }
+@keyframes siren { 50% { fill: #d03b3b; } }
+@keyframes rotor { 50% { transform: scaleX(.2); } }
+@keyframes hslane { to { stroke-dashoffset: -40; } }
+@keyframes door { 0%, 100% { opacity: .15; } 50% { opacity: .7; } }
+@keyframes chipFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes barFill { 0% { width: 70%; } 50% { width: 96%; } 100% { width: 70%; } }
