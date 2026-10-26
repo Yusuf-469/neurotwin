@@ -174,3 +174,53 @@ No comparison is significant after Holm. The ΔJ values in A and C exclude 0 onl
 4. **What would be needed:** training episodes in which diversions actually occur, such as constrained training on randomised stress, which needs a careful leakage design. A budget should also be defined relative to what is achievable in each scenario. Both are left as future work and stated as such.
 
 This experiment is reported as it came out. It was designed to fix the flaw of a frozen multiplier, and it did: the multiplier now adapts online. It also showed that a constraint method cannot control an outcome the policy never learned to influence. This is a useful negative result for constrained RL in rare-event settings.
+
+## 7. Safety shield against the collapse mode (v2.7, §6.25; `shield_comparisons.json`)
+**Command:** `python -m neurotwin.experiments.shield --workers 10`. The output is `shield_episodes.json` and `shield_comparisons.json`.
+
+**Design** (pre-registered in RESEARCH.md v2.7, commit f574cf7, before any run)
+- **Motivation, disclosed:** the idea came from the Stage 6 collapse finding, so it is post-hoc in motivation. The Stage 6 results are unchanged.
+- **Rule:** while the ED is full (exactly the state in which arrivals are diverted) and a placement is feasible, HOLD is removed from the agent's options. The agent takes its own best remaining action.
+- **No tunable parameter, and no retraining:** the five final agents are used as they are. Outside ED overflow the policy is identical.
+- **Evaluation:** the same 50 test seeds in A–E, compared with the Stage 6 rows for unshielded PPO and Load-Balancing (deterministic simulator, same seeds). Holm correction over 10 cost comparisons.
+
+**Primary outcome: collapses** (measured diversion above 50 per 100 arrivals)
+
+| Policy | Collapsed episodes |
+|---|---|
+| PPO, unshielded (Stage 6) | 5 of 1,250 |
+| **PPO with shield** | **0 of 1,250** |
+| Load-Balancing (Stage 6) | 0 of 1,250 |
+
+The worst episode's diversion rate fell from 99 to 34 per 100 arrivals (scenario E). Agent 0's worst cost per day fell as follows:
+
+| Scenario | Unshielded | Shielded |
+|---|---|---|
+| B | 8,331 | 1,764 |
+| D | 3,646 | 1,764 |
+| E | 3,908 | 2,145 |
+
+The shield intervened on average 1.9 times per episode in A, and 51–176 times in B–E.
+
+**Secondary outcome: cost J per day** (shielded − comparator; positive = shield worse)
+
+| Scenario | vs unshielded PPO | 95% CI | vs Load-Balancing | 95% CI |
+|---|---|---|---|---|
+| A | +1.0 (+0.5%) | [−4.9, 7.5] | +4.1 (+2.0%) | [−3.9, 13.5] |
+| B | +12.4 (+1.5%) | [−59.8, 60.7] | +15.7 (+1.9%) | [−12.8, 43.6] |
+| C | **+51.7 (+4.4%)*** | [24.2, 81.7] | +11.8 (+1.0%) | [−29.5, 56.1] |
+| D | −1.4 (−0.1%) | [−45.7, 35.1] | +29.4 (+3.3%) | [−3.1, 62.7] |
+| E | +16.5 (+1.1%) | [−30.3, 65.4] | +37.9 (+2.6%) | [−11.9, 90.6] |
+
+\* significant after Holm.
+
+**Descriptive mechanism** (means over 250 episodes; not significance-tested):
+- **Fewer turned-away ambulances:** diversions fell in every scenario, e.g. 14.3 → 12.9 per 100 in E and 5.3 → 4.2 in D.
+- **Longer tail waits:** 90th-percentile boarding rose in B, C and E, e.g. 48.9 → 52.3 h in C.
+
+Forcing a placement while the ED is full fills a bed that a more urgent later patient would otherwise have taken.
+
+**Findings**
+1. **The parameter-free shield eliminates the collapse mode** (5 → 0 of 1,250) without retraining, and removes the extreme worst cases.
+2. **It is not free.** In the staff-shortage scenario the average cost rises by 4.4% (significant). Elsewhere the change is not significant. The shielded agent remains statistically indistinguishable from Load-Balancing in every scenario.
+3. **Interpretation:** a learned policy plus a simple rule-based guard gives the robustness of the rules with the agent's behaviour everywhere else. This is the practical recommendation from this study: deploy learned policies only behind guards that rule out known failure states. Here, the trade is slightly worse average cost under one kind of stress in exchange for the removal of a catastrophic tail.

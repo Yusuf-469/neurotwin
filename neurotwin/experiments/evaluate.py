@@ -48,6 +48,8 @@ def run_job(job: tuple[str, int, str, int, str, dict]) -> dict[str, Any]:
     )
     if policy_name == "ppo":
         policy = PPOPolicy.load(Path(agent_dir) / f"agent_{agent}.pt")
+    elif policy_name == "ppo_shielded":
+        policy = PPOPolicy.load(Path(agent_dir) / f"agent_{agent}.pt", shield=True)
     elif policy_name == "ppo_lagrangian":
         from ..policies.constrained_ppo import ConstrainedPPOPolicy
 
@@ -65,6 +67,8 @@ def run_job(job: tuple[str, int, str, int, str, dict]) -> dict[str, Any]:
         "runtime_s": time.perf_counter() - t0,
     }
     row.update(episode_metrics(sim, CostWeights.load()))
+    if getattr(policy, "shield", False):
+        row["shield_activations"] = policy.shield_activations
     trace = getattr(policy, "lambda_trace", None)
     if trace:  # constrained PPO: how the multiplier moved during the measured window
         measured = [lam for t, lam in trace if t >= config.warmup_hours] or [trace[-1][1]]

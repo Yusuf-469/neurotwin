@@ -25,6 +25,7 @@ NeuroTwin simulates patient flow through an emergency department, medical and su
 - **PPO matches the best tuned rule, Load-Balancing:** no significant difference in overall cost in any scenario. It **beats** Priority, Trunk-Reservation, FCFS and the exact one-step optimiser in most scenarios, including stress it never trained on.
 - The apparent validation advantage over Load-Balancing **disappeared on fresh test seeds**, a case of model-selection optimism.
 - **Learned-policy failure mode:** one of five PPO agents collapsed (holding patients while beds emptied) in 2% of its stress episodes. No rule-based policy ever collapsed.
+- **A parameter-free safety guard fixes it:** forbidding HOLD while the ED is full (pre-registered, no retraining) cut collapses from 5 to 0 of 1,250 test episodes. The cost: +4.4% in the staff-shortage scenario; elsewhere no significant change, and the guarded agent still ties Load-Balancing.
 - **Under normal load, PPO learned a soft bed-reservation policy.** It holds more often as free beds run out, the threshold shape queueing theory predicts. Under unseen stress that structure disappears.
 - **Common random numbers narrowed confidence intervals up to 12.5×.** Without them, PPO's 9% advantage over Priority would have been undetectable.
 - **Ablations:** the priority-weighted reward is the component that matters most (uniform weights give +11% cost). No single observation group is necessary.

@@ -5,7 +5,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ErrorBar, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api, type WhatIfResult } from "@/lib/api";
-import { METRICS, POLICIES, policyMeta } from "@/lib/policies";
+import { LIVE_POLICIES, METRICS, policyMeta } from "@/lib/policies";
 import { Card, Segmented, useViewToggle } from "./ui";
 
 interface Props {
@@ -28,7 +28,7 @@ export default function WhatIfPanel({ sessionId, policies, disabled }: Props) {
   const [asTable, viewToggle] = useViewToggle();
 
   const toggle = (p: string) => setSelected((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]));
-  const ordered = POLICIES.map((p) => p.key).filter((k) => selected.includes(k) && policies.includes(k));
+  const ordered = LIVE_POLICIES.map((p) => p.key).filter((k) => selected.includes(k) && policies.includes(k));
 
   const run = async () => {
     setBusy(true);
@@ -58,7 +58,7 @@ export default function WhatIfPanel({ sessionId, policies, disabled }: Props) {
       subtitle="Copies the hospital as it is right now and plays out many possible futures under each decision-maker"
       explain="Pick who to compare and change the conditions (e.g. 1.3 = 30% more patients). Every decision-maker faces exactly the same futures, so the comparison is fair.">
       <div className="row" style={{ marginBottom: 10 }}>
-        {POLICIES.filter((p) => policies.includes(p.key)).map((p) => (
+        {LIVE_POLICIES.filter((p) => policies.includes(p.key)).map((p) => (
           <label key={p.key} className="chip" style={{ cursor: "pointer" }}>
             <input type="checkbox" checked={selected.includes(p.key)} onChange={() => toggle(p.key)}
               style={{ margin: 0 }} />

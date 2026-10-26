@@ -463,8 +463,8 @@ export default function ExperimentsPage() {
       {/* ------------------------------------------------------------------ 6 tougher */}
       {(dr.length > 0 || data.constrained) && (
         <Scene id="tougher">
-          <Reveal><SectionHeader num="6" kicker="Follow-up experiments" title="Two attempts to make the agent tougher"
-            lead="Both were planned and written down before running them, and both are reported exactly as they came out." /></Reveal>
+          <Reveal><SectionHeader num="6" kicker="Follow-up experiments" title="Three attempts to make the agent tougher"
+            lead="All three were planned and written down before running them, and all are reported exactly as they came out." /></Reveal>
           <div className="grid grid-2">
             {dr.length > 0 && (
               <Reveal kind="left">
@@ -514,6 +514,39 @@ export default function ExperimentsPage() {
               </Reveal>
             )}
           </div>
+          {data.shield && (
+            <Reveal>
+              <Card className="shield-card" title="Attempt 3: a safety guard against the collapse"
+                subtitle="test runs where the hospital collapsed (more than half of all ambulances turned away), out of 1,250"
+                explain="One trained agent sometimes kept beds empty while the emergency department was full, so ambulances were turned away and the hospital spiralled. The guard forbids holding a bed in exactly that situation.">
+                <div className="shield-compare">
+                  {([
+                    ["RL agent, no guard", data.shield.collapses.ppo, "var(--status-critical)"],
+                    ["RL agent + safety guard", data.shield.collapses.ppo_shielded, "var(--status-good)"],
+                    ["Balance-the-wards rule", data.shield.collapses.load_balancing, "var(--series-2)"],
+                  ] as [string, number, string][]).map(([label, n, color]) => (
+                    <div key={label} className="shield-tile" style={{ ["--tile" as string]: color }}>
+                      <div className="shield-num"><CountUp value={n} /></div>
+                      <div className="shield-lbl">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <Takeaway tone="good">
+                  <b>The guard removes every collapse</b> without retraining, and the agent still ties the best rule on cost everywhere.
+                </Takeaway>
+                <Takeaway tone="warn">
+                  It is not free: in the staff-shortage crisis average cost rises by about 4%, because a bed filled during overflow is not
+                  there for a more urgent patient later. Fewer ambulances are turned away in every crisis, but the longest waits get slightly longer.
+                </Takeaway>
+                <TechDetails>
+                  <p>Rule: if the ED is at capacity and any placement is feasible, HOLD is masked; the agent takes its best remaining action. No tunable
+                    parameter. Five final agents, 50 test seeds × 5 scenarios, compared with the Stage 6 rows (deterministic simulator, same seeds).
+                    Cost vs unshielded PPO: significant only in C (+4.4%), Holm over 10. Pre-registered as RESEARCH.md v2.7 before running; motivated by
+                    the Stage 6 finding, which stays in the record.</p>
+                </TechDetails>
+              </Card>
+            </Reveal>
+          )}
         </Scene>
       )}
 

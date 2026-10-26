@@ -272,10 +272,11 @@ export default function Overview() {
             <TechDetails><p>P(hold) vs free beds, scenario A: Spearman ρ = {Number.isFinite(rhoA) ? rhoA.toFixed(2) : "–"}, isotonic R² = 0.98. The pattern disappears under combined stress.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={0}><div className="card lift finding">
-            <span className="big" style={{ color: "var(--status-critical)" }}>1 in 5</span>
-            <h3>But it can fail in new ways</h3>
-            <p>One of five trained agents occasionally froze in a crisis, holding patients while beds emptied. No human-designed rule ever did that.</p>
-            <TechDetails><p>5 of 1,250 RL test episodes collapsed (diversion above 50%), all from one agent (2% of its stressed runs), against 0 of 1,250 for the rules. This is an out-of-distribution failure.</p></TechDetails>
+            <span className="big" style={{ color: "var(--status-good)" }}>5 → 0</span>
+            <h3>It found a new way to fail, then a guard fixed it</h3>
+            <p>One of five trained agents occasionally froze in a crisis, keeping beds empty while ambulances were turned away. A one-line safety guard (never hold a bed while the ED is full) removed every collapse.</p>
+            <TechDetails><p>Without the guard: 5 of 1,250 test episodes collapsed (diversion above 50%), all from one agent, against 0 of 1,250 for the rules.
+              With it: 0 of 1,250. No retraining. Cost: +4.4% in the staff-shortage scenario (significant); elsewhere no significant change. Pre-registered as RESEARCH.md v2.7.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-2)" }}><CountUp value={crnMax} digits={1} suffix="×" /></span>

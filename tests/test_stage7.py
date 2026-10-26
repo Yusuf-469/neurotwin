@@ -163,3 +163,48 @@ def test_constrained_policy_updates_lambda_daily():
     assert len(times) >= SHORT.horizon_hours // 24 - 1
     assert policy.lam > LAMBDA0 and policy.lam <= LAMBDA_MAX
     assert agent.obs[-1][-1] == pytest.approx(policy.lam / LAMBDA_MAX)
+
+
+def test_shield_mask_removes_hold_only_when_ed_full_and_placement_feasible():
+    from types import SimpleNamespace
+
+    from neurotwin.policies.ppo_policy import PPOPolicy
+
+    mask = np.array([True, True, False, False, False, False, False])
+    full = SimpleNamespace(config=SimpleNamespace(ed_capacity=30), ed_count=30)
+    not_full = SimpleNamespace(config=SimpleNamespace(ed_capacity=30), ed_count=29)
+    unlimited = SimpleNamespace(config=SimpleNamespace(ed_capacity=None), ed_count=99)
+    shielded, applied = PPOPolicy.shield_mask(full, mask)
+    assert applied and not shielded[0] and shielded[1] and mask[0]  # original mask untouched
+    for sim in (not_full, unlimited):
+        same, applied = PPOPolicy.shield_mask(sim, mask)
+        assert not applied and same[0]
+    only_hold = np.array([True] + [False] * 6)
+    same, applied = PPOPolicy.shield_mask(full, only_hold)
+    assert not applied and same[0]  # nothing feasible: HOLD stays the only option
+
+
+def test_shielded_agent_never_holds_while_ed_full():
+    from neurotwin.experiments.evaluate import DEFAULT_AGENTS
+    from neurotwin.policies.ppo_policy import PPOPolicy
+    from neurotwin.rl.actions import action_mask
+    from neurotwin.simulation.hospital import HospitalSimulation, run_episode
+
+    policy = PPOPolicy.load(DEFAULT_AGENTS / "agent_0.pt", shield=True)
+    violations = []
+    decide = policy.decide
+
+    def checked(sim):
+        full = sim.ed_count >= sim.config.ed_capacity and action_mask(sim)[1:].any()
+        result = decide(sim)
+        if full and result is None:
+            violations.append(sim.now)
+        return result
+
+    policy.decide = checked
+    from neurotwin.simulation.config import SEVERE_SCENARIOS
+
+    sim = HospitalSimulation(SHORT, SEVERE_SCENARIOS["E_severe"], seed=4)
+    run_episode(sim, policy)
+    assert policy.shield_activations > 0  # the overload actually triggered the shield
+    assert violations == []
