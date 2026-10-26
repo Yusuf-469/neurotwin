@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.6 (2026-10-26). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.7 (2026-10-27). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -695,6 +695,31 @@ CRN is claimed to tighten policy comparisons; this is measured, not assumed.
 2. Report the CI width ratio and the variance reduction `1 − Var(paired diff) / (Var(M_1) + Var(M_2))`, which equals the induced positive correlation between the two policies' metrics.
 3. Report it honestly even if the reduction is small for some metrics.
 
+## 6.25 Extension: Safety Shield Against the Collapse Mode (pre-registered 2026-10-27, before any run)
+
+**Motivation, disclosed:** this extension was designed *after* the Stage 6 test run revealed that agent 0 collapses in
+5 of its 250 test episodes (B, D, E): with the ED full and arrivals being diverted, it repeatedly chooses HOLD while beds
+empty (Stage 6 report §5). The original result stands unchanged; this experiment asks whether a minimal guard removes
+the failure, and at what cost.
+
+**Shield rule (no tunable parameter):** when the ED is at capacity (`ed_count >= ed_capacity`, exactly the condition
+under which the simulator diverts arrivals) and at least one placement action is feasible, HOLD is removed from the
+action mask. The agent then takes its own highest-probability remaining action. In every other state the policy is
+unchanged, so the learned reservation behaviour (§6.20) is untouched outside ED overflow. Rationale: while arrivals are
+being diverted, keeping a bed empty cannot protect a future arrival, because future arrivals are turned away.
+
+**Design:** the five final agents (final_A), unchanged weights, shield applied at decision time; the 50 test seeds,
+scenarios A-E, full protocol. Unshielded PPO and Load-Balancing are taken from the Stage 6 episodes (same seeds, CRN;
+the simulator is deterministic given the seed, so re-running them would reproduce identical rows).
+
+**Outcomes:**
+1. Primary: number of collapsed episodes (measured diversion > 50 per 100 arrivals) out of 1,250, against 5 for
+   unshielded PPO and 0 for every baseline.
+2. Secondary: cost J per day, shielded − unshielded PPO and shielded PPO − Load-Balancing, per scenario (hierarchical
+   paired bootstrap, Holm over these 10 comparisons). Agent 0 is also reported on its own.
+
+Reported as it comes out, including if the shield fails or costs performance.
+
 ## 6.22 Experiment Matrix
 
 ### Primary
@@ -873,6 +898,9 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.7 — 2026-10-27 (safety shield; §6.25)
+- **Pre-registered before any run.** Adds a parameter-free shield (no HOLD while the ED is full and a placement is feasible) evaluated on the five final agents, motivated by the Stage 6 collapse finding and disclosed as post-hoc in motivation. Stage 6 results are unchanged.
 
 ### v2.6 — 2026-10-26 (constrained PPO redesign; §6.19)
 - **Pre-registered before any run.** The PPO-Lagrangian design in v2.0 learned a single fixed λ during scenario A training. At test time the multiplier was frozen, so the policy could not respond when stress raised diversions in scenarios B–E, and the comparison could not test what a constrained method claims to do. It is replaced by a λ-conditioned policy, with λ ~ U[0, 100] per training episode and λ/100 as a 22nd input, plus online projected dual ascent at deployment: λ0 = 20, updated every 24 h toward a budget of 3 diversions per 100 arrivals with step size 5. The controller sees only past arrival and diversion times, like every other policy. Training uses the same seeds, hyperparameters and scenario (A) as the final PPO. Evaluation uses test seeds in A–E, paired against fixed-β PPO (final_A), with Holm correction (`neurotwin/experiments/constrained.py`). The constants are in `neurotwin/rl/constrained.py`.
