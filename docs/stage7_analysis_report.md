@@ -124,7 +124,53 @@ HOLD then means keeping a bed free for a possible urgent arrival. The analysis b
    One untested explanation is that fewer inputs mean less extrapolation outside the training distribution, which would be consistent with the structure breakdown in §3. Agent-level differences (see the limits above) could also contribute. We do not claim a causal effect.
 
 ## 5. Domain-randomised PPO (PPO-DR, §6.23; `ppo_dr_*.json`)
-**Status: pending.** The training range has been checked to be strictly milder than every test scenario (`ppo_dr check`; tested in `tests/test_stage7.py`).
+**Commands:** `python -m neurotwin.experiments.ppo_dr train --workers 5`, then `python -m neurotwin.experiments.ppo_dr evaluate`. The output is `ppo_dr_episodes.json` and `ppo_dr_comparisons.json`.
+
+**Design**
+- **Training:** each training episode draws its arrival multiplier from [0.95, 1.04] and its staff and capacity multipliers from [0.97, 1.0]. Everything else is identical to the final PPO: K = 5, the same agent and episode seeds, and warm starts branched into the sampled conditions.
+- **Leakage guard:** the harshest training corner (ρ_general = 0.981) is strictly milder than the mildest test scenario (1.020). This is asserted before training and tested.
+- **Evaluation:** test seeds in A–E, paired against PPO, with Holm correction over 25 comparisons.
+
+| Scenario | ΔJ (PPO-DR − PPO) | 95% CI | Δ off-service per 100 | 95% CI |
+|---|---|---|---|---|
+| A | +1.1 | [−2.3, 4.9] | −0.3 | [−0.8, 0.1] |
+| B | −45.0 | [−128.9, 17.8] | −0.6 | [−1.3, 0.1] |
+| C | −30.2 | [−90.7, 20.3] | −1.1 | [−1.8, −0.4] |
+| D | −38.1 | [−89.8, 3.9] | −0.6 | [−1.1, −0.1] |
+| E | −60.8 | [−147.8, 13.2] | **−1.8*** | [−2.8, −0.9] |
+
+\* significant after Holm.
+
+**Finding: a consistent but unconfirmed benefit at no cost.**
+- PPO-DR is no worse in the training scenario. Under every stress scenario its J is nominally lower, by 3–5%, but no ΔJ survives correction.
+- Its only significant effect is fewer off-service placements under combined stress.
+- Randomising over conditions milder than the tests therefore does not by itself close the generalisation gap.
+- A wider training range would need to approach the test conditions, which risks leakage. This is why the range was fixed in advance, and it is the obvious next experiment.
 
 ## 6. λ-conditioned constrained PPO (v2.6, §6.19; `constrained_*.json`)
-**Status: pending.** The design was pre-registered before any run (RESEARCH.md v2.6). A single policy is trained across λ ∈ [0, 100]. At deployment, online dual ascent moves λ toward a budget of 3 diversions per 100 arrivals. The question is whether this policy keeps diversions within budget under stress, unlike fixed-β PPO (§1), and how much waiting cost that costs.
+**Commands:** `python -m neurotwin.experiments.constrained train --workers 5`, then `python -m neurotwin.experiments.constrained evaluate`. The output is `constrained_episodes.json` and `constrained_comparisons.json`.
+
+**Design** (pre-registered in RESEARCH.md v2.6 before any run)
+- **Training:** one policy is trained across λ ∈ [0, 100], with λ/100 as an input. Training is in scenario A with the same seeds as the final PPO, K = 5.
+- **Deployment:** online dual ascent starts at λ0 = 20. Every 24 h it moves λ toward a budget of 3 diversions per 100 arrivals, with step size 5.
+- **Evaluation:** test seeds in A–E, paired against fixed-β PPO, with Holm correction over 25 comparisons.
+
+| Scenario | Mean λ (measured) | Δ diversions per 100 (λ-PPO − PPO) | 95% CI | Episodes within budget: PPO / λ-PPO | ΔJ | 95% CI |
+|---|---|---|---|---|---|---|
+| A | 0.5 | −0.12 | [−0.32, 0.01] | 96.8% / 97.2% | +5.6 | [0.4, 11.3] |
+| B | 29.1 | +0.04 | [−1.23, 1.49] | 58.8% / 55.6% | +27.2 | [−54.1, 95.6] |
+| C | 56.4 | +0.42 | [−0.81, 2.33] | 24.0% / 20.4% | +77.5 | [23.9, 131.5] |
+| D | 28.6 | −0.80 | [−1.90, 0.07] | 48.8% / 50.0% | +2.5 | [−40.2, 35.6] |
+| E | 77.7 | +1.80 | [−1.64, 7.99] | 7.2% / 6.4% | +75.2 | [−7.0, 168.8] |
+
+No comparison is significant after Holm. The ΔJ values in A and C exclude 0 only nominally.
+
+**Finding: a negative result. The controller behaves as designed, but the policy does not respond.**
+1. **The dual ascent works as intended.** λ falls toward 0 where the budget is met (A) and rises with stress (B/D ≈ 29, C ≈ 56, E ≈ 78).
+2. **Diversions do not fall.** The share of episodes within budget is unchanged in every scenario. ΔJ is nominally worse in A and C, which is what a policy pays when it is pushed by a large λ that it cannot act on effectively.
+3. **Why it fails:**
+   - **Training signal.** The policy was trained only in A, where diversions are about 0.3 per 100 arrivals. Whatever λ it was given, its training episodes contained almost no diversions, so it learned almost nothing about how its actions affect them. The λ input therefore barely changes its behaviour. This is the same mechanism as ablation F1 (§4.4): β = 0 vs β = 20 made no difference.
+   - **Infeasible budget.** The budget is unreachable under heavy stress for *every* policy: in Stage 6, the lowest diversion rates were 7.9 (Load-Balancing, C) and 12.0 (Load-Balancing, E) per 100. When ED capacity is exhausted, diversions are driven by capacity rather than by the allocation decision.
+4. **What would be needed:** training episodes in which diversions actually occur, such as constrained training on randomised stress, which needs a careful leakage design. A budget should also be defined relative to what is achievable in each scenario. Both are left as future work and stated as such.
+
+This experiment is reported as it came out. It was designed to fix the flaw of a frozen multiplier, and it did: the multiplier now adapts online. It also showed that a constraint method cannot control an outcome the policy never learned to influence. This is a useful negative result for constrained RL in rare-event settings.

@@ -36,6 +36,9 @@ NeuroTwin simulates patient flow through an emergency department, medical and su
 - **Learned-policy failure mode:** one of five PPO agents collapsed (holding patients while beds emptied) in 2% of its stress episodes. No rule-based policy ever collapsed.
 - **Under normal load, PPO learned a soft bed-reservation policy.** It holds more often as free beds run out, the threshold shape queueing theory predicts. Under unseen stress that structure disappears.
 - **Common random numbers narrowed confidence intervals up to 12.5×.** Without them, PPO's 9% advantage over Priority would have been undetectable.
+- **Ablations:** the priority-weighted reward is the component that matters most (uniform weights give +11% cost). No single observation group is necessary.
+- **The fixed diversion penalty has no measurable effect,** because diversions are too rare in training to give a learning signal. A pre-registered λ-conditioned constrained PPO with online dual ascent adapts its multiplier as designed, but does **not** reduce diversions under stress. This is a negative result: a constraint cannot steer an outcome the policy never learned to influence.
+- **Domain-randomised PPO** has nominally 3–5% lower cost under every stress scenario at no cost in A, but none of these differences is significant after correction.
 
 Full numbers, CIs and caveats are in the stage reports. One protocol amendment (censoring-inclusive boarding time) is disclosed in Stage 6 §2.
 
