@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { Icon, type IconName } from "./icons";
 
 interface CardProps {
   title: string;
@@ -23,7 +24,7 @@ export function Card({ title, subtitle, actions, explain, children, className = 
         <div className="spacer" />
         {actions}
       </div>
-      {explain && <p className="explain-line"><span aria-hidden="true">👀</span> {explain}</p>}
+      {explain && <p className="explain-line"><Icon name="eye" size={16} /><span>{explain}</span></p>}
       {children}
     </section>
   );
@@ -33,14 +34,14 @@ interface StatProps {
   label: string;
   value: ReactNode;
   note?: ReactNode;
-  icon?: string;
+  icon?: IconName;
   accent?: string;
 }
 
 export function Stat({ label, value, note, icon, accent }: StatProps) {
   return (
     <div className="card stat" style={accent ? { ["--stat-accent" as string]: accent } : undefined}>
-      <span className="stat-label">{icon && <span className="stat-icon" aria-hidden="true">{icon}</span>}{label}</span>
+      <span className="stat-label">{icon && <span className="stat-icon"><Icon name={icon} size={15} /></span>}{label}</span>
       <span className="stat-value">{value}</span>
       {note && <span className="stat-note">{note}</span>}
     </div>
@@ -51,7 +52,7 @@ export function Stat({ label, value, note, icon, accent }: StatProps) {
 export function Takeaway({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "good" | "warn" }) {
   return (
     <div className={`takeaway ${tone}`}>
-      <span className="takeaway-icon" aria-hidden="true">{tone === "good" ? "✓" : tone === "warn" ? "!" : "→"}</span>
+      <span className="takeaway-icon"><Icon name={tone === "good" ? "check" : tone === "warn" ? "alert" : "arrow"} size={14} stroke={2.4} /></span>
       <div>{children}</div>
     </div>
   );

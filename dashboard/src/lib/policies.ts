@@ -12,8 +12,8 @@ export interface PolicyMeta {
 }
 
 export const POLICIES: PolicyMeta[] = [
-  { key: "ppo", label: "AI agent", tech: "PPO (reinforcement learning)", color: "var(--series-1)",
-    desc: "Learned by trial and error over millions of simulated decisions. Nobody wrote its rules." },
+  { key: "ppo", label: "RL agent", tech: "PPO neural network, built from scratch", color: "var(--series-1)",
+    desc: "A neural network trained with reinforcement learning over 3 million simulated decisions. Nobody wrote its rules." },
   { key: "load_balancing", label: "Balance-the-wards rule", tech: "Load-Balancing", color: "var(--series-2)",
     desc: "Sends each patient to whichever suitable ward has the most room." },
   { key: "priority", label: "Most-urgent-first rule", tech: "Priority", color: "var(--series-3)",
@@ -50,12 +50,14 @@ export const SCENARIO_LABELS: Record<string, string> = {
   E: "E · Combined stress",
 };
 
-export const SCENARIO_INFO: Record<string, { short: string; desc: string; icon: string }> = {
-  A: { short: "Normal day", icon: "🏥", desc: "Typical demand and full staffing. The only situation the AI trained on." },
-  B: { short: "Demand surge", icon: "📈", desc: "10% more patients arrive than usual, like a bad flu week." },
-  C: { short: "Staff shortage", icon: "🧑‍⚕️", desc: "12% fewer nurses and doctors, so fewer beds can be staffed." },
-  D: { short: "Bed loss", icon: "🛏️", desc: "12% of beds are out of service, e.g. closed bays." },
-  E: { short: "Everything at once", icon: "⚠️", desc: "8% more patients, 10% fewer staff and 10% fewer beds at once: the hardest test." },
+import type { IconName } from "@/components/icons";
+
+export const SCENARIO_INFO: Record<string, { short: string; desc: string; icon: IconName }> = {
+  A: { short: "Normal day", icon: "hospital", desc: "Typical demand and full staffing. The only situation the RL agent trained on." },
+  B: { short: "Demand surge", icon: "trend", desc: "10% more patients arrive than usual, like a bad flu week." },
+  C: { short: "Staff shortage", icon: "staff", desc: "12% fewer nurses and doctors, so fewer beds can be staffed." },
+  D: { short: "Bed loss", icon: "bed", desc: "12% of beds are out of service, e.g. closed bays." },
+  E: { short: "Everything at once", icon: "alert", desc: "8% more patients, 10% fewer staff and 10% fewer beds at once: the hardest test." },
 };
 
 export interface MetricMeta {

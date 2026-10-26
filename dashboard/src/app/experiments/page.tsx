@@ -5,7 +5,8 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ErrorBar, Legend as RLegend, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { CountUp, Reveal, WhenVisible } from "@/components/motion";
+import { Icon, type IconName } from "@/components/icons";
+import { CountUp, Reveal, Scene, WhenVisible } from "@/components/motion";
 import { Card, Legend, SectionHeader, Segmented, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
 import { METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta } from "@/lib/policies";
@@ -37,7 +38,7 @@ const ABLATION_NAMES: Record<string, string> = {
 
 const CHAPTERS = [
   { id: "overall", label: "1 · Who does best?" },
-  { id: "headtohead", label: "2 · AI vs each rule" },
+  { id: "headtohead", label: "2 · Agent vs each rule" },
   { id: "crisis", label: "3 · Coping with crises" },
   { id: "clever", label: "4 · Did it learn something?" },
   { id: "ingredients", label: "5 · What makes it work?" },
@@ -46,24 +47,28 @@ const CHAPTERS = [
   { id: "glossary", label: "Glossary" },
 ];
 
-/** Diverging colour for an effect: negative (AI better) -> blue, positive -> red, ~0 -> gray. */
+/** Diverging colour for an effect: negative (Agent better) -> blue, positive -> red, ~0 -> gray. */
 function divergeColor(value: number, max: number): string {
   const t = Math.max(-1, Math.min(1, value / max));
   const pole = t < 0 ? "var(--diverge-neg)" : "var(--diverge-pos)";
   return `color-mix(in srgb, ${pole} ${Math.round(Math.abs(t) * 85)}%, var(--diverge-mid))`;
 }
 
-/** Highlights the chapter currently on screen. */
+/** Highlights the chapter currently on screen. Uses layout offsets (not on-screen rects), so the
+ *  sections' scroll animations (which move them while they fade) cannot confuse it. */
 function useActiveChapter(): string {
   const [active, setActive] = useState(CHAPTERS[0].id);
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => {
-      const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-      if (vis[0]) setActive(vis[0].target.id);
-    }, { rootMargin: "-20% 0px -65% 0px" });
-    CHAPTERS.forEach((c) => { const el = document.getElementById(c.id); if (el) io.observe(el); });
-    return () => io.disconnect();
+    const top = (el: HTMLElement) => { let y = 0; let e: HTMLElement | null = el; while (e) { y += e.offsetTop; e = e.offsetParent as HTMLElement | null; } return y; };
+    const onScroll = () => {
+      const line = window.scrollY + window.innerHeight * 0.3;
+      let cur = CHAPTERS[0].id;
+      for (const c of CHAPTERS) { const el = document.getElementById(c.id); if (el && top(el) <= line) cur = c.id; }
+      setActive(cur);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
   return active;
 }
@@ -196,15 +201,15 @@ export default function ExperimentsPage() {
       <section className="hero2" style={{ marginBottom: 8 }}>
         <span className="blob b1" /><span className="blob b2" />
         <Reveal><span className="pill"><span className="badge">Results</span> 2,500 test episodes · 50 fresh runs per situation</span></Reveal>
-        <Reveal delay={80}><h1 style={{ fontSize: "clamp(30px, 4.4vw, 52px)" }}>What happened when the AI <span className="gradient-text">met the rules</span></h1></Reveal>
+        <Reveal delay={80}><h1 style={{ fontSize: "clamp(30px, 4.4vw, 52px)" }}>What happened when the agent <span className="gradient-text">met the rules</span></h1></Reveal>
         <Reveal delay={160}><p className="lead">
           Seven short chapters, each answering one question. Every chart says what you are looking at and what
           it means. The full statistics are under &quot;Technical detail&quot;. Lower is better everywhere.
         </p></Reveal>
         <Reveal delay={240}>
           <div className="ribbon">
-            <div><div className="num"><CountUp value={wins} /></div><div className="lbl">confident AI wins out of {matchups.length} match-ups ({meta.label.toLowerCase()})</div></div>
-            <div><div className="num"><CountUp value={losses} /></div><div className="lbl">confident AI losses</div></div>
+            <div><div className="num"><CountUp value={wins} /></div><div className="lbl">confident agent wins out of {matchups.length} match-ups ({meta.label.toLowerCase()})</div></div>
+            <div><div className="num"><CountUp value={losses} /></div><div className="lbl">confident agent losses</div></div>
             <div><div className="num"><CountUp value={crnMax} digits={1} suffix="×" /></div><div className="lbl">sharper comparisons (same patients)</div></div>
             <div><div className="num"><CountUp value={(data.ablations?.length ?? 0) + (data.ppo_dr?.length ?? 0) + (data.constrained?.comparisons.length ?? 0) + (data.comparisons?.length ?? 0)} /></div><div className="lbl">pre-planned statistical tests</div></div>
           </div>
@@ -216,7 +221,7 @@ export default function ExperimentsPage() {
       </nav>
 
       {/* ------------------------------------------------------------------ 1 overall */}
-      <section className="section" id="overall">
+      <Scene id="overall">
         <Reveal><SectionHeader num="1" kicker="Overall" title="Who does best in each situation?"
           lead="Pick what to measure. Each group of bars is one situation; each bar is one decision-maker." /></Reveal>
         <Reveal>
@@ -262,29 +267,29 @@ export default function ExperimentsPage() {
             )}
             <Takeaway>
               Crises make everything worse for everyone, and the hardest one (&quot;everything at once&quot;) multiplies costs several
-              times over. Within each situation, the <b>AI agent</b> and the <b>balance-the-wards rule</b> are consistently among the best,
+              times over. Within each situation, the <b>RL agent</b> and the <b>balance-the-wards rule</b> are consistently among the best,
               and <b>first-come-first-served</b> is clearly the worst.
             </Takeaway>
             <TechDetails>
-              <p>Means over 50 test seeds (200000–200049); AI averaged over 5 independently trained agents. Whiskers: 95% t-intervals over seeds.
+              <p>Means over 50 test seeds (200000–200049); RL agent averaged over 5 independently trained agents. Whiskers: 95% t-intervals over seeds.
                 Boarding is censoring-inclusive (patients still waiting at the horizon count with their wait so far), a disclosed protocol amendment.</p>
             </TechDetails>
           </Card>
         </Reveal>
-      </section>
+      </Scene>
 
       {/* ------------------------------------------------------------------ 2 head to head */}
-      <section className="section" id="headtohead">
-        <Reveal><SectionHeader num="2" kicker="Head to head" title="Where does the AI beat each rule, and where does it lose?"
-          lead={<>Each square compares the AI with one rule in one situation. <b style={{ color: "var(--diverge-neg)" }}>Blue</b> = AI better,{" "}
-            <b style={{ color: "var(--diverge-pos)" }}>red</b> = AI worse, grey = no real difference. A dot ● marks a difference we are statistically confident about.</>} /></Reveal>
+      <Scene id="headtohead">
+        <Reveal><SectionHeader num="2" kicker="Head to head" title="Where does the agent beat each rule, and where does it lose?"
+          lead={<>Each square compares the agent with one rule in one situation. <b style={{ color: "var(--diverge-neg)" }}>Blue</b> = Agent better,{" "}
+            <b style={{ color: "var(--diverge-pos)" }}>red</b> = Agent worse, grey = no real difference. A dot ● marks a difference we are statistically confident about.</>} /></Reveal>
         <Reveal>
-          <Card title={`AI minus rule: ${meta.label.toLowerCase()}`} subtitle={meta.unit} actions={heatToggle}
-            explain={`Numbers show how much higher (+) or lower (−) the AI's ${meta.label.toLowerCase()} is than each rule's. Negative is good for the AI.`}>
+          <Card title={`Agent minus rule: ${meta.label.toLowerCase()}`} subtitle={meta.unit} actions={heatToggle}
+            explain={`Numbers show how much higher (+) or lower (−) the agent's ${meta.label.toLowerCase()} is than each rule's. Negative is good for the agent.`}>
             {heatTable ? (
               <div className="scroll">
                 <table>
-                  <thead><tr><th>AI vs</th>{SCENARIOS.map((s) => <th key={s}>{scenShort(s)}</th>)}</tr></thead>
+                  <thead><tr><th>Agent vs</th>{SCENARIOS.map((s) => <th key={s}>{scenShort(s)}</th>)}</tr></thead>
                   <tbody>{BASELINES.map((b) => (
                     <tr key={b}><td>{policyMeta(b).label}</td>{SCENARIOS.map((s) => {
                       const c = heat[b][s];
@@ -297,7 +302,7 @@ export default function ExperimentsPage() {
               <>
                 <div className="heat scroll" style={{ gridTemplateColumns: `200px repeat(${SCENARIOS.length}, minmax(96px, 1fr))` }}>
                   <div />
-                  {SCENARIOS.map((s) => <div key={s} className="hdr">{SCENARIO_INFO[s].icon} {scenShort(s)}</div>)}
+                  {SCENARIOS.map((s) => <div key={s} className="hdr"><Icon name={SCENARIO_INFO[s].icon} size={14} /> {scenShort(s)}</div>)}
                   {BASELINES.map((b, bi) => (
                     <div key={b} style={{ display: "contents" }}>
                       <div className="rowhdr"><i className="dot" style={{ background: policyMeta(b).color, marginRight: 6 }} />{policyMeta(b).label}</div>
@@ -317,29 +322,29 @@ export default function ExperimentsPage() {
                   ))}
                 </div>
                 <div className="legend" style={{ marginTop: 10 }}>
-                  <span><i className="swatch" style={{ background: divergeColor(-1.5, 1.5) }} />AI better</span>
+                  <span><i className="swatch" style={{ background: divergeColor(-1.5, 1.5) }} />Agent better</span>
                   <span><i className="swatch" style={{ background: "var(--diverge-mid)", border: "1px solid var(--grid)" }} />no real difference</span>
-                  <span><i className="swatch" style={{ background: divergeColor(1.5, 1.5) }} />AI worse</span>
+                  <span><i className="swatch" style={{ background: divergeColor(1.5, 1.5) }} />Agent worse</span>
                   <span>● confident difference</span>
                 </div>
               </>
             )}
             <Takeaway tone="good">
-              Against the classic rules (most-urgent-first, the instant optimiser, first-come-first-served) the AI is mostly blue.
+              Against the classic rules (most-urgent-first, the instant optimiser, first-come-first-served) the agent is mostly blue.
               Against the <b>balance-the-wards rule</b> the squares are grey: it is a genuine tie.
             </Takeaway>
             <TechDetails>
               <p>{metric === "J_per_day"
-                ? "Overall cost: cell = mean paired difference (AI − rule) with relative %; ● = 95% hierarchical-bootstrap CI excludes 0 (secondary, descriptive)."
+                ? "Overall cost: cell = mean paired difference (agent − rule) with relative %; ● = 95% hierarchical-bootstrap CI excludes 0 (secondary, descriptive)."
                 : "Cell = mean paired difference; second line = effect size d_z; ● = significant after Holm correction over all 100 pre-registered primary comparisons."}</p>
               <p>The keep-a-bed-free rule tuned itself to reserve zero beds, so it behaves exactly like most-urgent-first (identical numbers).</p>
             </TechDetails>
           </Card>
         </Reveal>
-      </section>
+      </Scene>
 
       {/* ------------------------------------------------------------------ 3 crisis */}
-      <section className="section" id="crisis">
+      <Scene id="crisis">
         <Reveal><SectionHeader num="3" kicker="Robustness" title="How much worse does each one get in a crisis?"
           lead="Compared with its own normal-day performance, how much does each decision-maker deteriorate across the four crises?" /></Reveal>
         <div className="grid grid-2">
@@ -366,7 +371,7 @@ export default function ExperimentsPage() {
           </Reveal>
           <Reveal kind="right">
             <Card title="How to read this" subtitle="steady is not the same as good">
-              <Takeaway tone="good">The AI deteriorates <b>clearly less</b> than the most-urgent-first rule, and about as much as the best rules.</Takeaway>
+              <Takeaway tone="good">The agent deteriorates <b>clearly less</b> than the most-urgent-first rule, and about as much as the best rules.</Takeaway>
               <Takeaway tone="warn">
                 First-come-first-served looks &quot;steady&quot; only because it is already bad on a normal day: there is less room to get worse.
                 Always read this together with chapter 1.
@@ -379,15 +384,15 @@ export default function ExperimentsPage() {
             </Card>
           </Reveal>
         </div>
-      </section>
+      </Scene>
 
       {/* ------------------------------------------------------------------ 4 clever */}
       {structure.length > 0 && (
-        <section className="section" id="clever">
-          <Reveal><SectionHeader num="4" kicker="Inside the AI" title="Did the AI discover something on its own?"
-            lead="Hospitals sometimes keep a bed empty for the next emergency. Nobody told the AI about this idea. Did it find it anyway?" /></Reveal>
+        <Scene id="clever">
+          <Reveal><SectionHeader num="4" kicker="Inside the agent" title="Did the agent discover something on its own?"
+            lead="Hospitals sometimes keep a bed empty for the next emergency. Nobody told the agent about this idea. Did it find it anyway?" /></Reveal>
           <Reveal>
-            <Card title="How often the AI keeps a free bed empty"
+            <Card title="How often the agent keeps a free bed empty"
               subtitle="when only non-urgent patients are waiting, by number of free beds"
               explain="Left = almost full, right = plenty of room. A falling line means: hold back when beds are scarce, fill freely when there is room.">
               <WhenVisible height={300}>
@@ -407,7 +412,7 @@ export default function ExperimentsPage() {
                 </div>
               </WhenVisible>
               <Takeaway tone="good">
-                <b>Yes, on normal days.</b> The blue line falls: the AI learned a soft &quot;keep a bed free&quot; strategy, the shape queueing theory predicts.
+                <b>Yes, on normal days.</b> The blue line falls: the agent learned a soft &quot;keep a bed free&quot; strategy, the shape queueing theory predicts.
               </Takeaway>
               <Takeaway tone="warn">
                 <b>But not in the crisis it never saw.</b> The orange line is flat and high: it holds beds about a third of the time no matter what.
@@ -420,24 +425,24 @@ export default function ExperimentsPage() {
               </TechDetails>
             </Card>
           </Reveal>
-        </section>
+        </Scene>
       )}
 
       {/* ------------------------------------------------------------------ 5 ingredients */}
       {ablA.length > 0 && (
-        <section className="section" id="ingredients">
-          <Reveal><SectionHeader num="5" kicker="Ablation study" title="Which ingredients make the AI work?"
-            lead="We retrained the AI eight times, each time taking one ingredient away, and measured how much worse it got on a normal day." /></Reveal>
+        <Scene id="ingredients">
+          <Reveal><SectionHeader num="5" kicker="Ablation study" title="Which ingredients make the agent work?"
+            lead="We retrained the agent eight times, each time taking one ingredient away, and measured how much worse it got on a normal day." /></Reveal>
           <Reveal>
-            <Card title="Cost increase when one ingredient is removed" subtitle="% change in overall cost vs the full AI (normal day) · faded bars = not a confident difference"
-              explain="Longer red bar = that ingredient matters more. A bar near zero means the AI copes fine without it.">
+            <Card title="Cost increase when one ingredient is removed" subtitle="% change in overall cost vs the full agent (normal day) · faded bars = not a confident difference"
+              explain="Longer red bar = that ingredient matters more. A bar near zero means the agent copes fine without it.">
               <DiffBars rows={ablA} unit="%" height={60 + ablA.length * 40} />
               <Takeaway>
-                <b>The reward matters more than the inputs.</b> Telling the AI that urgent patients count more is the single most important ingredient (+11% cost without it).
+                <b>The reward matters more than the inputs.</b> Telling the agent that urgent patients count more is the single most important ingredient (+11% cost without it).
                 No single input group is essential, because the inputs overlap.
               </Takeaway>
               <Takeaway tone="warn">
-                Removing the penalty for turning ambulances away changes <b>nothing</b>. On normal days this almost never happens, so the AI never learned from it.
+                Removing the penalty for turning ambulances away changes <b>nothing</b>. On normal days this almost never happens, so the agent never learned from it.
                 This motivated chapter 6.
               </Takeaway>
               <TechDetails>
@@ -447,19 +452,19 @@ export default function ExperimentsPage() {
               </TechDetails>
             </Card>
           </Reveal>
-        </section>
+        </Scene>
       )}
 
       {/* ------------------------------------------------------------------ 6 tougher */}
       {(dr.length > 0 || data.constrained) && (
-        <section className="section" id="tougher">
-          <Reveal><SectionHeader num="6" kicker="Follow-up experiments" title="Two attempts to make the AI tougher"
+        <Scene id="tougher">
+          <Reveal><SectionHeader num="6" kicker="Follow-up experiments" title="Two attempts to make the agent tougher"
             lead="Both were planned and written down before running them, and both are reported exactly as they came out." /></Reveal>
           <div className="grid grid-2">
             {dr.length > 0 && (
               <Reveal kind="left">
-                <Card title="Attempt 1: train on varied days" subtitle="% change in cost vs the original AI, per situation"
-                  explain="During training, each simulated day had slightly different demand and staffing. Negative = the varied-training AI did better.">
+                <Card title="Attempt 1: train on varied days" subtitle="% change in cost vs the original agent, per situation"
+                  explain="During training, each simulated day had slightly different demand and staffing. Negative = the varied-training agent did better.">
                   <DiffBars rows={dr.map((r) => ({ ...r, color: r.sig ? undefined : "var(--series-1)" }))} unit="%" height={60 + dr.length * 40} />
                   <Takeaway>
                     A <b>small, consistent improvement</b> (3–5% lower cost in every crisis, no loss on normal days), but not large enough to be
@@ -475,7 +480,7 @@ export default function ExperimentsPage() {
             {data.constrained && (
               <Reveal kind="right">
                 <Card title="Attempt 2: an ambulance-diversion budget" subtitle="share of runs that stayed within 3 diversions per 100 arrivals"
-                  explain="A controller raises the AI's diversion penalty whenever too many ambulances are turned away. Did more runs stay within budget?">
+                  explain="A controller raises the agent's diversion penalty whenever too many ambulances are turned away. Did more runs stay within budget?">
                   <WhenVisible height={260}>
                     <div style={{ width: "100%", height: 260 }}>
                       <ResponsiveContainer>
@@ -483,8 +488,8 @@ export default function ExperimentsPage() {
                           <CartesianGrid stroke="var(--grid)" vertical={false} />
                           <XAxis dataKey="scenario" {...axis} tickFormatter={(s) => String(s).split(" · ")[1]} />
                           <YAxis {...axis} unit="%" domain={[0, 100]} />
-                          <Tooltip {...tip} formatter={(v, n) => [typeof v === "number" ? `${v.toFixed(0)}% of runs` : "–", n === "ppo" ? "original AI" : "AI with budget controller"]} />
-                          <RLegend verticalAlign="top" height={26} formatter={(v) => (v === "ppo" ? "Original AI" : "AI + budget controller")} wrapperStyle={{ fontSize: 12 }} />
+                          <Tooltip {...tip} formatter={(v, n) => [typeof v === "number" ? `${v.toFixed(0)}% of runs` : "–", n === "ppo" ? "original agent" : "agent with budget controller"]} />
+                          <RLegend verticalAlign="top" height={26} formatter={(v) => (v === "ppo" ? "Original agent" : "Agent + budget controller")} wrapperStyle={{ fontSize: 12 }} />
                           <Bar dataKey="ppo" fill="var(--series-1)" radius={[4, 4, 0, 0]} animationDuration={900} />
                           <Bar dataKey="constrained" fill="var(--violet)" radius={[4, 4, 0, 0]} animationDuration={900} animationBegin={200} />
                         </BarChart>
@@ -493,7 +498,7 @@ export default function ExperimentsPage() {
                   </WhenVisible>
                   <Takeaway tone="warn">
                     <b>A useful negative result.</b> The controller worked (the penalty rose from about {budget["A:lambda_mean"]?.toFixed(1)} on normal days
-                    to about {budget["E:lambda_mean"]?.toFixed(0)} in the hardest crisis), but the AI did not turn away fewer ambulances.
+                    to about {budget["E:lambda_mean"]?.toFixed(0)} in the hardest crisis), but the agent did not turn away fewer ambulances.
                     It never learned how to influence diversions, and in severe crises the budget is impossible for <i>every</i> method.
                   </Takeaway>
                   <TechDetails>
@@ -504,11 +509,11 @@ export default function ExperimentsPage() {
               </Reveal>
             )}
           </div>
-        </section>
+        </Scene>
       )}
 
       {/* ------------------------------------------------------------------ 7 trust */}
-      <section className="section" id="trust">
+      <Scene id="trust">
         <Reveal><SectionHeader num="7" kicker="Methodology" title="Why you can trust these numbers"
           lead="A simulation study is only as good as its fairness. Here is how we kept it honest." /></Reveal>
         <div className="grid grid-2">
@@ -522,7 +527,7 @@ export default function ExperimentsPage() {
                       <CartesianGrid stroke="var(--grid)" horizontal={false} />
                       <XAxis type="number" {...axis} tickFormatter={(v) => `${v}×`} />
                       <YAxis type="category" dataKey="label" width={170} {...axis} tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                      <Tooltip {...tip} formatter={(v, _n, item) => [`${typeof v === "number" ? v.toFixed(1) : "–"}× narrower · variance −${(100 * (item.payload as { reduction: number }).reduction).toFixed(1)}%`, "AI vs this rule"]} />
+                      <Tooltip {...tip} formatter={(v, _n, item) => [`${typeof v === "number" ? v.toFixed(1) : "–"}× narrower · variance −${(100 * (item.payload as { reduction: number }).reduction).toFixed(1)}%`, "Agent vs this rule"]} />
                       <Bar dataKey="ratio" barSize={16} radius={4} animationDuration={1000}
                         label={{ position: "right", fill: "var(--text-secondary)", fontSize: 11, formatter: (v: unknown) => `${Number(v).toFixed(1)}×` }}>
                         {crn.map((r) => <Cell key={r.policy} fill={policyMeta(r.policy).color} />)}
@@ -538,24 +543,24 @@ export default function ExperimentsPage() {
           <Reveal kind="right">
             <Card title="The ground rules we followed" subtitle="written down before looking at test results">
               <div className="stack" style={{ gap: 10 }}>
-                {[
-                  ["🔒", "Test runs kept sealed", "50 test runs per situation were never used for training or tuning, and were opened once."],
-                  ["📝", "Plan first, run second", "The statistical plan was committed to git before the test run."],
-                  ["🎯", "Fair opponents", "Every rule was tuned for its best possible score, the same way the AI was."],
-                  ["🔁", "Several AIs, not one", "Five independently trained agents, so one lucky (or unlucky) agent can't decide the result."],
-                  ["⚖️", "No cherry-picking", "100 comparisons corrected together (Holm), and negative results reported in full."],
-                  ["✅", "Simulator verified", "Matches textbook queueing formulas in 15 of 15 checks."],
-                ].map(([icon, t, d]) => (
-                  <div key={t} className="guide-item"><span style={{ fontSize: 20 }}>{icon}</span><div><b>{t}.</b> {d}</div></div>
+                {([
+                  ["lock", "Test runs kept sealed", "50 test runs per situation were never used for training or tuning, and were opened once."],
+                  ["file", "Plan first, run second", "The statistical plan was committed to git before the test run."],
+                  ["target", "Fair opponents", "Every rule was tuned for its best possible score, the same way the agent was."],
+                  ["repeat", "Several agents, not one", "Five independently trained agents, so one lucky (or unlucky) agent can't decide the result."],
+                  ["scale", "No cherry-picking", "100 comparisons corrected together (Holm), and negative results reported in full."],
+                  ["check", "Simulator verified", "Matches textbook queueing formulas in 15 of 15 checks."],
+                ] as [IconName, string, string][]).map(([icon, t, d]) => (
+                  <div key={t} className="guide-item"><span className="icon-badge" style={{ width: 34, height: 34, margin: 0, borderRadius: 10 }}><Icon name={icon} size={17} /></span><div><b>{t}.</b> {d}</div></div>
                 ))}
               </div>
             </Card>
           </Reveal>
         </div>
-      </section>
+      </Scene>
 
       {/* ------------------------------------------------------------------ glossary */}
-      <section className="section" id="glossary">
+      <Scene id="glossary">
         <Reveal><SectionHeader kicker="Glossary" title="Words used on this site" /></Reveal>
         <Reveal>
           <dl className="glossary">
@@ -565,7 +570,7 @@ export default function ExperimentsPage() {
               ["Diversion", "When the emergency department is full, new arrivals are sent to another hospital."],
               ["Wrong-ward (off-service)", "A patient placed in a ward of another specialty because theirs is full. Usually means a longer stay."],
               ["Urgency levels", "Critical, Very urgent, Urgent, Standard, Planned (1 to 5). Planned admissions are scheduled in advance."],
-              ["AI agent (PPO)", "A neural network trained with reinforcement learning (Proximal Policy Optimisation), written from scratch for this project."],
+              ["RL agent (PPO)", "A neural network trained with reinforcement learning (Proximal Policy Optimisation), written from scratch for this project."],
               ["Digital twin", "A simulation that can copy the hospital's exact current state and play out possible futures from it."],
               ["Confidence interval (CI)", "The range the true value very likely lies in. If it doesn't include zero, the difference is real, not luck."],
               ["Statistically significant", "Unlikely to be luck, even after correcting for running many tests at once (Holm correction)."],
@@ -576,7 +581,7 @@ export default function ExperimentsPage() {
           </dl>
         </Reveal>
         <p className="muted" style={{ marginTop: 24, textAlign: "center" }}>{data.label}</p>
-      </section>
+      </Scene>
     </div>
   );
 }

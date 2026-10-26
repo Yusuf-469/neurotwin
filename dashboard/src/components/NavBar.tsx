@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "./icons";
 import { ThemeToggle } from "./ui";
 
 const LINKS = [
@@ -17,11 +18,7 @@ export default function NavBar() {
   return (
     <header className="topbar">
       <Link href="/" className="brand" aria-label="NeuroTwin home">
-        <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-          <rect x="2" y="2" width="28" height="28" rx="8" fill="var(--accent)" />
-          <path d="M9 17h4l2-5 3 9 2-4h3" fill="none" stroke="#fff" strokeWidth="2.2"
-            strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Logo size={32} />
         NeuroTwin
       </Link>
       <nav className="nav">
