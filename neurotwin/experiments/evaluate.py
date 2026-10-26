@@ -48,6 +48,10 @@ def run_job(job: tuple[str, int, str, int, str, dict]) -> dict[str, Any]:
     )
     if policy_name == "ppo":
         policy = PPOPolicy.load(Path(agent_dir) / f"agent_{agent}.pt")
+    elif policy_name == "ppo_ensemble":
+        from ..policies.ensemble_ppo import EnsemblePPOPolicy
+
+        policy = EnsemblePPOPolicy.load(sorted(Path(agent_dir).glob("agent_*.pt")))
     elif policy_name == "ppo_shielded":
         policy = PPOPolicy.load(Path(agent_dir) / f"agent_{agent}.pt", shield=True)
     elif policy_name == "ppo_lagrangian":

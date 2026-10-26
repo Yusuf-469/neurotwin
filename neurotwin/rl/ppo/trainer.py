@@ -43,6 +43,11 @@ class PPOConfig:
     hidden: tuple[int, ...] = (64, 64)
     seed: int = 0  # network init, sampling and minibatch order
     torch_threads: int = 1
+    # Fine-tuning from an initial agent (RESEARCH.md §6.26): keep its observation normaliser
+    # fixed, and update only the critic for the first updates so that the initial policy is not
+    # disturbed by advantages computed with an untrained value function.
+    freeze_obs_norm: bool = False
+    critic_warmup_updates: int = 0
 
     @property
     def batch_size(self) -> int:
@@ -63,11 +68,13 @@ def train(
     episode_seeds: Iterator[int],
     log_every: int = 0,
     callback: Callable[[int, PPOAgent, TrainLog], None] | None = None,
+    init_agent: PPOAgent | None = None,
 ) -> tuple[PPOAgent, TrainLog]:
     """Train PPO. ``episode_seeds`` yields a seed for every episode reset (e.g. TRAIN seeds).
 
     Each env may provide ``info["action_mask"]`` (default: all valid) and ``info["dt_hours"]``
-    (default: 1, i.e. ordinary MDP discounting).
+    (default: 1, i.e. ordinary MDP discounting). ``init_agent`` starts from a copy of that
+    agent's weights and observation normaliser instead of a fresh network.
     """
     torch.manual_seed(config.seed)
     torch.set_num_threads(config.torch_threads)
@@ -81,6 +88,10 @@ def train(
         model.parameters(), lr=config.learning_rate, eps=1e-5
     )  # [37 details] Adam epsilon 1e-5
     obs_rms = RunningMeanStd((obs_dim,)) if config.normalize_obs else IdentityNormalizer((obs_dim,))
+    if init_agent is not None:
+        model.load_state_dict(init_agent.model.state_dict())
+        obs_rms = RunningMeanStd.from_state_dict(init_agent.obs_rms.state_dict())
+    obs_rms.frozen = config.freeze_obs_norm
     agent = PPOAgent(model, obs_rms, {"config": asdict(config)})
     log = TrainLog()
 
@@ -176,6 +187,9 @@ def train(
                 )
                 optimizer.zero_grad()
                 loss.backward()
+                if update <= config.critic_warmup_updates:
+                    for p in model.actor.parameters():
+                        p.grad = None  # critic-only warm-up
                 torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
                 optimizer.step()
                 infos.append(info)
