@@ -48,7 +48,8 @@ const CHAPTERS = [
   { id: "clever", label: "4 · Did it learn something?" },
   { id: "ingredients", label: "5 · What makes it work?" },
   { id: "tougher", label: "6 · Making it tougher" },
-  { id: "trust", label: "7 · Why trust this?" },
+  { id: "beat", label: "7 · Beating the best rule" },
+  { id: "trust", label: "8 · Why trust this?" },
   { id: "glossary", label: "Glossary" },
 ];
 
@@ -550,9 +551,70 @@ export default function ExperimentsPage() {
         </Scene>
       )}
 
-      {/* ------------------------------------------------------------------ 7 trust */}
+      {/* ------------------------------------------------------------------ 7 beat */}
+      {data.beat_rule && (
+        <Scene id="beat">
+          <Reveal><SectionHeader num="7" kicker="RL agent v2" title="Can the agent beat the best rule?"
+            lead="The first agent tied the balance-the-wards rule. So the agent first learned by copying that rule, then used reinforcement learning to improve on it, and five copies vote. Tested once, on 50 runs never used before." /></Reveal>
+          <div className="grid grid-2">
+            <Reveal kind="left">
+              <Card title="RL agent v2 vs balance-the-wards rule" subtitle="% difference in overall cost, fresh test runs · faded bars = not a confident difference"
+                explain="Bars to the left (blue) mean the agent's cost is lower than the rule's. Each row is one situation.">
+                <DiffBars rows={data.beat_rule.primary_vs_load_balancing.map((c) => ({
+                  label: `${c.scenario} · ${scenShort(c.scenario)}`,
+                  diff: (100 * c.diff_mean) / c.baseline_mean, lo: (100 * c.ci_low) / c.baseline_mean, hi: (100 * c.ci_high) / c.baseline_mean,
+                  sig: c.significant_holm,
+                }))} unit="%" height={260} />
+                <Takeaway tone="good">
+                  <b>A clear win on normal days:</b> 8.5% lower cost than the best hand-tuned rule, statistically certain even after correcting for multiple tests.
+                </Takeaway>
+                <Takeaway tone="warn">
+                  In crises it is a tie, and under &quot;everything at once&quot; it is 3.5% behind, a gap too small to be statistically certain.
+                  It beats the rule where it trained and holds its own elsewhere.
+                </Takeaway>
+              </Card>
+            </Reveal>
+            <Reveal kind="right">
+              <Card title="How it was built" subtitle="validation score, normal day (lower is better)"
+                explain="Every candidate was scored on validation runs only. The best one was locked in before the fresh test runs were opened.">
+                <div className="stack" style={{ gap: 8 }}>
+                  {([
+                    ["bc", "Copying the rule only"],
+                    ["load_balancing", "Balance-the-wards rule"],
+                    ["ppo", "Original RL agent"],
+                    ["ens_ppo", "Vote of original agents"],
+                    ["bc_ppo", "Copy, then RL fine-tuning"],
+                    ["ens_bc_ppo", "Vote of fine-tuned agents (v2)"],
+                  ] as [string, string][]).map(([k, label]) => {
+                    const v = data.beat_rule_validation?.validation_J[k]?.mean_J ?? NaN;
+                    const best = k === data.beat_rule_validation?.selected;
+                    return (
+                      <div key={k} className={`vrow${best ? " best" : ""}`}>
+                        <span>{label}</span>
+                        <span className="vbar"><i style={{ width: `${Math.min(100, (100 * v) / 270)}%` }} /></span>
+                        <b>{Number.isFinite(v) ? v.toFixed(1) : "–"}</b>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Takeaway>
+                  Copying alone fails badly: tiny mistakes add up into situations the rule never showed it. Reinforcement learning is what turns
+                  the copy into an agent better than the rule it learned from.
+                </Takeaway>
+                <TechDetails>
+                  <p>Behaviour cloning of Load-Balancing (96% held-out agreement), then PPO fine-tuning (lr 1e-4, frozen observation normaliser,
+                    30 critic-only warm-up updates, 3M steps), K = 5; soft-vote ensemble of the five. Pre-registered as RESEARCH.md v2.8; selection
+                    committed before the one-time test on seeds 400,000–400,049 (A–E). Holm over 5 scenarios. Collapses: 0 of 250.</p>
+                </TechDetails>
+              </Card>
+            </Reveal>
+          </div>
+        </Scene>
+      )}
+
+      {/* ------------------------------------------------------------------ 8 trust */}
       <Scene id="trust">
-        <Reveal><SectionHeader num="7" kicker="Methodology" title="Why you can trust these numbers"
+        <Reveal><SectionHeader num="8" kicker="Methodology" title="Why you can trust these numbers"
           lead="A simulation study is only as good as its fairness. Here is how we kept it honest." /></Reveal>
         <div className="grid grid-2">
           <Reveal kind="left">

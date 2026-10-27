@@ -685,3 +685,13 @@ main, .footer, .banner { position: relative; z-index: 1; }
 .fp-ed.board { fill: color-mix(in srgb, var(--accent) 55%, var(--surface-2)); stroke: var(--accent); }
 .fp-edlegend text { fill: var(--text-muted); font-size: 11px; }
 .fp-sub.alert { fill: var(--status-critical); font-weight: 700; }
+
+/* ---------- validation ladder (results chapter 7) ---------- */
+.vrow { display: grid; grid-template-columns: 190px 1fr 56px; gap: 10px; align-items: center; font-size: 13px; color: var(--text-secondary);
+  padding: 6px 8px; border-radius: 8px; }
+.vrow b { text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.vrow.best { background: var(--accent-soft); color: var(--text-primary); font-weight: 600; }
+.vbar { height: 8px; border-radius: 4px; background: var(--grid); overflow: hidden; }
+.vbar i { display: block; height: 100%; border-radius: 4px; background: var(--axis); }
+.vrow.best .vbar i { background: var(--grad); }
+@media (max-width: 640px) { .vrow { grid-template-columns: 1fr 48px; } .vrow .vbar { display: none; } }
