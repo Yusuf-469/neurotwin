@@ -224,3 +224,52 @@ Forcing a placement while the ED is full fills a bed that a more urgent later pa
 1. **The parameter-free shield eliminates the collapse mode** (5 → 0 of 1,250) without retraining, and removes the extreme worst cases.
 2. **It is not free.** In the staff-shortage scenario the average cost rises by 4.4% (significant). Elsewhere the change is not significant. The shielded agent remains statistically indistinguishable from Load-Balancing in every scenario.
 3. **Interpretation:** a learned policy plus a simple rule-based guard gives the robustness of the rules with the agent's behaviour everywhere else. This is the practical recommendation from this study: deploy learned policies only behind guards that rule out known failure states. Here, the trade is slightly worse average cost under one kind of stress in exchange for the removal of a catastrophic tail.
+
+## 8. Can a learned policy beat Load-Balancing? Imitation-initialised PPO and ensembles (v2.8, §6.26)
+**Commands:** `python -m neurotwin.experiments.bc_ppo clone`, then `finetune`, `validate` and `test`.
+The output is `bc_ppo_validation.json`, `bc_ppo_test.json` and `bc_ppo_test_episodes.json`.
+
+**Design** (pre-registered in RESEARCH.md v2.8, commit 3c07d4d, before any run)
+- **Behaviour cloning (BC):** Load-Balancing's decisions are cloned into the PPO actor network. 30 training-seed episodes per agent give about 65,000 decisions each; 3.3% of the rule's decisions cannot be expressed as one of the 7 actions and are skipped.
+- **Fine-tuning (BC+PPO):** PPO starts from the cloned network, with learning rate 1e-4, the observation normaliser frozen, 30 critic-only warm-up updates and 3M steps. K = 5.
+- **Ensembles:** soft-vote ensembles average the masked action probabilities of five agents.
+- **Selection:** on the 20 validation seeds, scenario A, by lowest mean cost J.
+- **One-time final test:** on a fresh seed block (400,000–400,049) never used before, scenarios A–E. The code refuses to run it twice.
+
+**Cloning accuracy:** 96.0–96.4% on held-out demonstrations.
+
+**Validation** (scenario A, mean J per day; selection among the last three candidates)
+
+| Candidate | Validation J |
+|---|---|
+| BC only | 260.4 |
+| Load-Balancing | 164.4 |
+| PPO (final_A) | 151.2 |
+| ENS(PPO) | 148.1 |
+| BC+PPO (mean of 5) | 144.5 |
+| **ENS(BC+PPO), selected** | **144.1** |
+
+The selection was committed (14d3a99) before the fresh test.
+
+**Fresh test:** selected candidate − Load-Balancing, J per day (negative = learned policy better). Holm correction over 5 scenarios.
+
+| Scenario | ENS(BC+PPO) | Load-Balancing | Difference | 95% CI | Holm p |
+|---|---|---|---|---|---|
+| A | 195.3 | 213.4 | **−18.1 (−8.5%)** | [−24.1, −12.9] | **0.0005** |
+| B | 839.0 | 853.6 | −14.6 (−1.7%) | [−35.1, 6.8] | 0.53 |
+| C | 1223.4 | 1217.8 | +5.6 (+0.5%) | [−26.3, 40.5] | 1.0 |
+| D | 877.8 | 876.2 | +1.6 (+0.2%) | [−22.9, 27.1] | 1.0 |
+| E | 1493.3 | 1442.2 | +51.2 (+3.5%) | [6.1, 96.9] | 0.10 |
+
+**Secondary: compared with the original PPO** (final_A, same fresh seeds)
+- Better in A: −11.6, significant.
+- Worse in E: +54.3, significant.
+- B–D: no significant difference.
+
+**Collapses:** 0 of 250 for the ensemble, 0 of 250 for Load-Balancing, and 1 of 1,250 for the original PPO agents.
+
+**Findings**
+1. **A learned policy now beats the strongest tuned rule in the training scenario:** −8.5% cost in A, significant after Holm, on seeds never used before. The original PPO only tied it.
+2. **Under unseen stress it ties Load-Balancing in B, C and D.** In E it is nominally 3.5% worse, which is not significant after correction. Compared with the original PPO it gives up some robustness under combined stress (significantly worse in E) in exchange for the gain in A.
+3. **Pure imitation fails.** BC alone agrees with the rule on 96% of decisions but costs 58% more than the rule on validation, because small errors compound into states the rule never visited. This is the known distribution-shift problem of behaviour cloning. The RL fine-tuning is what turns the clone into a policy better than its teacher.
+4. **The claim is limited to what was tested:** a significant win in normal conditions, and no significant loss under stress. It does not say that RL beats the rule everywhere.

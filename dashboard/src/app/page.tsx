@@ -104,6 +104,8 @@ export default function Overview() {
   }, []);
 
   const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
+  const winA = data?.beat_rule?.primary_vs_load_balancing.find((c) => c.scenario === "A");
+  const winPct = winA ? (100 * -winA.diff_mean) / winA.baseline_mean : NaN;
   const vsLB = avg(data?.J_comparisons?.filter((c) => c.baseline === "load_balancing").map((c) => c.rel_diff_pct) ?? []);
   const vsPri = avg(data?.J_comparisons?.filter((c) => c.baseline === "priority").map((c) => c.rel_diff_pct) ?? []);
   const crnMax = Math.max(...(data?.crn_check?.map((c) => c.width_ratio_independent_over_paired) ?? [NaN]));
@@ -254,10 +256,11 @@ export default function Overview() {
           lead="Measured on 50 fresh test runs per situation that were never used to tune anything. All numbers are from the simulation." /></Reveal>
         <div className="grid grid-3">
           <Reveal delay={0}><div className="card lift finding">
-            <span className="big" style={{ color: "var(--series-1)" }}>≈ <CountUp value={Math.abs(vsLB)} digits={1} suffix="%" /></span>
-            <h3>Ties the best hand-tuned rule</h3>
-            <p>The RL agent performs as well as the balance-the-wards rule. The difference is too small to call a winner in any situation.</p>
-            <TechDetails><p>Mean relative difference in cost J over 5 scenarios; no paired 95% CI excludes 0.</p></TechDetails>
+            <span className="big" style={{ color: "var(--series-1)" }}><CountUp value={winPct} digits={1} suffix="%" /> lower</span>
+            <h3>Beats the best hand-tuned rule</h3>
+            <p>RL agent v2 learned from the balance-the-wards rule, then improved on it: lower cost on normal days, tested on 50 fresh runs, and no significant loss in any crisis.</p>
+            <TechDetails><p>Imitation-initialised PPO, 5-agent vote, pre-registered (RESEARCH.md v2.8) and tested once on a fresh seed block: −8.5% J in scenario A (Holm p = 0.0005); B–D tie;
+              E +3.5% (not significant after Holm). The first agent tied the rule ({Number.isFinite(vsLB) ? `${vsLB > 0 ? "+" : ""}${vsLB.toFixed(1)}%` : "–"} on average).</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--status-good)" }}><CountUp value={Math.abs(vsPri)} digits={1} suffix="%" /> lower</span>

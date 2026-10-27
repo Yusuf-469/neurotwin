@@ -24,6 +24,7 @@ COPY --chown=user neurotwin ./neurotwin
 COPY --chown=user config ./config
 COPY --chown=user docs/data ./docs/data
 COPY --chown=user results/ppo/final_A/agent_*.pt ./results/ppo/final_A/
+COPY --chown=user results/ppo/bc_ppo/agent_*.pt ./results/ppo/bc_ppo/
 COPY --from=dashboard --chown=user /dashboard/out ./dashboard/out
 USER user
 ENV PYTHONPATH=/app HOME=/home/user

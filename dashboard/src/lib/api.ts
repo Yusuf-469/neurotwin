@@ -161,6 +161,9 @@ export interface StudyResults {
   constrained: { comparisons: Comparison[]; budget: Record<string, number> } | null;
   /** Stage 7: safety shield (RESEARCH.md §6.25); collapses out of 1,250 test episodes. */
   shield: { collapses: Record<string, number>; n_episodes: number; comparisons: Comparison[] } | null;
+  /** Stage 7 §6.26: selected candidate vs Load-Balancing on the fresh seed block. */
+  beat_rule: { selected: string; primary_vs_load_balancing: Comparison[]; secondary_vs_ppo: Comparison[]; collapses: Record<string, number> } | null;
+  beat_rule_validation: { validation_J: Record<string, { mean_J: number }>; selected: string } | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

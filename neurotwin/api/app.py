@@ -61,6 +61,7 @@ def _make_llm_client():
 from ..experiments.metrics import episode_metrics
 from ..experiments.objective import CostWeights
 from ..policies import POLICY_CLASSES, DecisionLog, LoggingPolicy, load_baseline_params, make_policy
+from ..policies.ensemble_ppo import EnsemblePPOPolicy
 from ..policies.ppo_policy import PPOPolicy
 from ..simulation.config import SCENARIOS, SEVERE_SCENARIOS, ScenarioConfig, load_default_config
 from ..simulation.hospital import HospitalSimulation, run_until
@@ -80,6 +81,8 @@ MAX_STEP_HOURS = 24 * 14
 MAX_FUTURES = 50
 MAX_WHATIF_HOURS = 24 * 14
 MAX_SESSIONS = 200
+# Five-agent vote of the imitation-initialised PPO agents (RESEARCH.md §6.26), if present.
+ENSEMBLE_AGENTS = sorted((ROOT / "results" / "ppo" / "bc_ppo").glob("agent_*.pt"))
 LLM_MAX_PER_HOUR = int(os.environ.get("NEUROTWIN_LLM_MAX_PER_HOUR", "60"))
 # Browser origins allowed to call the API cross-site: the local dev server, plus any origins in
 # NEUROTWIN_CORS_ORIGINS (comma-separated), e.g. a dashboard hosted separately on Vercel while
@@ -103,6 +106,8 @@ def available_policies() -> list[str]:
     names = list(POLICY_CLASSES)
     if AGENT_PATH.exists():
         names += ["ppo", "ppo_shielded"]
+    if ENSEMBLE_AGENTS:
+        names.append("ppo_ensemble")
     return names
 
 
@@ -112,6 +117,10 @@ def build_policy(name: str):
         if not AGENT_PATH.exists():
             raise HTTPException(404, f"no trained PPO agent at {AGENT_PATH}")
         return PPOPolicy.load(AGENT_PATH, shield=name == "ppo_shielded")
+    if name == "ppo_ensemble":
+        if not ENSEMBLE_AGENTS:
+            raise HTTPException(404, "no imitation-initialised agents available")
+        return EnsemblePPOPolicy.load(ENSEMBLE_AGENTS)
     if name not in POLICY_CLASSES:
         raise HTTPException(404, f"unknown policy {name!r}")
     return make_policy(name, load_baseline_params()[name])
@@ -436,6 +445,8 @@ def experiment_results() -> dict[str, Any]:
         "ppo_dr": "docs/data/stage7/ppo_dr_comparisons.json",
         "constrained": "docs/data/stage7/constrained_comparisons.json",
         "shield": "docs/data/stage7/shield_comparisons.json",
+        "beat_rule": "docs/data/stage7/bc_ppo_test.json",
+        "beat_rule_validation": "docs/data/stage7/bc_ppo_validation.json",
     }.items():
         path = ROOT / rel
         out[key] = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None

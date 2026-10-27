@@ -34,8 +34,15 @@ export const SHIELDED: PolicyMeta = {
   desc: "The same agent, but it may never keep a bed empty while ambulances are being turned away.",
 };
 
+/** The improved agent (RESEARCH.md §6.26): learned from the best rule, then improved with RL;
+ *  five such agents vote. Same family colour as the RL agent, always shown with its own label. */
+export const ENSEMBLE: PolicyMeta = {
+  key: "ppo_ensemble", label: "RL agent v2 (best)", tech: "imitation + PPO fine-tuning, 5-agent vote", color: "var(--series-1)",
+  desc: "Learned from the best hand-tuned rule, then improved itself with reinforcement learning; five copies vote on each decision.",
+};
+
 /** Decision-makers offered in the live hospital and what-if tools. */
-export const LIVE_POLICIES: PolicyMeta[] = [POLICIES[0], SHIELDED, ...POLICIES.slice(1)];
+export const LIVE_POLICIES: PolicyMeta[] = [ENSEMBLE, POLICIES[0], SHIELDED, ...POLICIES.slice(1)];
 
 export const policyMeta = (key: string): PolicyMeta =>
   LIVE_POLICIES.find((p) => p.key === key) ??

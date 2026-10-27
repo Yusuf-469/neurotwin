@@ -84,6 +84,8 @@ def test_results_endpoint_serves_stage6_data_with_label():
     assert len(body["ablations"]) == 80 and len(body["ppo_dr"]) == 25
     assert body["shield"]["collapses"]["ppo_shielded"] == 0
     assert "ppo_shielded" in client.get("/api/policies").json()["policies"]
+    assert "ppo_ensemble" in client.get("/api/policies").json()["policies"]
+    assert body["beat_rule"]["selected"] == "ens_bc_ppo"
     assert (
         len(body["constrained"]["comparisons"]) == 25
         and "E:lambda_mean" in body["constrained"]["budget"]
