@@ -102,6 +102,10 @@ def train_agent(args: tuple) -> dict[str, Any]:
 
         check_training_range()
         sampler = sample_scenario
+    if env_opts.get("dr_wide"):
+        from .v3 import sample_wide  # crisis-covering range (RESEARCH.md §6.27)
+
+        sampler = sample_wide
     pool = WarmStartPool.generate(
         sim_config, SCENARIOS["A"], range(MIN_TRAINING_POOL), GreedyPlacement()
     )
