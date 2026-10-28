@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DecisionLog from "@/components/DecisionLog";
 import FloorPlan from "@/components/FloorPlan";
+import FuturesFan from "@/components/FuturesFan";
 import { Icon, type IconName } from "@/components/icons";
 import LiveCharts from "@/components/LiveCharts";
 import RunVerdict from "@/components/RunVerdict";
@@ -37,7 +38,7 @@ function clock(hours: number) {
   return { day, hh: h, label: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` };
 }
 
-type Tab = "trends" | "decisions";
+type Tab = "trends" | "decisions" | "futures";
 type Server = "checking" | "online" | "waking" | "offline";
 
 export default function SimulationPage() {
@@ -439,7 +440,7 @@ export default function SimulationPage() {
       <Reveal>
         <section className="card">
           <div className="tabs" role="tablist">
-            {([["trends", "chart", "Trends over time"], ["decisions", "chat", "Every decision, explained"]] as [Tab, IconName, string][]).map(([k, icon, label]) => (
+            {([["trends", "chart", "Trends over time"], ["decisions", "chat", "Every decision, explained"], ["futures", "split", "Possible futures"]] as [Tab, IconName, string][]).map(([k, icon, label]) => (
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
                 <Icon name={icon} size={16} />{label}
               </button>
@@ -451,6 +452,9 @@ export default function SimulationPage() {
               ? <LiveCharts history={history} warmupHours={status.warmup_hours} />
               : <p className="muted">Play for a little while to build up the charts.</p>)}
             {status && tab === "decisions" && <DecisionLog sessionId={sid} decisions={decisions.decisions} total={decisions.total} policy={status.policy} />}
+            {status && tab === "futures" && (status.finished
+              ? <p className="muted">This run has ended. Reset or start a new run to play out futures.</p>
+              : <FuturesFan sessionId={sid} policy={status.policy} onStart={() => setPlaying(false)} />)}
           </div>
           <TechDetails label="How this simulation works">
             <p>Discrete-event simulation: arrivals, treatment, stays and nurse shifts are random events drawn from fixed, seeded
