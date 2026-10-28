@@ -74,6 +74,7 @@ from ..rl.features import FeatureScales
 from ..rl.introspect import explain_decision
 from ..simulation.hospital import HospitalSimulation, run_until
 from ..whatif import WhatIfEngine, WhatIfRequest
+from ..whatif.fan import futures_fan
 from ..whatif.race import Race
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -636,6 +637,37 @@ def whatif(sid: str, body: WhatIfBody) -> dict[str, Any]:
         session.sim, WhatIfRequest(body.horizon_hours, body.n_futures, scenario)
     )
     return result.as_dict()
+
+
+class FuturesBody(BaseModel):
+    """Body of POST /api/simulation/{sid}/futures (bounded so one request stays affordable on
+    the free server: 2 policies x 20 futures x 48 h is the default)."""
+
+    policies: list[str] = Field(default_factory=lambda: ["ppo_v3", "load_balancing"], min_length=1, max_length=2)
+    horizon_hours: float = Field(48.0, ge=12, le=72)
+    n_futures: int = Field(20, ge=5, le=30)
+
+
+@app.post("/api/simulation/{sid}/futures")
+def futures(sid: str, body: FuturesBody) -> dict[str, Any]:
+    """Possible futures from this moment: percentile bands of waiting patients and accumulated
+    cost for each policy, on the same random futures (whatif/fan.py). Read-only: the session's
+    own run is not advanced or changed."""
+    session = _get(sid)
+    if session.sim.finished:
+        raise HTTPException(409, "simulation has reached its horizon")
+    if len(set(body.policies)) != len(body.policies):
+        raise HTTPException(422, "choose different policies")
+    factories = {}
+    for name in body.policies:
+        build_policy(name)  # validates the name early
+        factories[name] = lambda n=name: build_policy(n)
+    t0 = time.perf_counter()
+    try:
+        result = futures_fan(session.sim, factories, body.horizon_hours, body.n_futures)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {"label": SIMULATION_LABEL, "compute_ms": round(1000 * (time.perf_counter() - t0), 1), **result}
 
 
 # ---------------------------------------------------------------------- reproduce a result

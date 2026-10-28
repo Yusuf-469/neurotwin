@@ -88,5 +88,6 @@ No. It is a research simulation with assumed parameters, not validated on real d
 1. Open the hosted Hugging Face Space, or run `docker run -p 7860:7860 neurotwin` locally (verified: health, pages, sessions, what-if, explanations). Open `/simulation/?demo=1` for a pre-warmed run.
 2. Simulation page: scenario A, policy `ppo`, seed 3. Step one week (warm-up), then one more week.
 3. Open a few decisions. With an RL agent deciding, show the "Inside the agent" panel: the five-network vote, the comparison with Load-Balancing, and the input attributions. Then point out facts vs generated text, and the reliability indicator.
-4. Run what-if: Priority vs Load-Balancing vs PPO, arrivals ×1.3, 72 h, 20 futures. Show the paired CIs.
-5. Study results page: cost table with CIs, CRN narrowing, reservation table.
+4. Open "Possible futures" on the Live hospital page: 20 shared futures from this moment for the agent and Balance-the-wards. Stress that it is one moment, not the study. On the Results page, "Re-run any test result yourself" repeats a sealed test run live and matches the published number to every digit.
+5. Run what-if: Priority vs Load-Balancing vs PPO, arrivals ×1.3, 72 h, 20 futures. Show the paired CIs.
+6. Study results page: cost table with CIs, CRN narrowing, reservation table.

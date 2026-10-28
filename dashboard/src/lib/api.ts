@@ -82,6 +82,23 @@ export interface HistoryPoint {
   cumulative_off_service: number;
 }
 
+type Bands = Record<"p10" | "p25" | "p50" | "p75" | "p90", number[]>;
+
+/** Possible futures from one moment (neurotwin/whatif/fan.py): percentile bands per policy. */
+export interface FuturesResult {
+  start_time: number;
+  end_time: number;
+  hours: number[];
+  n_futures: number;
+  compute_ms: number;
+  series: Record<string, { waiting: Bands; cost: Bands }>;
+  final_cost: Record<string, { mean: number; per_future: number[] }>;
+  comparison: null | {
+    policy: string; reference: string; diff_mean: number; ci95: [number, number];
+    share_policy_cheaper: number; share_tied: number;
+  };
+}
+
 /** One sealed test run, re-simulated on the server and compared with the stored result. */
 export interface ReproduceResult {
   policy: string;
@@ -340,6 +357,10 @@ export const api = {
   explanation: (sid: string, id: number) =>
     request<{ explanation: Explanation }>(`/api/simulation/${sid}/explanations/${id}`),
   insight: (sid: string, id: number) => request<Insight>(`/api/simulation/${sid}/insight/${id}`),
+  futures: (sid: string, policies: string[], horizon_hours: number, n_futures: number) =>
+    request<FuturesResult>(`/api/simulation/${sid}/futures`, {
+      method: "POST", body: JSON.stringify({ policies, horizon_hours, n_futures }),
+    }),
   reproduce: (policy: string, scenario: string, seed: number) =>
     request<ReproduceResult>("/api/reproduce", { method: "POST", body: JSON.stringify({ policy, scenario, seed }) }),
   whatif: (sid: string, body: WhatIfRequestBody) =>
