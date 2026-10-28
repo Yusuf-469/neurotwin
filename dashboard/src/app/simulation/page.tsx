@@ -450,7 +450,7 @@ export default function SimulationPage() {
             {status && tab === "trends" && (history.length > 1
               ? <LiveCharts history={history} warmupHours={status.warmup_hours} />
               : <p className="muted">Play for a little while to build up the charts.</p>)}
-            {status && tab === "decisions" && <DecisionLog sessionId={sid} decisions={decisions.decisions} total={decisions.total} />}
+            {status && tab === "decisions" && <DecisionLog sessionId={sid} decisions={decisions.decisions} total={decisions.total} policy={status.policy} />}
           </div>
           <TechDetails label="How this simulation works">
             <p>Discrete-event simulation: arrivals, treatment, stays and nurse shifts are random events drawn from fixed, seeded

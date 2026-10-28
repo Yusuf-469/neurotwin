@@ -63,8 +63,11 @@ from ..experiments.metrics import episode_metrics
 from ..experiments.objective import CostWeights
 from ..policies import POLICY_CLASSES, DecisionLog, LoggingPolicy, load_baseline_params, make_policy
 from ..policies.ensemble_ppo import EnsemblePPOPolicy
+from ..policies.insight_recorder import InsightRecorder, compare
 from ..policies.ppo_policy import PPOPolicy
 from ..simulation.config import SCENARIOS, SEVERE_SCENARIOS, ScenarioConfig, load_default_config
+from ..rl.features import FeatureScales
+from ..rl.introspect import explain_decision
 from ..simulation.hospital import HospitalSimulation, run_until
 from ..whatif import WhatIfEngine, WhatIfRequest
 from ..whatif.race import Race
@@ -189,12 +192,28 @@ def _conditions(scenario: str, custom: "CustomConditions | None" = None) -> Scen
     raise HTTPException(404, f"unknown scenario {scenario!r}")
 
 
+#: Policies whose decisions can be opened in the "Inside the agent" panel.
+RL_POLICIES = ("ppo", "ppo_shielded", "ppo_ensemble", "ppo_v3")
+#: Reference rule the agent is compared with: the strongest hand-designed rule in the study.
+REFERENCE_RULE = "load_balancing"
+
+
+def _session_policy(name: str):
+    """The session's policy; RL agents are wrapped so their decisions can be inspected later.
+    The wrapper returns the agent's own decision unchanged (tests/test_insight.py)."""
+    policy = build_policy(name)
+    if name in RL_POLICIES:
+        rule = make_policy(REFERENCE_RULE, load_baseline_params()[REFERENCE_RULE])
+        return InsightRecorder(policy, rule)
+    return policy
+
+
 def _new_session(
     scenario: str, seed: int, policy: str, custom: CustomConditions | None = None
 ) -> Session:
     sim = HospitalSimulation(load_default_config(), _conditions(scenario, custom), seed=seed)
     session = Session(
-        scenario, seed, policy, sim, LoggingPolicy(build_policy(policy), DecisionLog())
+        scenario, seed, policy, sim, LoggingPolicy(_session_policy(policy), DecisionLog())
     )
     session.history.append(_history_point(sim))
     return session
@@ -464,6 +483,33 @@ def explanation(sid: str, decision_id: int) -> dict[str, Any]:
         result["verification_issues"] = ["hourly LLM limit reached; template explanation used"]
         return {"label": SIMULATION_LABEL, "explanation": result}
     return {"label": SIMULATION_LABEL, "explanation": TemplateExplainer().explain(record).as_dict()}
+
+
+@app.get("/api/simulation/{sid}/insight/{decision_id}")
+def insight(sid: str, decision_id: int) -> dict[str, Any]:
+    """Inside the agent for one decision: action probabilities of every voting agent, the
+    critic's value estimate, integrated-gradients input attributions, and what the reference
+    rule would have done in the same state. Computed from the real networks on request."""
+    session = _get(sid)
+    recorder = session.policy.policy
+    if not isinstance(recorder, InsightRecorder):
+        raise HTTPException(409, "only available when an RL agent is making the decisions")
+    snap = recorder.snapshots.get(decision_id)
+    if snap is None:
+        raise HTTPException(404, "decision not available (unknown, or too old to keep)")
+    result = explain_decision(
+        recorder.agents, snap["obs"], snap["mask"], FeatureScales.from_config(session.sim.config)
+    )
+    return {
+        "label": SIMULATION_LABEL,
+        "decision_id": decision_id,
+        "time": snap["time"],
+        **result,
+        "agent_choice": snap["agent"],
+        "reference_rule": REFERENCE_RULE,
+        "rule_choice": snap["rule"],
+        "agreement": compare(snap["agent"], snap["rule"]),
+    }
 
 
 # ---------------------------------------------------------------------- live races

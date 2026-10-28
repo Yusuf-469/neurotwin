@@ -40,12 +40,15 @@ class EnsemblePPOPolicy(AllocationPolicy):
             self._scales = FeatureScales.from_config(sim.config)
         mask = action_mask(sim)
         obs = features(sim, self._scales)
+        self._last_obs = obs
         probs = np.mean([a.action_probabilities(obs, mask) for a in self.agents], axis=0)
         return probs, mask
 
     def decide(self, sim: HospitalSimulation) -> tuple[int, Unit] | None:
         probs, mask = self.probabilities(sim)
         action = int(np.argmax(np.where(mask, probs, -1.0)))
+        # Exact decision-time inputs, kept for the dashboard's "inside the agent" view.
+        self.last_obs, self.last_mask = self._last_obs, mask
         self.last_details = {
             "chosen_action": Action(action).name,
             "action_probabilities": {

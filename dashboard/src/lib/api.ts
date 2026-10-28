@@ -82,6 +82,42 @@ export interface HistoryPoint {
   cumulative_off_service: number;
 }
 
+/** A placement as recorded at decision time (agent's own, or what the reference rule would do). */
+export interface InsightPlacement {
+  rid: number;
+  unit: string;
+  priority: number;
+  request_type: string;
+  primary_unit: string;
+  waited_hours: number;
+}
+
+/** "Inside the agent" for one decision, computed from the real networks (neurotwin/rl/introspect.py). */
+export interface Insight {
+  decision_id: number;
+  time: number;
+  chosen_action: string;
+  actions: { action: string; probability: number; per_agent: number[] }[];
+  n_agents: number;
+  agents_agreeing: number;
+  attribution: null | {
+    method: string;
+    target: string;
+    runner_up: string;
+    baseline: string;
+    steps: number;
+    margin: number;
+    baseline_margin: number;
+    completeness_error: number;
+    inputs: { key: string; label: string; value: string; contribution: number }[];
+    other_inputs_total: number;
+  };
+  agent_choice: InsightPlacement | null;
+  reference_rule: string;
+  rule_choice: InsightPlacement | null;
+  agreement: "same" | "same_patient_other_ward" | "different_patient" | "both_wait" | "agent_waits" | "rule_waits";
+}
+
 export interface DecisionRecord {
   decision_id: number;
   time: number;
@@ -291,6 +327,7 @@ export const api = {
     request<{ total: number; decisions: DecisionRecord[] }>(`/api/simulation/${sid}/decisions?limit=${limit}`),
   explanation: (sid: string, id: number) =>
     request<{ explanation: Explanation }>(`/api/simulation/${sid}/explanations/${id}`),
+  insight: (sid: string, id: number) => request<Insight>(`/api/simulation/${sid}/insight/${id}`),
   whatif: (sid: string, body: WhatIfRequestBody) =>
     request<WhatIfResult>(`/api/simulation/${sid}/whatif`, { method: "POST", body: JSON.stringify(body) }),
   results: () => request<StudyResults>("/api/experiments/results"),
