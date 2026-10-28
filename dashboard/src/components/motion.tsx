@@ -98,20 +98,27 @@ export function CountUp({ value, digits = 0, prefix = "", suffix = "", duration 
 
 /** Thin bar at the top of the page showing how far the reader has scrolled. */
 export function ScrollProgress() {
-  const [p, setP] = useState(0);
+  // Writes the transform directly, once per frame: no React re-render and no page-wide CSS
+  // variable per scroll event (that forced a style recalculation of the whole document).
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const onScroll = () => {
+    let frame = 0;
+    const paint = () => {
+      frame = 0;
       const h = document.documentElement;
       const max = h.scrollHeight - h.clientHeight;
-      setP(max > 0 ? h.scrollTop / max : 0);
-      h.style.setProperty("--scroll", String(h.scrollTop));
+      if (ref.current) ref.current.style.transform = `scaleX(${max > 0 ? h.scrollTop / max : 0})`;
     };
-    onScroll();
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(paint); };
+    paint();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
-    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); };
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll);
+    };
   }, []);
-  return <div className="scroll-progress" style={{ transform: `scaleX(${p})` }} aria-hidden="true" />;
+  return <div ref={ref} className="scroll-progress" style={{ transform: "scaleX(0)" }} aria-hidden="true" />;
 }
 
 /** Pointer effects for every `.lift` card: 3D tilt toward the cursor plus a spotlight glow that
@@ -127,8 +134,6 @@ export function PointerFX() {
     const onMove = (e: PointerEvent) => {
       const el = (e.target as HTMLElement | null)?.closest?.(".lift") as HTMLElement | null;
       if (el !== last) { reset(last); last = el; }
-      document.documentElement.style.setProperty("--mx-page", `${e.clientX}px`);
-      document.documentElement.style.setProperty("--my-page", `${e.clientY}px`);
       if (!el) return;
       const r = el.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width;
@@ -172,12 +177,98 @@ export function PointerFX() {
       window.removeEventListener("pointerdown", onDown); document.removeEventListener("pointerleave", onLeave);
     };
   }, []);
-  return <div className="cursor-glow" aria-hidden="true" />;
+  return <CursorGlow />;
+}
+
+/** Cursor light: a soft halo and a brighter core that ease toward the pointer at different
+ *  speeds, so the light trails smoothly. Moved with translate3d from one requestAnimationFrame
+ *  loop (compositor-only: no layout or style recalculation) that stops once it has caught up.
+ *  Hidden for touch input, where there is no hovering cursor. */
+function CursorGlow() {
+  const halo = useRef<HTMLDivElement>(null);
+  const core = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const target = { x: -600, y: -600 };
+    const h = { x: -600, y: -600 };
+    const c = { x: -600, y: -600 };
+    let frame = 0;
+    let visible = false;
+    const show = (on: boolean) => {
+      if (on === visible) return;
+      visible = on;
+      halo.current?.classList.toggle("on", on);
+      core.current?.classList.toggle("on", on);
+    };
+    const tick = () => {
+      h.x += (target.x - h.x) * 0.08; h.y += (target.y - h.y) * 0.08;
+      c.x += (target.x - c.x) * 0.2; c.y += (target.y - c.y) * 0.2;
+      if (halo.current) halo.current.style.transform = `translate3d(${h.x}px, ${h.y}px, 0)`;
+      if (core.current) core.current.style.transform = `translate3d(${c.x}px, ${c.y}px, 0)`;
+      const moving = Math.abs(target.x - h.x) + Math.abs(target.y - h.y) > 0.5;
+      frame = moving ? requestAnimationFrame(tick) : 0;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") { show(false); return; }
+      if (!visible) { h.x = c.x = e.clientX; h.y = c.y = e.clientY; }
+      target.x = e.clientX; target.y = e.clientY;
+      show(true);
+      if (!frame) frame = requestAnimationFrame(tick);
+    };
+    const onLeave = () => show(false);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onLeave);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", onMove);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
+    };
+  }, []);
+  return (
+    <>
+      <div ref={halo} className="cursor-glow" aria-hidden="true" />
+      <div ref={core} className="cursor-core" aria-hidden="true" />
+    </>
+  );
 }
 
 /** Fixed, decorative hospital-themed background: blueprint grid, drifting medical crosses and
  *  ECG traces sweeping across the page. Purely visual; sits behind all content. */
 export function HospitalBackdrop() {
+  const grid = useRef<HTMLDivElement>(null);
+  const depth = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Scroll parallax for the blueprint grid and a gentle pointer-driven depth shift for the
+    // light layers. One eased rAF loop, transforms only; it idles when nothing is changing.
+    const want = { x: 0, y: 0 };
+    const cur = { x: 0, y: 0 };
+    let frame = 0;
+    const place = () => {
+      if (depth.current) depth.current.style.transform = `translate3d(${cur.x * -34}px, ${cur.y * -24}px, 0)`;
+      if (grid.current) grid.current.style.transform =
+        `translate3d(${cur.x * -10}px, ${-window.scrollY * 0.08 + cur.y * -8}px, 0)`;
+    };
+    const tick = () => {
+      cur.x += (want.x - cur.x) * 0.05; cur.y += (want.y - cur.y) * 0.05;
+      place();
+      frame = Math.abs(want.x - cur.x) + Math.abs(want.y - cur.y) > 0.001 ? requestAnimationFrame(tick) : 0;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      want.x = e.clientX / window.innerWidth - 0.5;
+      want.y = e.clientY / window.innerHeight - 0.5;
+      if (!frame) frame = requestAnimationFrame(tick);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("scroll", place, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", onMove); window.removeEventListener("scroll", place);
+    };
+  }, []);
+  // Fixed (not random) particle layout so the server and the browser render the same markup.
+  const motes = Array.from({ length: 22 }, (_, i) => ({
+    x: (i * 37 + 11) % 100, s: 2 + (i % 3), d: 14 + (i * 7) % 12, delay: -((i * 5.3) % 20),
+  }));
   const crosses = [
     { x: 6, y: 18, s: 22, d: 0 }, { x: 88, y: 12, s: 16, d: -6 }, { x: 72, y: 64, s: 26, d: -12 },
     { x: 14, y: 78, s: 18, d: -3 }, { x: 46, y: 40, s: 12, d: -9 }, { x: 93, y: 88, s: 20, d: -15 },
@@ -186,9 +277,17 @@ export function HospitalBackdrop() {
   const ecg = "M0 50 L180 50 L200 50 L210 30 L222 72 L236 10 L250 88 L262 50 L300 50 L420 50 L432 42 L446 58 L460 50 L600 50";
   return (
     <div className="backdrop" aria-hidden="true">
-      <div className="aurora a1" /><div className="aurora a2" /><div className="aurora a3" />
-      <div className="floor" />
-      <div className="bp-grid" />
+      <div className="depth" ref={depth}>
+        <div className="aurora a1" /><div className="aurora a2" /><div className="aurora a3" />
+      </div>
+      <div className="floor"><div className="floor-plane" /></div>
+      <div className="bp-grid" ref={grid} />
+      <div className="motes">
+        {motes.map((m, i) => (
+          <span key={i} style={{ left: `${m.x}%`, width: m.s, height: m.s, animationDuration: `${m.d}s`, animationDelay: `${m.delay}s` }} />
+        ))}
+      </div>
+      <div className="scanline" />
       <div className="vignette" />
       {crosses.map((c, i) => (
         <svg key={i} className="bp-cross" viewBox="0 0 24 24" width={c.s} height={c.s}
@@ -297,4 +396,31 @@ export function BackToTop() {
         strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
     </button>
   );
+}
+
+/** Pauses CSS animations inside page sections, cards and illustrations while they are off
+ *  screen, and resumes them on the way back in. Nothing visible changes, but the browser stops
+ *  doing per-frame work for things nobody can see, which keeps scrolling and the cursor light
+ *  smooth. New content (route changes, live updates) is picked up by a MutationObserver. */
+export function AnimationGovernor() {
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const seen = new WeakSet<Element>();
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) e.target.classList.toggle("anim-off", !e.isIntersecting);
+    }, { rootMargin: "120px 0px" });
+    const scan = () => {
+      document.querySelectorAll("main .scene, main .section, main .card, main .hero-scene-wrap").forEach((el) => {
+        if (!seen.has(el)) { seen.add(el); io.observe(el); }
+      });
+    };
+    let timer = 0;
+    const mo = new MutationObserver(() => {
+      if (!timer) timer = window.setTimeout(() => { timer = 0; scan(); }, 400);
+    });
+    scan();
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => { io.disconnect(); mo.disconnect(); window.clearTimeout(timer); };
+  }, []);
+  return null;
 }
