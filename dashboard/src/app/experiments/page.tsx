@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   Bar, BarChart, CartesianGrid, Cell, ErrorBar, Legend as RLegend, Line, LineChart, ReferenceLine,
@@ -211,7 +212,8 @@ export default function ExperimentsPage() {
         <Reveal delay={160}><p className="lead">
           Seven short chapters, each answering one question. Every chart says what you are looking at and what
           it means. The full statistics are under &quot;Technical detail&quot;. Lower is better everywhere.
-        </p></Reveal>
+         These are the study's fixed results, computed once from 2,500 sealed test runs, so they do not change.
+          To run your own experiment live, use <Link href="/race/">the Race</Link>.</p></Reveal>
         <Reveal delay={240}>
           <div className="ribbon">
             <div><div className="num"><CountUp value={wins} /></div><div className="lbl">confident agent wins out of {matchups.length} match-ups ({meta.label.toLowerCase()})</div></div>

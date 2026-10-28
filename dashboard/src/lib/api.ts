@@ -166,6 +166,37 @@ export interface StudyResults {
   beat_rule_validation: { validation_J: Record<string, { mean_J: number }>; selected: string } | null;
 }
 
+export interface RaceLane {
+  name: string;
+  rank: number;
+  cost: number;
+  cost_per_day: number;
+  turned_away: number;
+  wrong_ward: number;
+  placements: number;
+  waiting_now: number;
+  compute_ms: number;
+  trace: [number, number][];
+}
+
+export interface RaceState {
+  elapsed_hours: number;
+  horizon_hours: number;
+  finished: boolean;
+  lanes: RaceLane[];
+  compute_ms?: number;
+}
+
+export interface RaceStartBody {
+  competitors: string[];
+  scenario: string;
+  custom?: Conditions;
+  seed: number;
+  start: "busy" | "empty" | "session";
+  session_id?: string;
+  horizon_hours: number;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -206,4 +237,10 @@ export const api = {
   whatif: (sid: string, body: WhatIfRequestBody) =>
     request<WhatIfResult>(`/api/simulation/${sid}/whatif`, { method: "POST", body: JSON.stringify(body) }),
   results: () => request<StudyResults>("/api/experiments/results"),
+  raceStart: (body: RaceStartBody) =>
+    request<RaceState & { race_id: string; start_label: string; start_time: number; setup_ms: number }>("/api/race/start", {
+      method: "POST", body: JSON.stringify(body),
+    }),
+  raceStep: (rid: string, hours: number) =>
+    request<RaceState>(`/api/race/${rid}/step`, { method: "POST", body: JSON.stringify({ hours }) }),
 };

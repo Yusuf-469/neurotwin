@@ -18,7 +18,7 @@ NeuroTwin simulates patient flow through an emergency department, medical and su
 | RL | Gymnasium env (7 masked actions, semi-Markov reward); in-house PPO with γ^Δt GAE, checked against stable-baselines3 and MaskablePPO | [Stage 5](docs/stage5_rl_report.md) |
 | Evaluation | 2,500 test episodes; hierarchical paired bootstrap; Holm over 100 comparisons; protocol committed before the test run | [Stage 6](docs/stage6_evaluation_report.md) |
 | Robustness | Degradation index, CRN variance reduction, learned bed-reservation structure, ablations, domain randomisation, constrained PPO | [Stage 7](docs/stage7_analysis_report.md) |
-| Platform | What-if engine, post-hoc explanation layer with fact-check guard, FastAPI backend, Next.js dashboard | [Stages 8–11](docs/stage8_11_platform_report.md) |
+| Platform | What-if engine and live decision-maker race (identical patients for every competitor), post-hoc explanation layer with fact-check guard, FastAPI backend, Next.js dashboard with an animated live hospital | [Stages 8–11](docs/stage8_11_platform_report.md) |
 
 ## Main findings (simulation, test seeds)
 

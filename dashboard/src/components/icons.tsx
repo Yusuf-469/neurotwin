@@ -8,7 +8,7 @@ export type IconName =
   | "chart" | "shield" | "flask" | "layers" | "eye" | "arrow" | "sparkle" | "pulse" | "sun"
   | "moon" | "play" | "pause" | "forward" | "lock" | "repeat" | "scale" | "target" | "file"
   | "cpu" | "trend" | "staff" | "door" | "fire" | "split" | "chat" | "wand" | "mirror" | "build"
-  | "info" | "hourglass" | "bolt" | "network" | "reset";
+  | "info" | "hourglass" | "bolt" | "network" | "reset" | "flag";
 
 const P: Record<IconName, ReactNode> = {
   ambulance: <><path d="M3 7h10v9H3z" /><path d="M13 10h4l3 3v3h-7" /><circle cx="7" cy="17.5" r="1.8" /><circle cx="16.5" cy="17.5" r="1.8" /><path d="M8 9.5v3M6.5 11h3" /></>,
@@ -52,6 +52,7 @@ const P: Record<IconName, ReactNode> = {
   hourglass: <><path d="M6 3h12M6 21h12" /><path d="M7 3c0 5 10 6 10 9s-10 4-10 9M17 3c0 5-10 6-10 9s10 4 10 9" /></>,
   bolt: <path d="M13 2L4 14h7l-1 8 9-12h-7z" />,
   network: <><circle cx="5" cy="6" r="2" /><circle cx="5" cy="18" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="19" cy="18" r="2" /><path d="M7 6.8l3.2 4M7 17.2l3.2-4M13.8 11.2L17 6.8M13.8 12.8L17 17.2" /></>,
+  flag: <><path d="M5 21V4" /><path d="M5 4h12l-2.5 4L17 12H5" /></>,
   reset: <><path d="M4 4v6h6" /><path d="M4.5 15a8 8 0 1 0 1.9-8.4L4 10" /></>,
 };
 

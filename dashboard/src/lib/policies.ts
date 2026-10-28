@@ -12,7 +12,7 @@ export interface PolicyMeta {
 }
 
 export const POLICIES: PolicyMeta[] = [
-  { key: "ppo", label: "RL agent", tech: "PPO neural network, built from scratch", color: "var(--series-1)",
+  { key: "ppo", label: "RL agent v1", tech: "PPO neural network, built from scratch", color: "var(--series-1)",
     desc: "A neural network trained with reinforcement learning over 3 million simulated decisions. Nobody wrote its rules." },
   { key: "load_balancing", label: "Balance-the-wards rule", tech: "Load-Balancing", color: "var(--series-2)",
     desc: "Sends each patient to whichever suitable ward has the most room." },
@@ -30,19 +30,26 @@ export const POLICIES: PolicyMeta[] = [
  *  study, so it is kept out of POLICIES; it shares the agent's colour because it is the same
  *  trained network, and is always shown with its own label. */
 export const SHIELDED: PolicyMeta = {
-  key: "ppo_shielded", label: "RL agent + safety guard", tech: "PPO with a no-hold-while-ED-full guard", color: "var(--series-1)",
+  key: "ppo_shielded", label: "RL agent v1 + safety guard", tech: "PPO with a no-hold-while-ED-full guard", color: "color-mix(in srgb, var(--series-1) 55%, var(--text-muted))",
   desc: "The same agent, but it may never keep a bed empty while ambulances are being turned away.",
 };
 
 /** The improved agent (RESEARCH.md §6.26): learned from the best rule, then improved with RL;
  *  five such agents vote. Same family colour as the RL agent, always shown with its own label. */
 export const ENSEMBLE: PolicyMeta = {
-  key: "ppo_ensemble", label: "RL agent v2 (best)", tech: "imitation + PPO fine-tuning, 5-agent vote", color: "var(--series-1)",
+  key: "ppo_ensemble", label: "RL agent v2 (latest)", tech: "imitation + PPO fine-tuning, 5-agent vote", color: "var(--violet)",
   desc: "Learned from the best hand-tuned rule, then improved itself with reinforcement learning; five copies vote on each decision.",
 };
 
-/** Decision-makers offered in the live hospital and what-if tools. */
+/** Decision-makers offered in the live hospital and race tools. */
 export const LIVE_POLICIES: PolicyMeta[] = [ENSEMBLE, POLICIES[0], SHIELDED, ...POLICIES.slice(1)];
+
+/** How decision-makers are grouped in pickers: one RL agent with its versions, then the rules. */
+export const POLICY_GROUPS: { label: string; keys: string[] }[] = [
+  { label: "RL agent (latest)", keys: ["ppo_ensemble"] },
+  { label: "Earlier RL versions", keys: ["ppo", "ppo_shielded"] },
+  { label: "Hand-designed rules", keys: ["load_balancing", "priority", "trunk_reservation", "mip", "fcfs"] },
+];
 
 export const policyMeta = (key: string): PolicyMeta =>
   LIVE_POLICIES.find((p) => p.key === key) ??

@@ -94,6 +94,21 @@ const SPEC: { k: string; v: string; d: string; icon: IconName }[] = [
   { k: "Verified", v: "vs stable-baselines3", d: "My PPO was checked against the reference PPO (stable-baselines3) and MaskablePPO (sb3-contrib) on CartPole and on this hospital.", icon: "check" },
 ];
 
+const JOURNEY: { tag: string; title: string; text: string; result: string; icon: IconName; tone: string }[] = [
+  { tag: "Version 1", title: "Learning from scratch", icon: "cpu", tone: "",
+    text: "A neural network trained with PPO, written from scratch, on normal days only. It beat four of the five hand-designed rules.",
+    result: "Tied the best rule (balance-the-wards); no significant difference" },
+  { tag: "Finding", title: "A failure no rule has", icon: "alert", tone: "bad",
+    text: "Under crises one of the five trained copies sometimes froze: it kept beds empty while ambulances were turned away.",
+    result: "5 collapsed runs out of 1,250; the rules had none" },
+  { tag: "Fix", title: "A one-line safety guard", icon: "shield", tone: "good",
+    text: "Never keep a bed empty while the emergency department is full. No retraining, no tuned number.",
+    result: "Collapses 5 → 0, at a small cost in one crisis" },
+  { tag: "Version 2", title: "Learn from the best, then beat it", icon: "trend", tone: "win",
+    text: "The agent first copied the best rule, then improved on it with reinforcement learning; five copies vote. Tested once on 50 runs never used before.",
+    result: "8.5% lower cost than the best rule on normal days; ties in crises" },
+];
+
 export default function Overview() {
   const [data, setData] = useState<StudyResults | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
@@ -232,6 +247,27 @@ export default function Overview() {
         </Reveal>
       </Scene>
 
+      {/* ------------------------------------------------------------------ journey */}
+      <Scene>
+        <Reveal><SectionHeader kicker="How the agent evolved" title="One agent, improved step by step"
+          lead="Each step was planned in writing before it ran, and each one is reported, including what went wrong." /></Reveal>
+        <div className="journey">
+          {JOURNEY.map((j, i) => (
+            <Reveal key={j.title} kind={i % 2 ? "right" : "left"} delay={i * 80}>
+              <div className={`journey-step ${j.tone}`}>
+                <div className="journey-dot"><Icon name={j.icon} size={18} /></div>
+                <div className="card lift">
+                  <div className="journey-tag">{j.tag}</div>
+                  <h3>{j.title}</h3>
+                  <p>{j.text}</p>
+                  <div className="journey-result">{j.result}</div>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </Scene>
+
       {/* ------------------------------------------------------------------ contenders */}
       <Scene>
         <Reveal><SectionHeader kicker="The contenders" title="Six ways to decide who gets a bed"
@@ -240,10 +276,11 @@ export default function Overview() {
           {POLICIES.map((p, i) => (
             <Reveal key={p.key} delay={(i % 3) * 100}>
               <div className={`card lift policy-card${p.key === "ppo" ? " star" : ""}`} style={{ ["--pc" as string]: p.color }}>
-                <div className="pc-name"><i className="dot" style={{ background: p.color }} />{p.label}
+                <div className="pc-name"><i className="dot" style={{ background: p.key === "ppo" ? "var(--violet)" : p.color }} />
+                  {p.key === "ppo" ? "RL agent" : p.label}
                   {p.key === "ppo" && <Icon name="sparkle" size={16} style={{ color: "var(--accent)" }} />}</div>
-                <div className="pc-tech">{p.tech}</div>
-                <p>{p.desc}</p>
+                <div className="pc-tech">{p.key === "ppo" ? "PPO from scratch, now in version 2" : p.tech}</div>
+                <p>{p.key === "ppo" ? "A neural network that learns by trial and error. Version 2 first learned from the best rule, then improved past it." : p.desc}</p>
               </div>
             </Reveal>
           ))}
@@ -355,11 +392,12 @@ export default function Overview() {
               See the agent make decisions, live
             </h2>
             <p className="secondary" style={{ maxWidth: 560, margin: "0 auto 22px" }}>
-              Watch ambulances arrive, patients move to their beds and wards fill up, click any decision to see why it was made,
-              and ask &quot;what if 30% more patients arrived right now?&quot;
+              Watch ambulances arrive and patients move to their beds, click any decision to see why it was made,
+              or race the decision-makers against each other on exactly the same patients.
             </p>
             <div className="row" style={{ justifyContent: "center" }}>
               <Link href="/simulation/?demo=1" className="btn lg glow"><Icon name="play" size={16} /> Launch the live hospital <span className="arrow"><Icon name="arrow" size={16} /></span></Link>
+              <Link href="/race/" className="btn lg ghost"><Icon name="flag" size={16} /> Start a race</Link>
             </div>
           </div>
         </Reveal>

@@ -151,3 +151,56 @@ def test_custom_conditions_run_and_report_live_work():
         json={"scenario": "custom", "custom": {"arrival_multiplier": 9}},
     )
     assert bad.status_code == 422
+
+
+def test_race_runs_competitors_on_identical_futures():
+    r = client.post(
+        "/api/race/start",
+        json={"competitors": ["priority", "priority", "fcfs"], "start": "empty", "seed": 4},
+    )
+    assert r.status_code == 422  # duplicates rejected
+    r = client.post(
+        "/api/race/start",
+        json={
+            "competitors": ["priority", "load_balancing", "fcfs"],
+            "start": "empty",
+            "seed": 4,
+            "horizon_hours": 48,
+        },
+    )
+    assert r.status_code == 200
+    race = r.json()
+    assert race["elapsed_hours"] == 0 and len(race["lanes"]) == 3
+    last = None
+    while True:
+        last = client.post(f"/api/race/{race['race_id']}/step", json={"hours": 12}).json()
+        if last["finished"]:
+            break
+    assert last["elapsed_hours"] == 48
+    assert sorted(lane["rank"] for lane in last["lanes"]) == [1, 2, 3]
+    costs = {lane["name"]: lane["cost"] for lane in last["lanes"]}
+    assert costs["fcfs"] >= min(costs.values())
+    assert all(len(lane["trace"]) == 5 for lane in last["lanes"])  # start + 4 steps
+    over = client.post(f"/api/race/{race['race_id']}/step", json={"hours": 12})
+    assert over.status_code == 409
+
+
+def test_race_is_reproducible_and_can_start_from_a_session():
+    body = {
+        "competitors": ["priority", "load_balancing"],
+        "start": "empty",
+        "seed": 9,
+        "horizon_hours": 24,
+    }
+    results = []
+    for _ in range(2):
+        rid = client.post("/api/race/start", json=body).json()["race_id"]
+        results.append(client.post(f"/api/race/{rid}/step", json={"hours": 24}).json())
+    assert [l["cost"] for l in results[0]["lanes"]] == [l["cost"] for l in results[1]["lanes"]]
+    sid = _start()
+    client.post(f"/api/simulation/{sid}/step", json={"hours": 24})
+    r = client.post(
+        "/api/race/start",
+        json={"competitors": ["priority", "fcfs"], "start": "session", "session_id": sid},
+    )
+    assert r.status_code == 200 and r.json()["start_time"] == 24
