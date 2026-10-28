@@ -67,12 +67,17 @@ export const UNIT_LABELS: Record<string, string> = {
   ICU: "Intensive care",
 };
 
+/** Situations are shown as numbers 1-5; the letters A-E remain the internal keys (and the
+ *  names used in RESEARCH.md and the stage reports). */
+export const SCENARIO_NUM: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 };
+export const scenNum = (key: string): string => String(SCENARIO_NUM[key?.[0]] ?? key);
+
 export const SCENARIO_LABELS: Record<string, string> = {
-  A: "A · Normal (training)",
-  B: "B · Demand surge",
-  C: "C · Staff shortage",
-  D: "D · Bed loss",
-  E: "E · Combined stress",
+  A: "1 · Normal day",
+  B: "2 · Demand surge",
+  C: "3 · Staff shortage",
+  D: "4 · Bed loss",
+  E: "5 · Everything at once",
 };
 
 import type { IconName } from "@/components/icons";

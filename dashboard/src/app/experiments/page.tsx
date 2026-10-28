@@ -10,7 +10,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene, WhenVisible } from "@/components/motion";
 import { Card, Legend, SectionHeader, Segmented, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
-import { ENSEMBLE, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, type PolicyMeta } from "@/lib/policies";
+import { ENSEMBLE, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, scenNum, type PolicyMeta } from "@/lib/policies";
 
 // Study results as a guided story: each chapter asks one plain question, shows one chart, states
 // the takeaway, and keeps the full statistics in a collapsible "Technical detail". All values are
@@ -210,10 +210,10 @@ export default function ExperimentsPage() {
     })
     .sort((a, b) => b.diff - a.diff);
   const dr = (data.ppo_dr ?? []).filter((c) => c.metric === "J_per_day")
-    .map((c) => toRow(c, `${c.scenario} · ${scenShort(c.scenario)}`, 100 / c.baseline_mean));
+    .map((c) => toRow(c, `${scenNum(c.scenario)} · ${scenShort(c.scenario)}`, 100 / c.baseline_mean));
   const budget = data.constrained?.budget ?? {};
   const lam = SCENARIOS.map((s) => ({
-    scenario: `${s} · ${scenShort(s)}`,
+    scenario: `${scenNum(s)} · ${scenShort(s)}`,
     lambda: budget[`${s}:lambda_mean`],
     ppo: 100 * (budget[`${s}:ppo`] ?? NaN),
     constrained: 100 * (budget[`${s}:ppo_lagrangian`] ?? NaN),
@@ -334,7 +334,7 @@ export default function ExperimentsPage() {
               <>
                 <div className="heat scroll" style={{ gridTemplateColumns: `200px repeat(${SCENARIOS.length}, minmax(96px, 1fr))` }}>
                   <div />
-                  {SCENARIOS.map((s) => <div key={s} className="hdr"><Icon name={SCENARIO_INFO[s].icon} size={14} /> {scenShort(s)}</div>)}
+                  {SCENARIOS.map((s) => <div key={s} className="hdr"><Icon name={SCENARIO_INFO[s].icon} size={14} /> {scenNum(s)} · {scenShort(s)}</div>)}
                   {BASELINES.map((b, bi) => (
                     <div key={b} style={{ display: "contents" }}>
                       <div className="rowhdr"><i className="dot" style={{ background: pm(b).color, marginRight: 6 }} />{pm(b).label}</div>
@@ -410,8 +410,8 @@ export default function ExperimentsPage() {
                 Always read this together with the overall results in &quot;Who does best?&quot; at the top of this page.
               </Takeaway>
               <TechDetails>
-                <p>Robustness index = mean relative degradation (stress − A)/A over scenarios B–E and four metrics (cost, mean and 90th-percentile boarding,
-                  off-service). Bootstrap over seeds jointly across scenarios and over agents. Diversion is excluded (≈0 in A makes ratios meaningless) and
+                <p>Robustness index = mean relative degradation (crisis − normal day)/normal day over situations 2–5 and four metrics (cost, mean and 90th-percentile boarding,
+                  off-service). Bootstrap over seeds jointly across scenarios and over agents. Diversion is excluded (≈0 on a normal day makes ratios meaningless) and
                   reported as an absolute change in the Stage 7 report.</p>
               </TechDetails>
             </Card>
@@ -479,7 +479,7 @@ export default function ExperimentsPage() {
                 This motivated chapter 6.
               </Takeaway>
               <TechDetails>
-                <p>8 variants × 3 agents (a disclosed reduction from 5, for compute), same seeds and hyperparameters, evaluated on the 50 test seeds in A and E.
+                <p>8 variants × 3 agents (a disclosed reduction from 5, for compute), same seeds and hyperparameters, evaluated on the 50 test seeds in situations 1 and 5.
                   Paired hierarchical bootstrap, Holm over 80 comparisons. Only &quot;all patients weighted equally&quot; is significant after correction.
                   Full table in docs/stage7_analysis_report.md §4.</p>
               </TechDetails>
@@ -569,7 +569,7 @@ export default function ExperimentsPage() {
                 <TechDetails>
                   <p>Rule: if the ED is at capacity and any placement is feasible, HOLD is masked; the agent takes its best remaining action. No tunable
                     parameter. Five final agents, 50 test seeds × 5 scenarios, compared with the Stage 6 rows (deterministic simulator, same seeds).
-                    Cost vs unshielded PPO: significant only in C (+4.4%), Holm over 10. Pre-registered as RESEARCH.md v2.7 before running; motivated by
+                    Cost vs unshielded PPO: significant only in situation 3 (+4.4%), Holm over 10. Pre-registered as RESEARCH.md v2.7 before running; motivated by
                     the Stage 6 finding, which stays in the record.</p>
                 </TechDetails>
               </Card>
@@ -588,7 +588,7 @@ export default function ExperimentsPage() {
               <Card title="RL agent v2 vs balance-the-wards rule" subtitle="% difference in overall cost, fresh test runs · faded bars = not a confident difference"
                 explain="Bars to the left (blue) mean the agent's cost is lower than the rule's. Each row is one situation.">
                 <DiffBars rows={data.beat_rule.primary_vs_load_balancing.map((c) => ({
-                  label: `${c.scenario} · ${scenShort(c.scenario)}`,
+                  label: `${scenNum(c.scenario)} · ${scenShort(c.scenario)}`,
                   diff: (100 * c.diff_mean) / c.baseline_mean, lo: (100 * c.ci_low) / c.baseline_mean, hi: (100 * c.ci_high) / c.baseline_mean,
                   sig: c.significant_holm,
                 }))} unit="%" height={260} />
@@ -631,7 +631,7 @@ export default function ExperimentsPage() {
                 <TechDetails>
                   <p>Behaviour cloning of Load-Balancing (96% held-out agreement), then PPO fine-tuning (lr 1e-4, frozen observation normaliser,
                     30 critic-only warm-up updates, 3M steps), K = 5; soft-vote ensemble of the five. Pre-registered as RESEARCH.md v2.8; selection
-                    committed before the one-time test on seeds 400,000–400,049 (A–E). Holm over 5 scenarios. Collapses: 0 of 250.</p>
+                    committed before the one-time test on seeds 400,000–400,049 (situations 1–5). Holm over 5 scenarios. Collapses: 0 of 250.</p>
                 </TechDetails>
               </Card>
             </Reveal>
@@ -664,7 +664,7 @@ export default function ExperimentsPage() {
                 </div>
               </WhenVisible>
               <TechDetails><p>Common random numbers: separate random streams per source, patient attributes drawn at arrival. Ratio of 95% CI widths for PPO − baseline cost,
-                independent seed block vs paired test seeds (scenario A).</p></TechDetails>
+                independent seed block vs paired test seeds (situation 1).</p></TechDetails>
             </Card>
           </Reveal>
           <Reveal kind="right">

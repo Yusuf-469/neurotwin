@@ -4,7 +4,7 @@
 // picker grouped so the RL agent reads as one agent with versions, not several unrelated models.
 
 import type { Conditions } from "@/lib/api";
-import { LIVE_POLICIES, POLICY_GROUPS, SCENARIO_INFO, SCENARIO_LABELS } from "@/lib/policies";
+import { LIVE_POLICIES, POLICY_GROUPS, SCENARIO_INFO, SCENARIO_LABELS, scenNum } from "@/lib/policies";
 import { Icon, type IconName } from "./icons";
 
 export const EXTRA_SCENARIOS = ["B_severe", "C_severe", "D_severe", "E_severe"];
@@ -21,8 +21,8 @@ export function describe(c: Conditions): string {
 export function SituationSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
-      {Object.keys(SCENARIO_LABELS).map((k) => <option key={k} value={k}>{k} · {SCENARIO_INFO[k].short}</option>)}
-      {EXTRA_SCENARIOS.map((k) => <option key={k} value={k}>{k[0]} · {SCENARIO_INFO[k[0]].short}, extreme overload</option>)}
+      {Object.keys(SCENARIO_LABELS).map((k) => <option key={k} value={k}>{scenNum(k)} · {SCENARIO_INFO[k].short}</option>)}
+      {EXTRA_SCENARIOS.map((k) => <option key={k} value={k}>{scenNum(k)} · {SCENARIO_INFO[k[0]].short}, extreme overload</option>)}
       <option value="custom">Custom: set your own conditions</option>
     </select>
   );

@@ -7,7 +7,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene } from "@/components/motion";
 import { SectionHeader, TechDetails } from "@/components/ui";
 import { api, type StudyResults } from "@/lib/api";
-import { POLICIES, SCENARIO_INFO } from "@/lib/policies";
+import { POLICIES, SCENARIO_INFO, scenNum } from "@/lib/policies";
 
 // Story-style overview. Plain language first; each claim keeps its technical backing one click
 // away. Numbers marked "live" are read from /api/experiments/results (Stage 6-7 data); the rest
@@ -296,20 +296,20 @@ export default function Overview() {
             <span className="big" style={{ color: "var(--series-1)" }}><CountUp value={winPct} digits={1} suffix="%" /> lower</span>
             <h3>Beats the best hand-tuned rule</h3>
             <p>RL agent v2 learned from the balance-the-wards rule, then improved on it: lower cost on normal days, tested on 50 fresh runs, and no significant loss in any crisis.</p>
-            <TechDetails><p>Imitation-initialised PPO, 5-agent vote, pre-registered (RESEARCH.md v2.8) and tested once on a fresh seed block: −8.5% J in scenario A (Holm p = 0.0005); B–D tie;
-              E +3.5% (not significant after Holm). The first agent tied the rule ({Number.isFinite(vsLB) ? `${vsLB > 0 ? "+" : ""}${vsLB.toFixed(1)}%` : "–"} on average).</p></TechDetails>
+            <TechDetails><p>Imitation-initialised PPO, 5-agent vote, pre-registered (RESEARCH.md v2.8) and tested once on a fresh seed block: −8.5% J in situation 1 (Holm p = 0.0005); situations 2–4 tie;
+              situation 5 +3.5% (not significant after Holm). The first agent tied the rule ({Number.isFinite(vsLB) ? `${vsLB > 0 ? "+" : ""}${vsLB.toFixed(1)}%` : "–"} on average).</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--status-good)" }}><CountUp value={Math.abs(vsPri)} digits={1} suffix="%" /> lower</span>
             <h3>Beats the most-urgent-first rule</h3>
             <p>A lower overall cost score than the classic "most urgent first" rule, in every situation, including crises it never trained on.</p>
-            <TechDetails><p>Mean relative difference in J vs Priority; CI excludes 0 in scenarios A, C and D.</p></TechDetails>
+            <TechDetails><p>Mean relative difference in J vs Priority; CI excludes 0 in situations 1, 3 and 4.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={240}><div className="card lift finding">
             <span className="big" style={{ color: "var(--violet)" }}>Self-taught</span>
             <h3>It learned to keep beds free</h3>
             <p>Nobody told it to, but the agent holds a bed back for emergencies more often when only a few beds remain, exactly what queueing theory recommends.</p>
-            <TechDetails><p>P(hold) vs free beds, scenario A: Spearman ρ = {Number.isFinite(rhoA) ? rhoA.toFixed(2) : "–"}, isotonic R² = 0.98. The pattern disappears under combined stress.</p></TechDetails>
+            <TechDetails><p>P(hold) vs free beds, situation 1: Spearman ρ = {Number.isFinite(rhoA) ? rhoA.toFixed(2) : "–"}, isotonic R² = 0.98. The pattern disappears under combined stress.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={0}><div className="card lift finding">
             <span className="big" style={{ color: "var(--status-good)" }}>5 → 0</span>
@@ -322,7 +322,7 @@ export default function Overview() {
             <span className="big" style={{ color: "var(--series-2)" }}><CountUp value={crnMax} digits={1} suffix="×" /></span>
             <h3>Sharper measurements</h3>
             <p>Giving every decision-maker the exact same patients made our comparisons this many times more precise, so small differences become visible.</p>
-            <TechDetails><p>Common random numbers: ratio of 95% CI widths, independent vs paired seeds (scenario A, J).</p></TechDetails>
+            <TechDetails><p>Common random numbers: ratio of 95% CI widths, independent vs paired seeds (situation 1, J).</p></TechDetails>
           </div></Reveal>
           <Reveal delay={240}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-4)" }}>+<CountUp value={f3pct} digits={0} suffix="%" /></span>
@@ -345,7 +345,7 @@ export default function Overview() {
             <Reveal key={k} delay={i * 90} kind="zoom">
               <div className={`card lift scen${k === "A" ? " train" : ""}`}>
                 <div className={`icon-badge${k === "E" ? " red" : k === "A" ? " green" : ""}`}><Icon name={s.icon} size={24} /></div>
-                <div className="scen-letter">SCENARIO {k}{k === "A" ? " · TRAINING" : " · UNSEEN"}</div>
+                <div className="scen-letter">SITUATION {scenNum(k)}{k === "A" ? " · TRAINING" : " · UNSEEN"}</div>
                 <h3>{s.short}</h3>
                 <p>{s.desc}</p>
               </div>
