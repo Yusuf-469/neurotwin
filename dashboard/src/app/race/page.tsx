@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Icon } from "@/components/icons";
-import { Reveal } from "@/components/motion";
+import { liveDot, Reveal, SplitWords } from "@/components/motion";
 import { ConditionsSliders, SituationSelect, describe } from "@/components/setup";
 import { Legend, TechDetails } from "@/components/ui";
 import { RunLost, ServerUnavailable, api, type Conditions, type RaceLane, type RaceStartBody, type RaceState } from "@/lib/api";
@@ -231,7 +231,7 @@ export default function RacePage() {
         <section className="hero2" style={{ padding: "26px clamp(18px, 3vw, 36px)" }}>
           <span className="blob b1" /><span className="blob b2" />
           <span className="pill"><span className="badge">Live</span> computed on the server as you watch</span>
-          <h1 style={{ fontSize: "clamp(28px, 4vw, 48px)", margin: "12px 0 8px" }}>The decision-maker <span className="gradient-text">race</span></h1>
+          <h1 style={{ fontSize: "clamp(28px, 4vw, 48px)", margin: "12px 0 8px" }}><SplitWords text="The decision-maker" /> <SplitWords text="race" delay={160} wordClass="gradient-text" /></h1>
           <p className="lead" style={{ marginBottom: 0 }}>
             Identical copies of one hospital, one per competitor, run side by side on the server. Lowest cost wins.
           </p>
@@ -395,7 +395,8 @@ export default function RacePage() {
                       itemSorter={(i) => Number(i.value ?? 0)} labelFormatter={(d) => `day ${d} (best first)`}
                       formatter={(v, n) => [typeof v === "number" ? v.toLocaleString() : "–", label(String(n))]} />
                     {race.lanes.map((l) => (
-                      <Line key={l.name} dataKey={l.name} stroke={policyMeta(l.name).color} strokeWidth={2.4} dot={false} isAnimationActive={false} />
+                      <Line key={l.name} dataKey={l.name} stroke={policyMeta(l.name).color} strokeWidth={2.4} isAnimationActive={false}
+                        dot={liveDot(chart.length - 1, policyMeta(l.name).color)} />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import NavBar from "@/components/NavBar";
-import { HospitalBackdrop, PointerFX, ScrollProgress } from "@/components/motion";
+import { BackToTop, HospitalBackdrop, PointerFX, ScrollProgress } from "@/components/motion";
 import "./globals.css";
 
 // next/font downloads the fonts at build time and serves them from this site (no runtime calls to
@@ -49,6 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <a href="https://github.com/Yusuf-469/neurotwin" target="_blank" rel="noreferrer">Source code &amp; reports ↗</a>
           </div>
         </footer>
+        <BackToTop />
       </body>
     </html>
   );
