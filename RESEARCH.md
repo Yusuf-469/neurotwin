@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.9 (2026-10-28). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.10 (2026-10-28). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -754,6 +754,27 @@ primary comparisons with Holm, secondary J comparisons, summary table, robustnes
 (vs Load-Balancing, Holm over 5) remains the pre-registered claim; the full table is secondary. Earlier agents are
 reported as development versions.
 
+## 6.27 Extension: Crisis-Trained Agent v3 (pre-registered 2026-10-28, before any run)
+
+**Motivation:** the final agent v2 (§6.26) beats Load-Balancing in A but only ties it in B-E. v2 was trained on A
+only. This extension trains for crisis conditions explicitly.
+
+**Disclosure of what changes:** v3's training distribution *covers* the stress scenarios, so B-E are no longer
+out-of-distribution for v3. Its crisis results answer "can a crisis-trained agent beat the rules in crises?", not
+"does training on normal days generalise to unseen crises" (which §6.15-§6.26 answer for v1/v2).
+
+**Candidate v3:** continue PPO fine-tuning from each of the five BC+PPO agents (§6.26) with domain randomisation per
+episode: arrival multiplier ~ U[0.95, 1.15], staff ~ U[0.85, 1.00], beds ~ U[0.85, 1.00], drawn independently.
+Learning rate 1e-4, observation normaliser frozen, 30 critic-only warm-up updates, 3M steps, K = 5, soft-vote
+ensemble. Training seeds only.
+
+**Selection (validation only):** the 20 validation seeds in all five scenarios. Score = mean over scenarios of
+(J_candidate - J_LB) / J_LB. Candidates: v2 and v3; the lower score is selected. All scores are reported.
+
+**Final test (once):** a new fresh block FRESH_TEST_2 = 500,000-500,049, scenarios A-E. The selected agent and all
+five baselines, Stage 6 analysis. Primary: selected agent vs Load-Balancing per scenario, Holm over 5. Reported as it
+comes out; a tie or loss is reported as such.
+
 ## 6.22 Experiment Matrix
 
 ### Primary
@@ -932,6 +953,9 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.10 — 2026-10-28 (crisis-trained agent v3; §6.27)
+- **Pre-registered before any run.** Fine-tunes v2 with domain randomisation covering the crisis scenarios (disclosed: B-E become in-distribution for v3), selects between v2 and v3 on validation seeds across all scenarios, and tests once on a new fresh block (500,000-500,049).
 
 ### v2.9 — 2026-10-28 (full comparison of the final agent; §6.26 addendum)
 - Remaining baselines run on the fresh block so the frozen final agent can be compared with all of them under the Stage 6 analysis. Secondary to the §6.26 claim; no selection involved.

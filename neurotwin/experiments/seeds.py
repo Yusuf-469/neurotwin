@@ -11,6 +11,7 @@ VALIDATION = range(100_000, 100_020)  # tuning and early stopping (scenario A on
 TEST = range(200_000, 200_050)  # final evaluation, A-E
 CRN_INDEPENDENT = range(300_000, 300_050)  # §6.24 variance-reduction check only
 FRESH_TEST = range(400_000, 400_050)  # §6.26 one-time final test of the selected candidate
+FRESH_TEST_2 = range(500_000, 500_050)  # §6.27 one-time final test (crisis-trained agent)
 
 _ALL = {
     "train": TRAIN,
@@ -18,6 +19,7 @@ _ALL = {
     "test": TEST,
     "crn_independent": CRN_INDEPENDENT,
     "fresh_test": FRESH_TEST,
+    "fresh_test_2": FRESH_TEST_2,
 }
 
 
