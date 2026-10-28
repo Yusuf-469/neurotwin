@@ -286,8 +286,7 @@ export default function SimulationPage() {
               </div>
               <h1 style={{ fontSize: "clamp(26px, 3.4vw, 40px)", margin: "10px 0 6px" }}>The live hospital</h1>
               <p className="secondary" style={{ margin: 0, maxWidth: 640 }}>
-                A real simulation running on the server. Patients arrive, wait, get a bed or are turned away, and every bed
-                decision is made by the decision-maker you choose.
+                Computed live on the server. Every bed decision is made by the decision-maker you choose.
               </p>
             </div>
             <div className="clock">
@@ -365,8 +364,11 @@ export default function SimulationPage() {
       <div className="room">
         <Reveal kind="zoom">
           <section className="card plan-card">
-            <FloorPlan state={st} newDecisions={fresh.decisions} newDiversions={fresh.diversions} playing={playing}
-              hour={c.hh} tickMs={TICK_MS} />
+            <div className="plan-scroll">
+              <FloorPlan state={st} newDecisions={fresh.decisions} newDiversions={fresh.diversions} playing={playing}
+                hour={c.hh} tickMs={TICK_MS} />
+            </div>
+            <div className="swipe-hint"><Icon name="arrow" size={13} /> Swipe the floor plan sideways</div>
             <div className="plan-legend">
               <span><i className="lg-bed" style={{ background: "color-mix(in srgb, var(--series-1) 30%, var(--surface-1))", borderColor: "var(--series-1)" }} />occupied bed</span>
               <span><i className="lg-bed" style={{ background: "var(--bed-free)" }} />free bed</span>

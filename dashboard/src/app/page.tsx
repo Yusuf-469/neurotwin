@@ -68,19 +68,19 @@ function AgentDiagram() {
 
 const STEPS: { title: string; icon: IconName; text: string; tech: string[] }[] = [
   { title: "Build a virtual hospital", icon: "build",
-    text: "A computer model of an emergency department, a medical ward, a surgical ward and intensive care, with patients arriving, being treated and going home, minute by minute.",
+    text: "An emergency department, two wards and intensive care, simulated patient by patient.",
     tech: ["discrete-event simulation", "checked against queueing theory (15/15)"] },
   { title: "Make it a digital twin", icon: "mirror",
-    text: "Freeze the hospital at any moment, copy it, and play out many possible futures from that exact state.",
+    text: "Freeze the hospital at any moment and play out possible futures from that exact state.",
     tech: ["exact snapshots", "conditional resampling of stays"] },
   { title: "Let different decision-makers run it", icon: "brain",
-    text: "Hand the bed decisions to simple rules, to a mathematical optimiser, and to a reinforcement-learning agent trained from scratch.",
+    text: "Rules, an optimiser and a learning agent each take every bed decision.",
     tech: ["5 tuned baselines", "MIP", "PPO written from scratch"] },
   { title: "Test fairly, then stress it", icon: "flask",
-    text: "Every decision-maker faces exactly the same patients. Then we test situations the agent never saw: surges, staff shortages, closed beds.",
+    text: "Identical patients for every decision-maker, then surges, staff shortages and closed beds.",
     tech: ["2,500 test episodes", "pre-registered statistics", "Holm correction"] },
   { title: "Explain every decision", icon: "chat",
-    text: "Each decision is logged and can be explained in plain words, and you can ask \"what if?\" from any moment.",
+    text: "Every decision is logged, explained in plain words, and can be raced from any moment.",
     tech: ["decision log", "fact-checked explanations", "what-if engine"] },
 ];
 
@@ -96,19 +96,19 @@ const SPEC: { k: string; v: string; d: string; icon: IconName }[] = [
 
 const JOURNEY: { tag: string; title: string; text: string; result: string; icon: IconName; tone: string }[] = [
   { tag: "Version 1", title: "Learning from scratch", icon: "cpu", tone: "",
-    text: "A neural network trained with PPO, written from scratch, on normal days only. It beat four of the five hand-designed rules.",
+    text: "PPO written from scratch, trained on normal days only. Beat four of the five rules.",
     result: "Tied the best rule (balance-the-wards); no significant difference" },
   { tag: "Finding", title: "An out-of-distribution failure mode", icon: "alert", tone: "bad",
-    text: "Under crisis conditions, one of the five trained agents occasionally held beds empty while the emergency department was diverting arrivals.",
+    text: "Under crisis conditions, one trained agent occasionally held beds empty while arrivals were being diverted.",
     result: "5 of 1,250 test runs collapsed; 0 for every rule-based policy" },
   { tag: "Fix", title: "A parameter-free safety constraint", icon: "shield", tone: "good",
-    text: "Bed holding is prohibited while the emergency department is at capacity. No retraining and no tuned parameters.",
+    text: "Bed holding is prohibited while the emergency department is at capacity. No retraining.",
     result: "Collapses reduced from 5 to 0, at a 4.4% cost in one crisis scenario" },
   { tag: "Version 2", title: "Learn from the best, then beat it", icon: "trend", tone: "win",
-    text: "The agent first copied the best rule, then improved on it with reinforcement learning; five copies vote. Tested once on 50 runs never used before.",
+    text: "Copied the best rule, then improved on it with reinforcement learning. Five copies vote.",
     result: "8.5% lower cost than the best rule on normal days; ties in crises" },
   { tag: "Version 3", title: "Practise the crises too", icon: "flag", tone: "win",
-    text: "v2 kept learning on randomly varied days that include demand surges, staff shortages and bed loss; five copies vote. Tested once on another 50 brand-new runs.",
+    text: "Kept training on varied days: demand surges, staff shortages, bed loss.",
     result: "Beats the best rule on normal days (−5.1%) and in staff shortages (−5.3%); no significant loss anywhere" },
 ];
 
@@ -145,9 +145,8 @@ export default function Overview() {
               </Reveal>
               <Reveal delay={160}>
                 <p className="lead">
-                  NeuroTwin is a virtual hospital where a reinforcement-learning agent I built from scratch competes with
-                  classic rules and a mathematical optimiser to place patients into beds. All of them face the same
-                  patients, in normal times and in crises the agent has never seen.
+                  A virtual hospital where a reinforcement-learning agent, built from scratch, competes with hand-tuned
+                  rules and an optimiser to place every patient. Identical patients, normal days and crises.
                 </p>
               </Reveal>
               <Reveal delay={240}>
@@ -167,7 +166,7 @@ export default function Overview() {
             <div className="ribbon">
               <div><div className="num"><CountUp value={2500} /></div><div className="lbl">test episodes simulated</div></div>
               <div><div className="num"><CountUp value={6} /></div><div className="lbl">decision-makers compared</div></div>
-              <div><div className="num"><CountUp value={5} /></div><div className="lbl">situations, 4 of them unseen crises</div></div>
+              <div><div className="num"><CountUp value={5} /></div><div className="lbl">situations: a normal day and 4 crises</div></div>
               <div><div className="num"><CountUp value={3} />M</div><div className="lbl">training decisions per agent</div></div>
             </div>
           </Reveal>
@@ -177,12 +176,12 @@ export default function Overview() {
       {/* ------------------------------------------------------------------ problem */}
       <Scene>
         <Reveal><SectionHeader kicker="The problem" title="Three decisions hospitals make every hour"
-          lead="When beds are scarce, every choice has a cost somewhere else. Fixed rules handle normal days well, but crises change the trade-offs." /></Reveal>
+          lead="When beds are scarce, every choice has a cost somewhere else." /></Reveal>
         <div className="grid grid-3">
           {([
-            { icon: "ambulance", tone: "red", title: "Who goes first?", text: "A critical patient and a patient who has waited 6 hours both need the last bed. Urgency or fairness?" },
-            { icon: "hospital", tone: "", title: "Which ward?", text: "The surgical ward has room, but the patient is medical. Place them in the wrong specialty now, or make them wait?" },
-            { icon: "bed", tone: "green", title: "Keep a bed free?", text: "Filling every bed helps now, but leaves nothing for the next emergency ambulance. When is holding back worth it?" },
+            { icon: "ambulance", tone: "red", title: "Who goes first?", text: "A critical patient, or the one who has waited six hours?" },
+            { icon: "hospital", tone: "", title: "Which ward?", text: "Only surgical beds are free for a medical patient. Place now, or wait?" },
+            { icon: "bed", tone: "green", title: "Keep a bed free?", text: "Fill every bed now, or hold one for the next ambulance?" },
           ] as { icon: IconName; tone: string; title: string; text: string }[]).map((f, i) => (
             <Reveal key={f.title} delay={i * 120}>
               <div className="card lift feature" style={{ height: "100%" }}>
@@ -198,7 +197,7 @@ export default function Overview() {
       {/* ------------------------------------------------------------------ how it works */}
       <Scene>
         <Reveal><SectionHeader kicker="How it works" title="From a virtual hospital to a fair contest"
-          lead="Five building blocks, each written and tested from scratch." /></Reveal>
+          lead="Five building blocks, each built and tested from scratch." /></Reveal>
         <div className="steps">
           {STEPS.map((s, i) => (
             <Reveal key={s.title} kind="left" delay={i * 90}>
@@ -253,7 +252,7 @@ export default function Overview() {
       {/* ------------------------------------------------------------------ journey */}
       <Scene>
         <Reveal><SectionHeader kicker="How the agent evolved" title="One agent, improved step by step"
-          lead="Each step was planned in writing before it ran, and each one is reported, including what went wrong." /></Reveal>
+          lead="Every step planned in writing before it ran, and reported in full." /></Reveal>
         <div className="journey">
           {JOURNEY.map((j, i) => (
             <Reveal key={j.title} kind={i % 2 ? "right" : "left"} delay={i * 80}>
@@ -274,7 +273,7 @@ export default function Overview() {
       {/* ------------------------------------------------------------------ contenders */}
       <Scene>
         <Reveal><SectionHeader kicker="The contenders" title="Six ways to decide who gets a bed"
-          lead="Five were designed by people and tuned for the best possible score. One learned by itself." /></Reveal>
+          lead="Five tuned by people. One learned by itself." /></Reveal>
         <div className="grid grid-3">
           {POLICIES.map((p, i) => (
             <Reveal key={p.key} delay={(i % 3) * 100}>
@@ -293,25 +292,25 @@ export default function Overview() {
       {/* ------------------------------------------------------------------ findings */}
       <Scene>
         <Reveal><SectionHeader kicker="What we found" title="The headline results"
-          lead="Measured on 50 fresh test runs per situation that were never used to tune anything. All numbers are from the simulation." /></Reveal>
+          lead="50 brand-new test runs per situation. Simulation results." /></Reveal>
         <div className="grid grid-3">
           <Reveal delay={0}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-1)" }}><CountUp value={winPct} digits={1} suffix="%" /> lower</span>
             <h3>Beats the best hand-tuned rule</h3>
-            <p>RL agent v3 has a significantly lower cost than the balance-the-wards rule in a staff shortage and on a normal day (−5.1%), and is not significantly worse in any situation. Tested once on 50 brand-new runs.</p>
+            <p>Significantly lower cost than the balance-the-wards rule on normal days and in staff shortages. Never significantly worse.</p>
             <TechDetails><p>Crisis-trained v3 (RESEARCH.md v2.10), second fresh seed block: situation 1 −5.1% (Holm p = 0.024), situation 3 −5.3% (p = 0.0005),
               situations 2, 4 and 5 within the uncertainty. v2 won on normal days (−8.5%); v1 tied the rule ({Number.isFinite(vsLB) ? `${vsLB > 0 ? "+" : ""}${vsLB.toFixed(1)}%` : "–"} on average).</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--status-good)" }}><CountUp value={Math.abs(vsPri)} digits={1} suffix="%" /> lower</span>
             <h3>Beats the most-urgent-first rule</h3>
-            <p>A lower overall cost score than the classic "most urgent first" rule, in every situation, including crises it never trained on.</p>
+            <p>Lower cost than the classic most-urgent-first rule in every situation, even before any crisis training (v1).</p>
             <TechDetails><p>Mean relative difference in J vs Priority; CI excludes 0 in situations 1, 3 and 4.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={240}><div className="card lift finding">
             <span className="big" style={{ color: "var(--violet)" }}>Self-taught</span>
             <h3>It learned to keep beds free</h3>
-            <p>Nobody told it to, but the agent holds a bed back for emergencies more often when only a few beds remain, exactly what queueing theory recommends.</p>
+            <p>Unprompted, it learned to hold a bed back as beds run low, as queueing theory recommends.</p>
             <TechDetails><p>P(hold) vs free beds, situation 1: Spearman ρ = {Number.isFinite(rhoA) ? rhoA.toFixed(2) : "–"}, isotonic R² = 0.98. The pattern disappears under combined stress.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={0}><div className="card lift finding">
@@ -324,13 +323,13 @@ export default function Overview() {
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-2)" }}><CountUp value={crnMax} digits={1} suffix="×" /></span>
             <h3>Sharper measurements</h3>
-            <p>Giving every decision-maker the exact same patients made our comparisons this many times more precise, so small differences become visible.</p>
+            <p>Identical patients for every decision-maker make comparisons this many times sharper.</p>
             <TechDetails><p>Common random numbers: ratio of 95% CI widths, independent vs paired seeds (situation 1, J).</p></TechDetails>
           </div></Reveal>
           <Reveal delay={240}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-4)" }}>+<CountUp value={f3pct} digits={0} suffix="%" /></span>
             <h3>What it is rewarded for matters most</h3>
-            <p>Teaching the agent that urgent patients matter more was the most important ingredient. Without it, cost rises by this much.</p>
+            <p>Weighting urgent patients in training mattered most. Without it, cost rises by this much.</p>
             <TechDetails><p>Ablation F3 (uniform priority weights in the training reward), the only ablation significant after Holm over 80 comparisons.</p></TechDetails>
           </div></Reveal>
         </div>
@@ -342,13 +341,13 @@ export default function Overview() {
       {/* ------------------------------------------------------------------ scenarios */}
       <Scene>
         <Reveal><SectionHeader kicker="The stress test" title="One normal day, four crises"
-          lead="The agent trained only on normal days. Everything else is a surprise, which is how we test whether it really generalises." /></Reveal>
+          lead="v1 and v2 trained on normal days only, so crises tested whether they generalise. v3 also practised the crises." /></Reveal>
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
           {Object.entries(SCENARIO_INFO).map(([k, s], i) => (
             <Reveal key={k} delay={i * 90} kind="zoom">
               <div className={`card lift scen${k === "A" ? " train" : ""}`}>
                 <div className={`icon-badge${k === "E" ? " red" : k === "A" ? " green" : ""}`}><Icon name={s.icon} size={24} /></div>
-                <div className="scen-letter">SITUATION {scenNum(k)}{k === "A" ? " · TRAINING" : " · UNSEEN"}</div>
+                <div className="scen-letter">SITUATION {scenNum(k)}{k === "A" ? " · NORMAL" : " · CRISIS"}</div>
                 <h3>{s.short}</h3>
                 <p>{s.desc}</p>
               </div>

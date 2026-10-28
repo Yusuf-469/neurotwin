@@ -90,7 +90,7 @@ export const SCENARIO_LABELS: Record<string, string> = {
 import type { IconName } from "@/components/icons";
 
 export const SCENARIO_INFO: Record<string, { short: string; desc: string; icon: IconName }> = {
-  A: { short: "Normal day", icon: "hospital", desc: "Typical demand and full staffing. The only situation the RL agent trained on." },
+  A: { short: "Normal day", icon: "hospital", desc: "Typical demand and full staffing." },
   B: { short: "Demand surge", icon: "trend", desc: "10% more patients arrive than usual, like a bad flu week." },
   C: { short: "Staff shortage", icon: "staff", desc: "12% fewer nurses and doctors, so fewer beds can be staffed." },
   D: { short: "Bed loss", icon: "bed", desc: "12% of beds are out of service, e.g. closed bays." },
