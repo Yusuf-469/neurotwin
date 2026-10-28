@@ -16,7 +16,7 @@ import { LIVE_POLICIES, POLICY_GROUPS, SCENARIO_INFO, policyMeta } from "@/lib/p
 
 const LANE_H = 86;
 const TICK_MS = 1100;
-const DEFAULT_COMPETITORS = ["ppo_ensemble", "load_balancing", "priority", "fcfs"];
+const DEFAULT_COMPETITORS = ["ppo_v3", "load_balancing", "priority", "fcfs"];
 
 type Phase = "setup" | "loading" | "countdown" | "racing" | "paused" | "finished";
 interface Commentary { id: number; t: number; text: string; tone?: "lead" | "bad" | "info" }

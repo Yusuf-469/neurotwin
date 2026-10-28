@@ -295,3 +295,34 @@ The 95% CI excludes 0 in every cell except:
 The E difference against Load-Balancing is not significant in the pre-registered Holm test (§8).
 
 The dashboard's Results page now shows this final agent by default in chapters 1–3, with the development version (v1, Stage 6) available for comparison.
+
+## 9. Crisis-trained agent v3 (v2.10, §6.27)
+**Commands:** `python -m neurotwin.experiments.v3 finetune`, then `validate` and `test`. The output is in `docs/data/v3/`.
+
+**Design** (pre-registered, commit 555a19f, before any run)
+- **Training:** PPO fine-tuning continued from each v2 (BC+PPO) agent, with per-episode domain randomisation covering every stress scenario: arrivals ×0.95–1.15, staff ×0.85–1.00 and beds ×0.85–1.00. K = 5, soft-vote ensemble.
+- **Disclosed:** situations 2–5 are therefore in-distribution for v3. Its results answer "can a crisis-trained agent beat the rules in crises?", not the generalisation question that v1 and v2 address.
+- **Selection:** v2 vs v3 on the 20 validation seeds in all five situations. The score is the mean relative J against Load-Balancing: v2 −1.2%, v3 −2.0%, so **v3 was selected** (committed 24ce77c before the test).
+- **One-time test:** a second fresh block (500,000–500,049), all baselines.
+
+**Fresh test: v3 − Load-Balancing, cost J per day** (Holm over 5)
+
+| Situation | Difference | 95% CI | Holm p |
+|---|---|---|---|
+| 1 Normal day | **−11.2 (−5.1%)** | [−18.6, −3.5] | **0.024** |
+| 2 Demand surge | −13.0 (−1.6%) | [−35.2, 11.2] | 0.52 |
+| 3 Staff shortage | **−65.6 (−5.3%)** | [−97.1, −34.9] | **0.0005** |
+| 4 Bed loss | −9.8 (−1.1%) | [−33.4, 14.6] | 0.52 |
+| 5 Everything at once | +23.1 (+1.6%) | [−6.3, 53.1] | 0.36 |
+
+**Against the other baselines** (relative J):
+- **Priority:** −15.5, −9.5, −5.6, −9.6 and −1.6% in situations 1–5.
+- **MIP:** −18 to −22% in every situation.
+- **FCFS:** −35 to −48% in every situation.
+
+**Collapses:** 0 in 1,500 test episodes, for every policy.
+
+**Findings**
+1. **v3 beats the strongest rule significantly in two situations**, normal day and staff shortage, **and is not significantly worse in any**. Its point estimate is lower than Load-Balancing's in four of five situations.
+2. **Crisis training closed most of v2's crisis gap.** Staff shortage moved from a tie to a significant win. Under combined stress the gap fell from +3.5% (v2, first fresh block) to +1.6% (v3, second fresh block). The two blocks differ, so this comparison is indicative, not a paired test.
+3. **These crisis results are in-distribution for v3** and are reported as such.

@@ -37,17 +37,24 @@ export const SHIELDED: PolicyMeta = {
 /** The improved agent (RESEARCH.md §6.26): learned from the best rule, then improved with RL;
  *  five such agents vote. Same family colour as the RL agent, always shown with its own label. */
 export const ENSEMBLE: PolicyMeta = {
-  key: "ppo_ensemble", label: "RL agent v2 (latest)", tech: "imitation + PPO fine-tuning, 5-agent vote", color: "var(--violet)",
+  key: "ppo_ensemble", label: "RL agent v2", tech: "imitation + PPO fine-tuning, 5-agent vote", color: "color-mix(in srgb, var(--violet) 55%, var(--text-muted))",
   desc: "Learned from the best hand-tuned rule, then improved itself with reinforcement learning; five copies vote on each decision.",
 };
 
+/** The latest agent (RESEARCH.md §6.27): v2 further trained on varied days covering the crisis
+ *  conditions; five copies vote. */
+export const V3: PolicyMeta = {
+  key: "ppo_v3", label: "RL agent v3 (latest)", tech: "crisis-trained: imitation + PPO + varied days, 5-agent vote", color: "var(--violet)",
+  desc: "Learned from the best rule, improved with reinforcement learning, then practised on crisis days; five copies vote on each decision.",
+};
+
 /** Decision-makers offered in the live hospital and race tools. */
-export const LIVE_POLICIES: PolicyMeta[] = [ENSEMBLE, POLICIES[0], SHIELDED, ...POLICIES.slice(1)];
+export const LIVE_POLICIES: PolicyMeta[] = [V3, ENSEMBLE, POLICIES[0], SHIELDED, ...POLICIES.slice(1)];
 
 /** How decision-makers are grouped in pickers: one RL agent with its versions, then the rules. */
 export const POLICY_GROUPS: { label: string; keys: string[] }[] = [
-  { label: "RL agent (latest)", keys: ["ppo_ensemble"] },
-  { label: "Earlier RL versions", keys: ["ppo", "ppo_shielded"] },
+  { label: "RL agent (latest)", keys: ["ppo_v3"] },
+  { label: "Earlier RL versions", keys: ["ppo_ensemble", "ppo", "ppo_shielded"] },
   { label: "Hand-designed rules", keys: ["load_balancing", "priority", "trunk_reservation", "mip", "fcfs"] },
 ];
 

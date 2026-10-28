@@ -107,6 +107,9 @@ const JOURNEY: { tag: string; title: string; text: string; result: string; icon:
   { tag: "Version 2", title: "Learn from the best, then beat it", icon: "trend", tone: "win",
     text: "The agent first copied the best rule, then improved on it with reinforcement learning; five copies vote. Tested once on 50 runs never used before.",
     result: "8.5% lower cost than the best rule on normal days; ties in crises" },
+  { tag: "Version 3", title: "Practise the crises too", icon: "flag", tone: "win",
+    text: "v2 kept learning on randomly varied days that include demand surges, staff shortages and bed loss; five copies vote. Tested once on another 50 brand-new runs.",
+    result: "Beats the best rule on normal days (−5.1%) and in staff shortages (−5.3%); no significant loss anywhere" },
 ];
 
 export default function Overview() {
@@ -119,7 +122,7 @@ export default function Overview() {
   }, []);
 
   const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
-  const winA = data?.beat_rule?.primary_vs_load_balancing.find((c) => c.scenario === "A");
+  const winA = (data?.v3_test ?? data?.beat_rule)?.primary_vs_load_balancing.find((c) => c.scenario === "C") ?? data?.beat_rule?.primary_vs_load_balancing.find((c) => c.scenario === "A");
   const winPct = winA ? (100 * -winA.diff_mean) / winA.baseline_mean : NaN;
   const vsLB = avg(data?.J_comparisons?.filter((c) => c.baseline === "load_balancing").map((c) => c.rel_diff_pct) ?? []);
   const vsPri = avg(data?.J_comparisons?.filter((c) => c.baseline === "priority").map((c) => c.rel_diff_pct) ?? []);
@@ -295,9 +298,9 @@ export default function Overview() {
           <Reveal delay={0}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-1)" }}><CountUp value={winPct} digits={1} suffix="%" /> lower</span>
             <h3>Beats the best hand-tuned rule</h3>
-            <p>RL agent v2 learned from the balance-the-wards rule, then improved on it: lower cost on normal days, tested on 50 fresh runs, and no significant loss in any crisis.</p>
-            <TechDetails><p>Imitation-initialised PPO, 5-agent vote, pre-registered (RESEARCH.md v2.8) and tested once on a fresh seed block: −8.5% J in situation 1 (Holm p = 0.0005); situations 2–4 tie;
-              situation 5 +3.5% (not significant after Holm). The first agent tied the rule ({Number.isFinite(vsLB) ? `${vsLB > 0 ? "+" : ""}${vsLB.toFixed(1)}%` : "–"} on average).</p></TechDetails>
+            <p>RL agent v3 has a significantly lower cost than the balance-the-wards rule in a staff shortage and on a normal day (−5.1%), and is not significantly worse in any situation. Tested once on 50 brand-new runs.</p>
+            <TechDetails><p>Crisis-trained v3 (RESEARCH.md v2.10), second fresh seed block: situation 1 −5.1% (Holm p = 0.024), situation 3 −5.3% (p = 0.0005),
+              situations 2, 4 and 5 within the uncertainty. v2 won on normal days (−8.5%); v1 tied the rule ({Number.isFinite(vsLB) ? `${vsLB > 0 ? "+" : ""}${vsLB.toFixed(1)}%` : "–"} on average).</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--status-good)" }}><CountUp value={Math.abs(vsPri)} digits={1} suffix="%" /> lower</span>

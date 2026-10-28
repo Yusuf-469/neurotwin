@@ -40,7 +40,7 @@ function reading(state: HospitalState, soFar: SoFar | null | undefined, now: num
 
 export default function RunVerdict({ sessionId, policy, state, soFar, now, warmupHours, available, onCompare }: Props) {
   const rivals = ["load_balancing", "priority", "fcfs"].filter((p) => p !== policy && available.includes(p));
-  const field = [policy, ...rivals, ...(policy !== "ppo_ensemble" && available.includes("ppo_ensemble") ? ["ppo_ensemble"] : [])];
+  const field = [policy, ...rivals, ...(policy !== "ppo_v3" && available.includes("ppo_v3") ? ["ppo_v3"] : [])];
   const [results, setResults] = useState<Record<string, number>>({});
   const [running, setRunning] = useState<string>("");
   const [error, setError] = useState("");

@@ -10,7 +10,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene, WhenVisible } from "@/components/motion";
 import { Card, Legend, SectionHeader, Segmented, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
-import { ENSEMBLE, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, scenNum, type PolicyMeta } from "@/lib/policies";
+import { ENSEMBLE, V3, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, scenNum, type PolicyMeta } from "@/lib/policies";
 
 // Study results as a guided story: each chapter asks one plain question, shows one chart, states
 // the takeaway, and keeps the full statistics in a collapsible "Technical detail". All values are
@@ -117,7 +117,7 @@ export default function ExperimentsPage() {
   const [data, setData] = useState<StudyResults | null>(null);
   const [error, setError] = useState("");
   const [metric, setMetric] = useState("J_per_day");
-  const [version, setVersion] = useState<"v2" | "v1">("v2");
+  const [version, setVersion] = useState<"v3" | "v2" | "v1">("v3");
   const [barTable, barToggle] = useViewToggle();
   const [heatTable, heatToggle] = useViewToggle();
   const active = useActiveChapter();
@@ -138,15 +138,18 @@ export default function ExperimentsPage() {
   const meta = METRICS.find((m) => m.key === metric)!;
   // The final agent (v2) is compared with every rule on the fresh block (RESEARCH.md v2.9); the
   // development version (v1) on the original Stage 6 test block. Same analysis for both.
-  const V2 = version === "v2" && !!data.final_summary;
-  const src = V2
-    ? { summary: data.final_summary, J: data.final_J_comparisons, comps: data.final_comparisons, rob: data.final_robustness }
-    : { summary: data.summary, J: data.J_comparisons, comps: data.comparisons, rob: data.robustness };
+  const ver = version === "v3" && data.v3_summary ? "v3" : version !== "v1" && data.final_summary ? "v2" : "v1";
+  const V2 = ver !== "v1"; // a final-generation agent (v2 or v3) rather than the development version
+  const src = ver === "v3"
+    ? { summary: data.v3_summary, J: data.v3_J_comparisons, comps: data.v3_comparisons, rob: data.v3_robustness }
+    : ver === "v2"
+      ? { summary: data.final_summary, J: data.final_J_comparisons, comps: data.final_comparisons, rob: data.final_robustness }
+      : { summary: data.summary, J: data.J_comparisons, comps: data.comparisons, rob: data.robustness };
   const pm = (k: string): PolicyMeta => (k === "ppo"
-    ? (V2 ? { ...ENSEMBLE, key: "ppo", label: "RL agent v2 (final)" } : { ...policyMeta("ppo"), label: "RL agent v1 (development)" })
+    ? (ver === "v3" ? { ...V3, key: "ppo", label: "RL agent v3 (latest)" } : ver === "v2" ? { ...ENSEMBLE, key: "ppo", label: "RL agent v2" } : { ...policyMeta("ppo"), label: "RL agent v1 (development)" })
     : policyMeta(k));
   const STUDY = POLICIES.map((x) => pm(x.key));
-  const agentName = V2 ? "the final agent (v2)" : "the development agent (v1)";
+  const agentName = ver === "v3" ? "the latest agent (v3)" : ver === "v2" ? "agent v2" : "the development agent (v1)";
   const value = (s: string, p: string): [number, number, number] | null => {
     const e = src.summary!.find((x) => x.scenario === s && x.policy === p)?.[metric];
     return Array.isArray(e) ? e : null;
@@ -224,7 +227,7 @@ export default function ExperimentsPage() {
       {/* ------------------------------------------------------------------ intro */}
       <section className="hero2" style={{ marginBottom: 8 }}>
         <span className="blob b1" /><span className="blob b2" />
-        <Reveal><span className="pill"><span className="badge">Results</span> {V2 ? "final agent · 50 fresh runs per situation, never used before" : "development agent · 50 sealed test runs per situation"}</span></Reveal>
+        <Reveal><span className="pill"><span className="badge">Results</span> {ver === "v3" ? "latest agent (v3) · 50 brand-new runs per situation" : ver === "v2" ? "agent v2 · 50 fresh runs per situation" : "development agent (v1) · 50 sealed test runs per situation"}</span></Reveal>
         <Reveal delay={80}><h1 style={{ fontSize: "clamp(30px, 4.4vw, 52px)" }}>What happened when the agent <span className="gradient-text">met the rules</span></h1></Reveal>
         <Reveal delay={160}><p className="lead">
           Seven short chapters, each answering one question. Every chart says what you are looking at and what
@@ -233,9 +236,9 @@ export default function ExperimentsPage() {
           To run your own experiment live, use <Link href="/race/">the Race</Link>.</p></Reveal>
         <Reveal delay={200}>
           <div className="row" style={{ marginBottom: 4 }}>
-            <Segmented options={[{ value: "v2", label: "Final agent (v2)" }, { value: "v1", label: "Development version (v1)" }]}
-              value={version} onChange={(v) => setVersion(v as "v2" | "v1")} />
-            <span className="muted">{V2 ? "Chapters 1–3 show the final agent against every rule." : "Chapters 1–3 show where the agent started."}</span>
+            <Segmented options={[{ value: "v3", label: "Latest agent (v3)" }, { value: "v2", label: "v2" }, { value: "v1", label: "Development (v1)" }]}
+              value={version} onChange={(v) => setVersion(v as "v3" | "v2" | "v1")} />
+            <span className="muted">{ver === "v3" ? "Chapters 1–3 show the latest agent against every rule." : ver === "v2" ? "Chapters 1–3 show agent v2, before crisis training." : "Chapters 1–3 show where the agent started."}</span>
           </div>
         </Reveal>
         <Reveal delay={240}>
@@ -363,7 +366,7 @@ export default function ExperimentsPage() {
             )}
             <Takeaway tone="good">
               {V2
-                ? <>The final agent is blue against nearly every rule in nearly every situation, including the <b>balance-the-wards rule on normal days</b>. The exception is the combined crisis, where it is level with the two strongest rules.</>
+                ? <>The agent is blue against nearly every rule in nearly every situation, including the <b>balance-the-wards rule on normal days{ver === "v3" ? " and in a staff shortage" : ""}</b>. The exception is the combined crisis, where it is level with the two strongest rules.</>
                 : <>Against the classic rules (most-urgent-first, the instant optimiser, first-come-first-served) the development agent is mostly blue. Against the <b>balance-the-wards rule</b> the squares are grey: a genuine tie, which is what version 2 set out to beat.</>}
             </Takeaway>
             <TechDetails>
@@ -581,23 +584,24 @@ export default function ExperimentsPage() {
       {/* ------------------------------------------------------------------ 7 beat */}
       {data.beat_rule && (
         <Scene id="beat">
-          <Reveal><SectionHeader num="7" kicker="RL agent v2" title="Can the agent beat the best rule?"
-            lead="The first agent tied the balance-the-wards rule. So the agent first learned by copying that rule, then used reinforcement learning to improve on it, and five copies vote. Tested once, on 50 runs never used before." /></Reveal>
+          <Reveal><SectionHeader num="7" kicker="RL agent v3" title="Can the agent beat the best rule?"
+            lead="v1 tied the balance-the-wards rule. v2 learned by copying that rule and improving on it with reinforcement learning, and beat it on normal days. v3 then practised on crisis days too. Each version was tested once, on 50 runs never used before." /></Reveal>
           <div className="grid grid-2">
             <Reveal kind="left">
-              <Card title="RL agent v2 vs balance-the-wards rule" subtitle="% difference in overall cost, fresh test runs · faded bars = not a confident difference"
+              <Card title={data.v3_test ? "RL agent v3 vs balance-the-wards rule" : "RL agent v2 vs balance-the-wards rule"} subtitle="% difference in overall cost, brand-new test runs · faded bars = not a confident difference"
                 explain="Bars to the left (blue) mean the agent's cost is lower than the rule's. Each row is one situation.">
-                <DiffBars rows={data.beat_rule.primary_vs_load_balancing.map((c) => ({
+                <DiffBars rows={(data.v3_test ?? data.beat_rule).primary_vs_load_balancing.map((c) => ({
                   label: `${scenNum(c.scenario)} · ${scenShort(c.scenario)}`,
                   diff: (100 * c.diff_mean) / c.baseline_mean, lo: (100 * c.ci_low) / c.baseline_mean, hi: (100 * c.ci_high) / c.baseline_mean,
                   sig: c.significant_holm,
                 }))} unit="%" height={260} />
                 <Takeaway tone="good">
-                  <b>A clear win on normal days:</b> 8.5% lower cost than the best hand-tuned rule, statistically certain even after correcting for multiple tests.
+                  <b>Two clear wins, no losses:</b> 5.1% lower cost than the best hand-tuned rule on a normal day and 5.3% lower in a staff shortage,
+                  both statistically certain after correcting for multiple tests. In the other three situations the gap is within the uncertainty.
                 </Takeaway>
                 <Takeaway tone="warn">
-                  In crises it is a tie, and under &quot;everything at once&quot; it is 3.5% behind, a gap too small to be statistically certain.
-                  It beats the rule where it trained and holds its own elsewhere.
+                  v3 practised on crisis days, so its crisis results show a crisis-trained agent, not an untrained one generalising. Version 2,
+                  trained on normal days only, won on normal days (−8.5%) and tied in every crisis.
                 </Takeaway>
               </Card>
             </Reveal>
@@ -624,14 +628,31 @@ export default function ExperimentsPage() {
                     );
                   })}
                 </div>
+                {data.v3_validation && (
+                  <div className="stack" style={{ gap: 8, marginTop: 12 }}>
+                    <div className="eyebrow">Then: v2 or v3? Validation, all five situations (cost vs the rule)</div>
+                    {(["v2", "v3"] as const).map((k) => {
+                      const v = 100 * (data.v3_validation!.score_vs_lb[k] ?? NaN);
+                      return (
+                        <div key={k} className={`vrow${k === data.v3_validation!.selected ? " best" : ""}`}>
+                          <span>{k === "v2" ? "v2 (normal days only)" : "v3 (practised crises)"}</span>
+                          <span className="vbar"><i style={{ width: `${Math.min(100, 20 * Math.abs(v))}%` }} /></span>
+                          <b>{Number.isFinite(v) ? `${v.toFixed(1)}%` : "–"}</b>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <Takeaway>
                   Copying alone fails badly: tiny mistakes add up into situations the rule never showed it. Reinforcement learning is what turns
-                  the copy into an agent better than the rule it learned from.
+                  the copy into an agent better than the rule it learned from, and practising crises is what made it competitive in them.
                 </Takeaway>
                 <TechDetails>
                   <p>Behaviour cloning of Load-Balancing (96% held-out agreement), then PPO fine-tuning (lr 1e-4, frozen observation normaliser,
                     30 critic-only warm-up updates, 3M steps), K = 5; soft-vote ensemble of the five. Pre-registered as RESEARCH.md v2.8; selection
-                    committed before the one-time test on seeds 400,000–400,049 (situations 1–5). Holm over 5 scenarios. Collapses: 0 of 250.</p>
+                    committed before the one-time test on seeds 400,000–400,049 (situations 1–5). v3: further PPO fine-tuning with per-episode arrivals ×0.95–1.15,
+                    staff and beds ×0.85–1.00 (covers situations 2–5, disclosed), selected over v2 on validation (−2.0% vs −1.2%), tested once on seeds
+                    500,000–500,049 (RESEARCH.md v2.10). Holm over 5 situations. Collapses: 0 of 1,500.</p>
                 </TechDetails>
               </Card>
             </Reveal>

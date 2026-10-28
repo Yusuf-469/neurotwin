@@ -85,6 +85,8 @@ MAX_WHATIF_HOURS = 24 * 14
 MAX_SESSIONS = 200
 # Five-agent vote of the imitation-initialised PPO agents (RESEARCH.md §6.26), if present.
 ENSEMBLE_AGENTS = sorted((ROOT / "results" / "ppo" / "bc_ppo").glob("agent_*.pt"))
+# Crisis-trained agent v3 (RESEARCH.md §6.27): five-agent vote, if present.
+V3_AGENTS = sorted((ROOT / "results" / "ppo" / "v3").glob("agent_*.pt"))
 LLM_MAX_PER_HOUR = int(os.environ.get("NEUROTWIN_LLM_MAX_PER_HOUR", "60"))
 # Browser origins allowed to call the API cross-site: the local dev server, plus any origins in
 # NEUROTWIN_CORS_ORIGINS (comma-separated), e.g. a dashboard hosted separately on Vercel while
@@ -110,6 +112,8 @@ def available_policies() -> list[str]:
         names += ["ppo", "ppo_shielded"]
     if ENSEMBLE_AGENTS:
         names.append("ppo_ensemble")
+    if V3_AGENTS:
+        names.append("ppo_v3")
     return names
 
 
@@ -119,6 +123,10 @@ def build_policy(name: str):
         if not AGENT_PATH.exists():
             raise HTTPException(404, f"no trained PPO agent at {AGENT_PATH}")
         return PPOPolicy.load(AGENT_PATH, shield=name == "ppo_shielded")
+    if name == "ppo_v3":
+        if not V3_AGENTS:
+            raise HTTPException(404, "no crisis-trained agents available")
+        return EnsemblePPOPolicy.load(V3_AGENTS)
     if name == "ppo_ensemble":
         if not ENSEMBLE_AGENTS:
             raise HTTPException(404, "no imitation-initialised agents available")
@@ -600,6 +608,12 @@ def experiment_results() -> dict[str, Any]:
         "constrained": "docs/data/stage7/constrained_comparisons.json",
         "shield": "docs/data/stage7/shield_comparisons.json",
         "beat_rule": "docs/data/stage7/bc_ppo_test.json",
+        "v3_test": "docs/data/v3/test.json",
+        "v3_validation": "docs/data/v3/validation.json",
+        "v3_summary": "docs/data/v3/summary.json",
+        "v3_comparisons": "docs/data/v3/comparisons.json",
+        "v3_J_comparisons": "docs/data/v3/J_comparisons.json",
+        "v3_robustness": "docs/data/v3/robustness.json",
         "beat_rule_validation": "docs/data/stage7/bc_ppo_validation.json",
     }.items():
         path = ROOT / rel

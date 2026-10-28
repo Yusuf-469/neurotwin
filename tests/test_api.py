@@ -85,6 +85,8 @@ def test_results_endpoint_serves_stage6_data_with_label():
     assert body["shield"]["collapses"]["ppo_shielded"] == 0
     assert "ppo_shielded" in client.get("/api/policies").json()["policies"]
     assert "ppo_ensemble" in client.get("/api/policies").json()["policies"]
+    assert "ppo_v3" in client.get("/api/policies").json()["policies"]
+    assert body["v3_test"]["selected"] == "v3" and len(body["v3_comparisons"]) == 100
     assert body["beat_rule"]["selected"] == "ens_bc_ppo"
     assert (
         len(body["constrained"]["comparisons"]) == 25
