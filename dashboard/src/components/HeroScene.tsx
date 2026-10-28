@@ -1,9 +1,56 @@
 // Animated hero illustration of a hospital: ambulances arriving (one turned away), a helicopter
 // landing on the roof, patients moving from the emergency entrance into wards whose windows
 // light up as beds fill. Purely decorative and labelled as an illustration; the real,
-// data-driven view is the Live hospital page. SVG + SMIL/CSS only, no scripts.
+// data-driven view is the Live hospital page. SVG + CSS only, no scripts.
+//
+// Movement uses CSS transform keyframes rather than SMIL <animateMotion>: SMIL re-runs layout on
+// every frame, which kept the main thread busy and made the cursor light stutter. The keyframes
+// below reproduce the original paths, timings and easing.
 
 import { Icon } from "./icons";
+
+type Pt = [number, number];
+
+const PATIENTS: { color: string; pts: Pt[]; delay: number }[] = [
+  { color: "var(--status-critical)", pts: [[206, 360], [248, 360], [248, 214], [324, 214]], delay: 0 },
+  { color: "var(--status-serious)", pts: [[206, 360], [248, 360], [248, 264], [416, 264]], delay: 1.1 },
+  { color: "var(--text-muted)", pts: [[206, 360], [248, 360], [248, 164], [462, 164]], delay: 2.2 },
+  { color: "var(--status-serious)", pts: [[206, 360], [248, 360], [248, 314], [370, 314]], delay: 3.3 },
+];
+
+const at = ([x, y]: Pt) => `transform: translate(${x}px, ${y}px)`;
+
+/** Constant-speed walk along a polyline during the first 70% of the cycle, then a pause at the
+ *  bed (the old keyPoints="0;1;1" keyTimes="0;0.7;1"). */
+function walkKeyframes(name: string, pts: Pt[]): string {
+  const seg = pts.slice(1).map((q, i) => Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]));
+  const total = seg.reduce((a, b) => a + b, 0);
+  let run = 0;
+  const steps = [`0% { ${at(pts[0])}; }`];
+  seg.forEach((len, i) => {
+    run += len;
+    const pct = ((70 * run) / total).toFixed(2);
+    steps.push(i === seg.length - 1 ? `${pct}%, 100% { ${at(pts[i + 1])}; }` : `${pct}% { ${at(pts[i + 1])}; }`);
+  });
+  return `@keyframes ${name} { ${steps.join(" ")} }`;
+}
+
+const SCENE_CSS = [
+  ...PATIENTS.map((p, i) => walkKeyframes(`hsWalk${i}`, p.pts)),
+  // arriving ambulance: eases in to the entrance (45%), waits, fades out at the end
+  `@keyframes hsAmbIn { 0% { transform: translate(-90px, 410px); opacity: 1; animation-timing-function: cubic-bezier(.3,0,.2,1); }
+    45% { transform: translate(160px, 410px); } 92% { transform: translate(160px, 410px); opacity: 1; }
+    100% { transform: translate(160px, 410px); opacity: 0; } }`,
+  // turned-away ambulance drives straight past
+  `@keyframes hsAmbPast { from { transform: translate(-110px, 440px); } to { transform: translate(700px, 440px); } }`,
+  // helicopter: fly in, descend, land on the pad, wait, lift off and leave
+  `@keyframes hsHeli { 0% { transform: translate(-90px, 40px); } 14% { transform: translate(150px, 24px); }
+    28% { transform: translate(330px, 48px); }
+    38% { transform: translate(440px, 88px); animation-timing-function: cubic-bezier(0,0,.4,1); }
+    44% { transform: translate(470px, 101px); }
+    66% { transform: translate(470px, 101px); animation-timing-function: cubic-bezier(.6,0,1,1); }
+    74% { transform: translate(500px, 86px); } 88% { transform: translate(600px, 40px); } 100% { transform: translate(700px, 6px); } }`,
+].join("\n");
 
 function Ambulance({ tag }: { tag?: boolean }) {
   return (
@@ -33,9 +80,8 @@ export default function HeroScene() {
           <linearGradient id="hs-bld" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="var(--surface-1)" /><stop offset="1" stopColor="var(--surface-2)" />
           </linearGradient>
-          <filter id="hs-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
         </defs>
+        <style>{SCENE_CSS}</style>
 
         {/* clouds */}
         <g className="hs-cloud" style={{ animationDuration: "38s" }}>
@@ -73,19 +119,10 @@ export default function HeroScene() {
         <rect x="176" y="298" width="60" height="90" rx="3" className="hs-door" />
 
         {/* corridor from ED into the wards: patients move along it */}
-        {[
-          { color: "var(--status-critical)", path: "M206 360 L 248 360 L 248 214 L 324 214", begin: "0s" },
-          { color: "var(--status-serious)", path: "M206 360 L 248 360 L 248 264 L 416 264", begin: "1.1s" },
-          { color: "var(--text-muted)", path: "M206 360 L 248 360 L 248 164 L 462 164", begin: "2.2s" },
-          { color: "var(--status-serious)", path: "M206 360 L 248 360 L 248 314 L 370 314", begin: "3.3s" },
-        ].map((p, i) => (
-          <g key={i}>
-            <circle r="9" fill={p.color} opacity="0.3" filter="url(#hs-glow)">
-              <animateMotion dur="4.4s" begin={p.begin} repeatCount="indefinite" path={p.path} keyPoints="0;1;1" keyTimes="0;0.7;1" calcMode="linear" />
-            </circle>
-            <circle r="5.5" fill={p.color} stroke="var(--surface-1)" strokeWidth="1.5">
-              <animateMotion dur="4.4s" begin={p.begin} repeatCount="indefinite" path={p.path} keyPoints="0;1;1" keyTimes="0;0.7;1" calcMode="linear" />
-            </circle>
+        {PATIENTS.map((p, i) => (
+          <g key={i} className="hs-mover" style={{ animation: `hsWalk${i} 4.4s linear ${p.delay}s infinite both` }}>
+            <circle r="10" fill={p.color} opacity="0.28" />
+            <circle r="5.5" fill={p.color} stroke="var(--surface-1)" strokeWidth="1.5" />
           </g>
         ))}
 
@@ -95,24 +132,16 @@ export default function HeroScene() {
         <rect x="160" y="388" width="92" height="6" fill="var(--grid)" />
 
         {/* ambulance arriving and stopping at the entrance */}
-        <g>
-          <animateMotion dur="8s" repeatCount="indefinite" path="M-90 410 L 160 410" keyPoints="0;1;1" keyTimes="0;0.45;1" calcMode="spline" keySplines="0.3 0 0.2 1;0 0 1 1" />
-          <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="1;1;1;0" keyTimes="0;0.45;0.92;1" />
+        <g className="hs-mover" style={{ animation: "hsAmbIn 8s linear infinite both" }}>
           <Ambulance />
         </g>
         {/* ambulance turned away: drives straight past */}
-        <g opacity="0">
-          <animateMotion dur="9s" begin="3s" repeatCount="indefinite" path="M-110 440 L 700 440" />
-          <animate attributeName="opacity" dur="9s" begin="3s" repeatCount="indefinite" values="1;1" />
+        <g className="hs-mover" style={{ animation: "hsAmbPast 9s linear 3s infinite both" }}>
           <Ambulance tag />
         </g>
 
         {/* helicopter */}
-        <g>
-          <animateMotion dur="14s" repeatCount="indefinite" calcMode="spline"
-            values="-90,40; 150,24; 330,48; 440,88; 470,101; 470,101; 500,86; 600,40; 700,6"
-            keyTimes="0; 0.14; 0.28; 0.38; 0.44; 0.66; 0.74; 0.88; 1"
-            keySplines="0 0 1 1; 0 0 1 1; 0 0 1 1; 0 0 0.4 1; 0 0 1 1; 0.6 0 1 1; 0 0 1 1; 0 0 1 1" />
+        <g className="hs-mover" style={{ animation: "hsHeli 14s linear infinite both" }}>
           <g transform="translate(0,-8)">
             <ellipse cx="0" cy="0" rx="22" ry="9" fill="var(--accent)" />
             <ellipse cx="9" cy="-1" rx="8" ry="5" fill="#bfe0ff" />

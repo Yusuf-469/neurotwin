@@ -487,7 +487,6 @@ main, .footer, .banner { position: relative; z-index: 1; }
     linear-gradient(color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px);
   background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
-  transform: translateY(calc(var(--scroll, 0) * -0.08px));
   -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 75%);
   mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 75%); }
 .bp-cross { position: absolute; fill: color-mix(in srgb, var(--accent) 22%, transparent); animation: drift 22s ease-in-out infinite; }
@@ -498,9 +497,14 @@ main, .footer, .banner { position: relative; z-index: 1; }
 .bp-ecg.e1 { top: 22%; stroke: color-mix(in srgb, var(--accent) 35%, transparent); }
 .bp-ecg.e2 { top: 72%; stroke: color-mix(in srgb, var(--series-3) 30%, transparent); }
 .bp-ecg.e2 path { animation-duration: 9s; animation-delay: -4s; }
-.cursor-glow { position: fixed; z-index: 0; pointer-events: none; width: 520px; height: 520px; border-radius: 50%;
-  left: var(--mx-page, -999px); top: var(--my-page, -999px); transform: translate(-50%, -50%);
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, transparent), transparent 65%); transition: left .12s ease-out, top .12s ease-out; }
+/* cursor light: positioned by JS with translate3d; negative margins centre it on the pointer */
+.cursor-glow, .cursor-core { position: fixed; left: 0; top: 0; z-index: 0; pointer-events: none; border-radius: 50%;
+  opacity: 0; transition: opacity .4s ease; will-change: transform; }
+.cursor-glow { width: 560px; height: 560px; margin: -280px 0 0 -280px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 13%, transparent), transparent 62%); }
+.cursor-core { width: 140px; height: 140px; margin: -70px 0 0 -70px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--violet) 16%, transparent), transparent 70%); }
+.cursor-glow.on, .cursor-core.on { opacity: 1; }
 @keyframes drift { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(18px, -26px) rotate(25deg); } }
 @keyframes ecg { from { stroke-dashoffset: 2300; } to { stroke-dashoffset: 0; } }
 
@@ -641,7 +645,7 @@ main, .footer, .banner { position: relative; z-index: 1; }
 .hs-chip.bad { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 40%, var(--border)); }
 .hs-chip.bad .icon { color: var(--status-critical); }
 .hs-bar { width: 48px; height: 5px; border-radius: 3px; background: var(--grid); overflow: hidden; display: inline-block; }
-.hs-bar i { display: block; height: 100%; width: 94%; background: var(--grad); animation: barFill 5s ease-in-out infinite; }
+.hs-bar i { display: block; height: 100%; width: 100%; background: var(--grad); transform-origin: left; animation: barFill 5s ease-in-out infinite; }
 .hs-caption { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-size: 12px; color: var(--text-muted); }
 @media (max-width: 900px) { .hs-chip.c1 { left: 2%; } .hs-chip.c2 { right: 2%; } .hs-chip.c3 { right: 2%; } }
 @keyframes cloud { from { transform: translateX(-160px); } to { transform: translateX(700px); } }
@@ -653,7 +657,7 @@ main, .footer, .banner { position: relative; z-index: 1; }
 @keyframes hslane { to { stroke-dashoffset: -40; } }
 @keyframes door { 0%, 100% { opacity: .15; } 50% { opacity: .7; } }
 @keyframes chipFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes barFill { 0% { width: 70%; } 50% { width: 96%; } 100% { width: 70%; } }
+@keyframes barFill { 0%, 100% { transform: scaleX(.7); } 50% { transform: scaleX(.96); } }
 
 /* ---------- safety guard result tiles ---------- */
 .shield-card { margin-top: 16px; }
@@ -933,23 +937,28 @@ main { max-width: 1280px; padding: 28px clamp(16px, 3vw, 32px) 24px; }
 
 /* ---------- atmosphere ---------- */
 .backdrop { background: var(--page); }
-.aurora { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; mix-blend-mode: screen; animation: aurora 26s ease-in-out infinite; }
-:root[data-theme="light"] .aurora, :root:not([data-theme]) .aurora { mix-blend-mode: normal; }
+/* Soft light clouds. The radial gradients are already soft, so no blur filter or blend mode
+   (both forced a full repaint every frame); only transform animates, on the GPU. */
+.depth { position: absolute; inset: -40px; will-change: transform; }
+.aurora { position: absolute; border-radius: 50%; opacity: .7; will-change: transform; animation: aurora 26s ease-in-out infinite; }
 .aurora.a1 { width: 60vw; height: 50vh; left: -10vw; top: -20vh; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 45%, transparent), transparent 70%); }
 .aurora.a2 { width: 50vw; height: 45vh; right: -12vw; top: 10vh; background: radial-gradient(circle, color-mix(in srgb, var(--violet) 40%, transparent), transparent 70%); animation-delay: -9s; }
 .aurora.a3 { width: 55vw; height: 40vh; left: 25vw; bottom: -15vh; background: radial-gradient(circle, color-mix(in srgb, var(--teal) 30%, transparent), transparent 70%); animation-delay: -17s; }
 .floor { position: absolute; left: -20%; right: -20%; bottom: -10%; height: 55vh; opacity: .45;
+  transform: perspective(600px) rotateX(62deg); transform-origin: 50% 100%; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 80%); mask-image: linear-gradient(to top, #000 0%, transparent 80%); }
+/* the grid lives on an inner plane that slides with transform (no per-frame repaint) */
+.floor-plane { position: absolute; left: 0; right: 0; top: -64px; bottom: 0; will-change: transform;
+  animation: floorScroll 6s linear infinite;
   background-image: linear-gradient(color-mix(in srgb, var(--accent) 22%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent) 1px, transparent 1px);
-  background-size: 64px 64px; transform: perspective(600px) rotateX(62deg); transform-origin: 50% 100%;
-  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 80%); mask-image: linear-gradient(to top, #000 0%, transparent 80%);
-  animation: floorScroll 6s linear infinite; }
+  background-size: 64px 64px; }
 .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, transparent 40%, color-mix(in srgb, var(--page) 85%, transparent) 100%); }
 .bp-grid { opacity: .35; }
 .bp-cross { opacity: .6; }
 .bp-cross:nth-child(n+9) { display: none; }
 @keyframes aurora { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(4vw, 3vh) scale(1.12); } }
-@keyframes floorScroll { to { background-position: 0 64px; } }
+@keyframes floorScroll { to { transform: translate3d(0, 64px, 0); } }
 
 /* ---------- glass surfaces ---------- */
 .card { border-radius: var(--radius); background: linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 92%, transparent), color-mix(in srgb, var(--surface-1) 78%, transparent));
@@ -1185,3 +1194,24 @@ label.field { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercas
 
 /* keep the footer link clear of the back-to-top button */
 .footer-inner { padding-right: 64px; }
+
+/* ======================================================================= v6b: background */
+.bp-grid { will-change: transform; }
+.motes { position: absolute; inset: 0; }
+.motes span { position: absolute; bottom: -12px; border-radius: 50%; background: var(--accent); opacity: 0;
+  box-shadow: 0 0 8px var(--accent); will-change: transform, opacity; animation: mote 18s linear infinite; }
+.motes span:nth-child(3n) { background: var(--violet); box-shadow: 0 0 8px var(--violet); }
+.motes span:nth-child(4n) { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+@keyframes mote { 0% { transform: translate3d(0, 0, 0); opacity: 0; } 12% { opacity: .55; } 80% { opacity: .35; }
+  100% { transform: translate3d(28px, -105vh, 0); opacity: 0; } }
+.scanline { position: absolute; left: 0; right: 0; top: 0; height: 160px; will-change: transform; opacity: .8;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 7%, transparent) 70%,
+    color-mix(in srgb, var(--accent) 22%, transparent) 99%, transparent);
+  animation: scan 11s cubic-bezier(.45,.05,.55,.95) infinite; }
+@keyframes scan { 0% { transform: translate3d(0, -180px, 0); } 70%, 100% { transform: translate3d(0, 110vh, 0); } }
+.reduce-motion .motes, .reduce-motion .scanline, .reduce-motion .cursor-core { display: none; }
+.reduce-motion .floor-plane { animation: none !important; }
+
+/* off-screen sections: animations paused by AnimationGovernor (motion.tsx) */
+.anim-off, .anim-off * { animation-play-state: paused !important; }
+.hs-mover { will-change: transform; }
