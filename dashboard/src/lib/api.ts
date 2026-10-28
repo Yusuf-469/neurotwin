@@ -82,6 +82,18 @@ export interface HistoryPoint {
   cumulative_off_service: number;
 }
 
+/** One sealed test run, re-simulated on the server and compared with the stored result. */
+export interface ReproduceResult {
+  policy: string;
+  scenario: string;
+  seed: number;
+  run_number: number;
+  source: string;
+  compute_ms: number;
+  all_exact: boolean;
+  metrics: { metric: string; stored: number; reproduced: number; exact: boolean; difference: number }[];
+}
+
 /** A placement as recorded at decision time (agent's own, or what the reference rule would do). */
 export interface InsightPlacement {
   rid: number;
@@ -328,6 +340,8 @@ export const api = {
   explanation: (sid: string, id: number) =>
     request<{ explanation: Explanation }>(`/api/simulation/${sid}/explanations/${id}`),
   insight: (sid: string, id: number) => request<Insight>(`/api/simulation/${sid}/insight/${id}`),
+  reproduce: (policy: string, scenario: string, seed: number) =>
+    request<ReproduceResult>("/api/reproduce", { method: "POST", body: JSON.stringify({ policy, scenario, seed }) }),
   whatif: (sid: string, body: WhatIfRequestBody) =>
     request<WhatIfResult>(`/api/simulation/${sid}/whatif`, { method: "POST", body: JSON.stringify(body) }),
   results: () => request<StudyResults>("/api/experiments/results"),
