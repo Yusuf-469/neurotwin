@@ -136,3 +136,17 @@ export const PRIORITY_COLORS: Record<number, string> = {
   4: "var(--text-muted)",
   5: "var(--text-muted)",
 };
+
+/** Plain names for the RL agent's seven moves (neurotwin/rl/actions.py). */
+export const ACTION_LABELS: Record<string, string> = {
+  HOLD: "Wait and keep beds free",
+  ADMIT_PRIMARY_PRIORITY: "Admit the most urgent patient whose own ward has a free bed",
+  ADMIT_PRIMARY_LONGEST_WAIT: "Admit the longest-waiting patient whose own ward has a free bed",
+  ADMIT_OFF_SERVICE: "Place a patient in the other ward (their own is full)",
+  ADMIT_ICU: "Admit a patient to intensive care",
+  STEP_DOWN: "Move an ICU patient down to a ward",
+  ESCALATE: "Move a ward patient up to intensive care",
+};
+
+/** The RL decision-makers whose decisions can be opened in "Inside the agent". */
+export const RL_POLICY_KEYS = ["ppo_v3", "ppo_ensemble", "ppo", "ppo_shielded"];

@@ -37,6 +37,9 @@ The discrete-event simulator, the digital twin (snapshots, branching, conditiona
 **"How do you know your simulator is correct?"**
 In reduced configurations it is exactly M/M/c or M/M/c/K. All 15 analytical values (wait probability, mean wait, blocking, at three loads) fall inside the 95% CI of 30 replications. A deliberate 5% error in the arrival rate is detected, so the check has power. Exact sample-path identities (∫ queue dt = Σ waits) hold to 1e-9. This shows correct implementation, *not* realism. The parameters are plausible assumptions.
 
+**"Is the agent a black box?"**
+Open any decision on the Live hospital page. The panel is computed from the real networks: how each of the five voting networks scored every legal move, what Load-Balancing would have done in the same moment (it is consulted, never obeyed; a test checks the run is unchanged), and integrated-gradients attributions of the margin between the chosen move and the runner-up, against the average training situation. The attributions sum to the margin difference (completeness error shown), and they show what the network responded to, not causation. I do not show the critic's value: rewards are never positive, yet it predicts positive values in 14-24% of states, so its absolute level is not a calibrated forecast.
+
 **"Why didn't PPO beat Load-Balancing?"**
 It did on validation seeds (151 vs 164), but not on fresh test seeds, where the two are statistically indistinguishable. The validation numbers were also used to choose PPO's settings, so they were optimistically biased; the test set exists to remove that bias. Load-Balancing is also a strong, tuned baseline that directly targets the dominant trade-off. I report the honest result.
 
@@ -84,6 +87,6 @@ No. It is a research simulation with assumed parameters, not validated on real d
 0. Race page: RL agent v2 vs balance-the-wards vs most-urgent-first vs first-come-first-served, normal day, run 3, 3 days. Point out that all four get identical patients and that every number comes from the server live; then say one race is one sample and show the Results page for the 50-run verdict.
 1. Open the hosted Hugging Face Space, or run `docker run -p 7860:7860 neurotwin` locally (verified: health, pages, sessions, what-if, explanations). Open `/simulation/?demo=1` for a pre-warmed run.
 2. Simulation page: scenario A, policy `ppo`, seed 3. Step one week (warm-up), then one more week.
-3. Open a few decisions and explain them. Point out facts vs generated text, and the reliability indicator.
+3. Open a few decisions. With an RL agent deciding, show the "Inside the agent" panel: the five-network vote, the comparison with Load-Balancing, and the input attributions. Then point out facts vs generated text, and the reliability indicator.
 4. Run what-if: Priority vs Load-Balancing vs PPO, arrivals ×1.3, 72 h, 20 futures. Show the paired CIs.
 5. Study results page: cost table with CIs, CRN narrowing, reservation table.

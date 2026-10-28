@@ -36,7 +36,53 @@ POLICY_RULES = {
     "waiting against the cost of off-service placement",
     "ppo": "is a learned policy (PPO); its choice reflects patterns learned in training, not an "
     "explicit rule",
+    "ppo_shielded": "is a learned policy (PPO) with a safety guard that forbids keeping beds free "
+    "while the emergency department is full; otherwise its choice reflects patterns learned in "
+    "training, not an explicit rule",
+    "ppo_ensemble": "is a learned policy: five independently trained networks vote and the move "
+    "with the highest average probability is taken; it reflects patterns learned in training, "
+    "not an explicit rule",
 }
+
+# Plain-language names, so the explanation reads without knowing the code (the dashboard is
+# meant to be understandable by anyone). They match the dashboard's labels (lib/policies.ts).
+POLICY_NAMES = {
+    "fcfs": "first-come-first-served rule",
+    "priority": "most-urgent-first rule",
+    "load_balancing": "balance-the-wards rule",
+    "trunk_reservation": "keep-a-bed-free rule",
+    "mip": "instant optimiser",
+    "ppo": "RL agent",
+    "ppo_shielded": "RL agent with its safety guard",
+    "ppo_ensemble": "RL agent",
+}
+UNIT_NAMES = {"MED": "the medical ward", "SURG": "the surgical ward", "ICU": "intensive care"}
+PRIORITY_NAMES = {1: "critical", 2: "very urgent", 3: "urgent", 4: "standard", 5: "planned"}
+REQUEST_NAMES = {
+    "admit_general": "ward admission",
+    "admit_icu": "intensive-care admission",
+    "step_down": "move down from intensive care",
+    "escalation": "move up to intensive care",
+}
+ACTION_NAMES = {
+    "HOLD": "wait and keep beds free",
+    "ADMIT_PRIMARY_PRIORITY": "admit the most urgent patient whose own ward has a free bed",
+    "ADMIT_PRIMARY_LONGEST_WAIT": "admit the longest-waiting patient whose own ward has a free bed",
+    "ADMIT_OFF_SERVICE": "place a patient in the other ward because their own is full",
+    "ADMIT_ICU": "admit a patient to intensive care",
+    "STEP_DOWN": "move an intensive-care patient down to a ward",
+    "ESCALATE": "move a ward patient up to intensive care",
+}
+
+
+def _unit(u: str) -> str:
+    return UNIT_NAMES.get(u, u)
+
+
+def _clock(hours: float) -> str:
+    """Simulated time as "day D, HH:MM" (day 1 starts at hour 0)."""
+    day, rem = divmod(hours, 24.0)
+    return f"day {int(day) + 1}, {int(rem):02d}:{int(round((rem % 1) * 60)) % 60:02d}"
 LIMITATIONS = (
     "Post-hoc explanation of a simulated decision. It describes the policy's rule "
     "and the logged state; it does not show that the decision was good, and it is "
@@ -66,25 +112,32 @@ class Explanation:
 
 def _facts(record: dict[str, Any]) -> list[str]:
     f = [
-        f"time: {record['time']:.1f} h",
-        f"waiting requests: {record['n_waiting']} "
-        f"({record['n_waiting_high_priority']} with priority 1-2)",
-        f"longest wait: {record['oldest_wait_hours']:.1f} h",
-        "free staffed beds: " + ", ".join(f"{u} {n}" for u, n in record["free_staffed"].items()),
+        f"when: {_clock(record['time'])} of the simulation",
+        f"patients waiting: {record['n_waiting']} "
+        f"({record['n_waiting_high_priority']} critical or very urgent)",
+        f"longest wait so far: {record['oldest_wait_hours']:.1f} h",
+        "free beds with nurses: "
+        + ", ".join(f"{_unit(u)} {n}" for u, n in record["free_staffed"].items()),
     ]
     if record["action"] == "PLACE":
         f.append(
-            f"chosen request: {record['request_type']}, priority {record['priority']}, "
-            f"waited {record['waited_hours']:.1f} h, primary ward {record['primary_unit']}"
+            f"patient chosen: {PRIORITY_NAMES.get(record['priority'], 'priority')} "
+            f"(priority {record['priority']}), "
+            f"{REQUEST_NAMES.get(record['request_type'], record['request_type'])}, "
+            f"waited {record['waited_hours']:.1f} h, own ward {_unit(record['primary_unit'])}"
         )
         f.append(
-            f"placed in: {record['unit']}" + (" (off-service)" if record["off_service"] else "")
+            f"placed in: {_unit(record['unit'])}"
+            + (" (off-service: not their own ward)" if record["off_service"] else "")
         )
     probs = record.get("policy_details", {}).get("action_probabilities")
     if probs:
         f.append(
-            "policy action probabilities: "
-            + ", ".join(f"{a} {p:.2f}" for a, p in sorted(probs.items(), key=lambda kv: -kv[1]))
+            "network's probability for each possible move: "
+            + ", ".join(
+                f"{ACTION_NAMES.get(a, a)} {p:.2f}"
+                for a, p in sorted(probs.items(), key=lambda kv: -kv[1])
+            )
         )
     return f
 
@@ -96,33 +149,40 @@ class TemplateExplainer:
 
     def explain(self, record: dict[str, Any]) -> Explanation:
         policy = record["policy"]
+        name = POLICY_NAMES.get(policy, policy)
         rule = POLICY_RULES.get(policy, "applies its own decision rule")
         alternatives = [a for a in record.get("feasible_actions", []) if a != "HOLD"]
         if record["action"] == "PLACE":
-            where = record["unit"] + (" (off-service)" if record["off_service"] else "")
-            request_type = record["request_type"].replace("_", " ")
-            summary = (
-                f"Placed a priority-{record['priority']} {request_type} "
-                f"request that had waited {record['waited_hours']:.1f} h in {where}."
+            where = _unit(record["unit"]) + (
+                " (off-service: not their own ward)" if record["off_service"] else ""
             )
-            reasoning = f"The {policy} policy {rule}."
+            summary = (
+                f"Placed a {PRIORITY_NAMES.get(record['priority'], 'waiting')} patient "
+                f"(priority-{record['priority']}, "
+                f"{REQUEST_NAMES.get(record['request_type'], record['request_type'])}) "
+                f"in {where} after a {record['waited_hours']:.1f} h wait."
+            )
+            reasoning = f"The {name} {rule}."
             if record["off_service"]:
                 reasoning += (
-                    f" The patient's primary ward ({record['primary_unit']}) had "
-                    f"{record['free_staffed'].get(record['primary_unit'], 0)} free staffed beds."
+                    f" Their own ward, {_unit(record['primary_unit'])}, had "
+                    f"{record['free_staffed'].get(record['primary_unit'], 0)} free beds with nurses."
                 )
         else:
-            summary = f"Held: no placement made with {record['n_waiting']} requests waiting."
+            summary = (
+                f"Kept beds free: nobody was placed, with {record['n_waiting']} patients waiting."
+            )
             reasoning = (
-                f"The {policy} policy {rule}. At this moment it chose not to place any "
-                f"further patient although {len(alternatives)} placement action(s) were feasible."
+                f"The {name} {rule}. At this moment it chose not to place anyone, although "
+                f"{len(alternatives)} placement move(s) were possible."
             )
         probs = record.get("policy_details", {}).get("action_probabilities")
         if probs:
             top = max(probs, key=probs.get)
             reasoning += (
-                f" The learned policy assigned probability {probs[top]:.2f} to {top}; "
-                "this is the policy's output, not a confidence in the decision's quality."
+                f" The network gave probability {probs[top]:.2f} to the move "
+                f"\"{ACTION_NAMES.get(top, top)}\"; this is the network's output, "
+                "not a confidence in the decision's quality."
             )
         return Explanation(
             record["decision_id"],

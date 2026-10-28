@@ -67,6 +67,9 @@ class PPOPolicy(AllocationPolicy):
         if dropped:
             obs[dropped] = 0.0  # same feature ablation the agent was trained with
         action = self.agent.act(obs, mask, self.deterministic)
+        # Exact decision-time inputs (after feature dropping and the shield), kept for the
+        # dashboard's "inside the agent" view.
+        self.last_obs, self.last_mask = obs, mask
         # Decision-time details for the decision log / explanation layer (read-only).
         probs = self.agent.action_probabilities(obs, mask)
         self.last_details = {
