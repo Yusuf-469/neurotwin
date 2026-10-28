@@ -8,6 +8,7 @@ import { ThemeToggle } from "./ui";
 const LINKS = [
   { href: "/", label: "Overview" },
   { href: "/simulation/", label: "Live hospital" },
+  { href: "/race/", label: "Race" },
   { href: "/experiments/", label: "Results" },
 ];
 

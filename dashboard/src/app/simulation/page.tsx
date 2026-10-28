@@ -7,15 +7,15 @@ import { Icon, type IconName } from "@/components/icons";
 import LiveCharts from "@/components/LiveCharts";
 import { Reveal } from "@/components/motion";
 import { Segmented, TechDetails } from "@/components/ui";
-import WhatIfPanel from "@/components/WhatIfPanel";
+import Link from "next/link";
+import { ConditionsSliders, PolicySelect, SituationSelect, describe } from "@/components/setup";
 import { api, type Conditions, type DecisionRecord, type HistoryPoint, type HospitalState, type StateResponse } from "@/lib/api";
-import { LIVE_POLICIES, PRIORITY_COLORS, PRIORITY_NAMES, SCENARIO_INFO, SCENARIO_LABELS, UNIT_LABELS, policyMeta } from "@/lib/policies";
+import { PRIORITY_COLORS, PRIORITY_NAMES, SCENARIO_INFO, SCENARIO_LABELS, UNIT_LABELS, policyMeta } from "@/lib/policies";
 
 // Live "control room": the animated floor plan is driven by the real simulation state; every
 // tick advances the simulator by `speed` simulated hours and animates what happened in between
 // (placements, discharges, diversions). Charts, decision explanations and what-if sit in tabs.
 
-const EXTRA_SCENARIOS = ["B_severe", "C_severe", "D_severe", "E_severe"];
 type Speed = "2" | "6" | "12" | "24";
 const TICK_MS = 1800;
 
@@ -36,17 +36,8 @@ function clock(hours: number) {
   return { day, hh: h, label: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` };
 }
 
-type Tab = "trends" | "decisions" | "whatif";
+type Tab = "trends" | "decisions";
 type Server = "checking" | "online" | "waking" | "offline";
-
-/** "+30% patients, 20% fewer staff" style summary of custom conditions. */
-function describe(c: Conditions): string {
-  const part = (m: number, more: string, fewer: string) =>
-    Math.abs(m - 1) < 0.005 ? "" : m > 1 ? `${Math.round((m - 1) * 100)}% ${more}` : `${Math.round((1 - m) * 100)}% ${fewer}`;
-  const parts = [part(c.arrival_multiplier, "more patients", "fewer patients"),
-    part(c.staff_multiplier, "more staff", "fewer staff"), part(c.capacity_multiplier, "more beds", "fewer beds")].filter(Boolean);
-  return parts.length ? parts.join(", ") : "same as a normal day";
-}
 
 export default function SimulationPage() {
   const [policies, setPolicies] = useState<string[]>([]);
@@ -260,16 +251,10 @@ export default function SimulationPage() {
         <section className="card">
           <div className="control-dock">
             <label className="field">Situation
-              <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
-                {Object.keys(SCENARIO_LABELS).map((k) => <option key={k} value={k}>{k} · {SCENARIO_INFO[k].short}</option>)}
-                {EXTRA_SCENARIOS.map((k) => <option key={k} value={k}>{k[0]} · {SCENARIO_INFO[k[0]].short}, extreme overload</option>)}
-                <option value="custom">Custom: set your own conditions</option>
-              </select>
+              <SituationSelect value={scenario} onChange={setScenario} />
             </label>
             <label className="field">Decision-maker
-              <select value={policy} onChange={(e) => setPolicy(e.target.value)}>
-                {LIVE_POLICIES.filter((p) => policies.includes(p.key)).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-              </select>
+              <PolicySelect value={policy} onChange={setPolicy} available={policies} />
             </label>
             <label className="field">Run number<input type="number" min={0} value={seed} onChange={(e) => setSeed(+e.target.value)} /></label>
             <label className="field">Start from
@@ -290,27 +275,13 @@ export default function SimulationPage() {
             <button className="btn ghost" onClick={() => step(168)} disabled={!sid || playing || status?.finished}>
               <Icon name="forward" size={15} /> +1 week
             </button>
+            {sid && !status?.finished && (
+              <Link href={`/race/?from=${sid}`} className="btn ghost" onClick={() => setPlaying(false)}>
+                <Icon name="flag" size={15} /> Race from this moment
+              </Link>
+            )}
           </div>
-          {scenario === "custom" && (
-            <div className="custom-panel">
-              {([
-                ["arrival_multiplier", "Patients arriving", 0.5, 1.6, "users"],
-                ["staff_multiplier", "Nurses and doctors", 0.6, 1.4, "staff"],
-                ["capacity_multiplier", "Beds available", 0.6, 1.4, "bed"],
-              ] as [keyof Conditions, string, number, number, IconName][]).map(([key, label, lo, hi, icon]) => (
-                <label key={key} className="slider">
-                  <span className="slider-head"><Icon name={icon} size={15} />{label}
-                    <b>{custom[key] === 1 ? "normal" : `${custom[key] > 1 ? "+" : "−"}${Math.round(Math.abs(custom[key] - 1) * 100)}%`}</b></span>
-                  <input type="range" min={lo} max={hi} step={0.05} value={custom[key]}
-                    onChange={(e) => setCustom((c) => ({ ...c, [key]: +e.target.value }))} />
-                  <span className="slider-scale"><span>{Math.round(lo * 100)}%</span><span>normal</span><span>{Math.round(hi * 100)}%</span></span>
-                </label>
-              ))}
-              <p className="muted" style={{ margin: 0 }}>
-                Your situation: <b>{describe(custom)}</b>. Press Start to simulate it. The agent never trained on this, so it is a genuine test.
-              </p>
-            </div>
-          )}
+          {scenario === "custom" && <ConditionsSliders value={custom} onChange={setCustom} />}
           {error && <p className="error" style={{ marginBottom: 0 }}>{error}</p>}
           {status && (
             <p className="muted" style={{ margin: "10px 0 0" }}>
@@ -400,7 +371,7 @@ export default function SimulationPage() {
       <Reveal>
         <section className="card">
           <div className="tabs" role="tablist">
-            {([["trends", "chart", "Trends over time"], ["decisions", "chat", "Every decision, explained"], ["whatif", "wand", "What if…?"]] as [Tab, IconName, string][]).map(([k, icon, label]) => (
+            {([["trends", "chart", "Trends over time"], ["decisions", "chat", "Every decision, explained"]] as [Tab, IconName, string][]).map(([k, icon, label]) => (
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
                 <Icon name={icon} size={16} />{label}
               </button>
@@ -412,7 +383,6 @@ export default function SimulationPage() {
               ? <LiveCharts history={history} warmupHours={status.warmup_hours} />
               : <p className="muted">Play for a little while to build up the charts.</p>)}
             {status && tab === "decisions" && <DecisionLog sessionId={sid} decisions={decisions.decisions} total={decisions.total} />}
-            {status && tab === "whatif" && <WhatIfPanel sessionId={sid} policies={policies} disabled={!!status.finished} />}
           </div>
           <TechDetails label="How this simulation works">
             <p>Discrete-event simulation: arrivals, treatment, stays and nurse shifts are random events drawn from fixed, seeded

@@ -66,6 +66,7 @@ from ..policies.ppo_policy import PPOPolicy
 from ..simulation.config import SCENARIOS, SEVERE_SCENARIOS, ScenarioConfig, load_default_config
 from ..simulation.hospital import HospitalSimulation, run_until
 from ..whatif import WhatIfEngine, WhatIfRequest
+from ..whatif.race import Race
 
 ROOT = Path(__file__).resolve().parents[2]
 SIMULATION_LABEL = (
@@ -167,19 +168,22 @@ def _llm_budget_available() -> bool:
         return True
 
 
+def _conditions(scenario: str, custom: "CustomConditions | None" = None) -> ScenarioConfig:
+    """Named scenario, or user-defined multipliers for scenario "custom"."""
+    if scenario == "custom":
+        c = custom or CustomConditions()
+        return ScenarioConfig(
+            "custom", c.arrival_multiplier, c.staff_multiplier, c.capacity_multiplier
+        )
+    if scenario in ALL_SCENARIOS:
+        return ALL_SCENARIOS[scenario]
+    raise HTTPException(404, f"unknown scenario {scenario!r}")
+
+
 def _new_session(
     scenario: str, seed: int, policy: str, custom: CustomConditions | None = None
 ) -> Session:
-    if scenario == "custom":
-        c = custom or CustomConditions()
-        conditions = ScenarioConfig(
-            "custom", c.arrival_multiplier, c.staff_multiplier, c.capacity_multiplier
-        )
-    elif scenario in ALL_SCENARIOS:
-        conditions = ALL_SCENARIOS[scenario]
-    else:
-        raise HTTPException(404, f"unknown scenario {scenario!r}")
-    sim = HospitalSimulation(load_default_config(), conditions, seed=seed)
+    sim = HospitalSimulation(load_default_config(), _conditions(scenario, custom), seed=seed)
     session = Session(
         scenario, seed, policy, sim, LoggingPolicy(build_policy(policy), DecisionLog())
     )
@@ -397,6 +401,88 @@ def explanation(sid: str, decision_id: int) -> dict[str, Any]:
         result["verification_issues"] = ["hourly LLM limit reached; template explanation used"]
         return {"label": SIMULATION_LABEL, "explanation": result}
     return {"label": SIMULATION_LABEL, "explanation": TemplateExplainer().explain(record).as_dict()}
+
+
+# ---------------------------------------------------------------------- live races
+
+MAX_RACES = 50
+MAX_RACE_HOURS = 14 * 24
+RACES: "OrderedDict[str, Race]" = OrderedDict()
+
+
+class RaceStart(BaseModel):
+    """Body of POST /api/race/start. start: "busy" (35-day warm-up under Load-Balancing first,
+    so all competitors inherit the same realistic state), "empty", or "session" (branch the
+    current state of an interactive session)."""
+
+    competitors: list[str] = Field(..., min_length=2, max_length=6)
+    scenario: str = "A"
+    custom: CustomConditions | None = None
+    seed: int = Field(0, ge=0)
+    start: str = Field("busy", pattern="^(busy|empty|session)$")
+    session_id: str | None = None
+    horizon_hours: float = Field(72.0, ge=12.0, le=MAX_RACE_HOURS)
+
+
+class RaceStep(BaseModel):
+    hours: float = Field(6.0, gt=0, le=48.0)
+
+
+@app.post("/api/race/start")
+def race_start(body: RaceStart) -> dict[str, Any]:
+    """Branch one hospital state into identical copies, one per competitor (CRN)."""
+    if len(set(body.competitors)) != len(body.competitors):
+        raise HTTPException(422, "competitors must be distinct")
+    factories = {}
+    for name in body.competitors:
+        build_policy(name)  # validates the name early
+        factories[name] = lambda n=name: build_policy(n)
+    t0 = time.perf_counter()
+    if body.start == "session":
+        if not body.session_id:
+            raise HTTPException(422, "start=session needs session_id")
+        base = _get(body.session_id).sim
+        label = "your live run"
+    else:
+        conditions = _conditions(body.scenario, body.custom)
+        base = HospitalSimulation(load_default_config(), conditions, seed=body.seed)
+        if body.start == "busy":
+            warm = make_policy("load_balancing", load_baseline_params()["load_balancing"])
+            run_until(base, warm, until=base.config.warmup_hours)
+        label = conditions.name
+    if base.finished:
+        raise HTTPException(409, "that run has already finished")
+    try:
+        race = Race(base, factories, body.horizon_hours, seed=body.seed)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    rid = uuid.uuid4().hex[:12]
+    RACES[rid] = race
+    RACES.move_to_end(rid)
+    while len(RACES) > MAX_RACES:
+        RACES.popitem(last=False)
+    return {
+        "label": SIMULATION_LABEL,
+        "race_id": rid,
+        "start_label": label,
+        "start_time": race.start,
+        "setup_ms": round(1000 * (time.perf_counter() - t0), 1),
+        **race.standings(),
+    }
+
+
+@app.post("/api/race/{rid}/step")
+def race_step(rid: str, body: RaceStep) -> dict[str, Any]:
+    """Advance every competitor by the same simulated time; report live standings."""
+    if rid not in RACES:
+        raise HTTPException(404, "unknown race (it may have expired)")
+    race = RACES[rid]
+    RACES.move_to_end(rid)
+    if race.finished:
+        raise HTTPException(409, "the race is over")
+    t0 = time.perf_counter()
+    out = race.step(body.hours)
+    return {"compute_ms": round(1000 * (time.perf_counter() - t0), 1), **out}
 
 
 @app.post("/api/simulation/{sid}/whatif")

@@ -695,3 +695,95 @@ main, .footer, .banner { position: relative; z-index: 1; }
 .vbar i { display: block; height: 100%; border-radius: 4px; background: var(--axis); }
 .vrow.best .vbar i { background: var(--grad); }
 @media (max-width: 640px) { .vrow { grid-template-columns: 1fr 48px; } .vrow .vbar { display: none; } }
+
+/* ---------- race: setup picker ---------- */
+.picker { display: grid; gap: 14px; margin-top: 16px; }
+.picker-group .eyebrow { margin-bottom: 6px; }
+.pick { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 13.5px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary); transition: all .2s ease; }
+.pick:hover { border-color: var(--pc); color: var(--text-primary); transform: translateY(-1px); }
+.pick.on { border-color: var(--pc); color: var(--text-primary); background: color-mix(in srgb, var(--pc) 16%, var(--surface-1));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc) 20%, transparent); }
+.pick .icon { color: var(--pc); }
+
+/* ---------- race: track ---------- */
+.race-card { overflow: hidden; }
+.race-head { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.race-clock { font-family: var(--font-display, inherit); font-size: 30px; font-weight: 800; letter-spacing: -0.03em; }
+.race-clock .muted { font-size: 15px; font-weight: 500; }
+.track { position: relative; }
+.lane { position: absolute; left: 0; right: 0; height: 78px; display: grid; grid-template-columns: 44px 190px minmax(0, 1fr) 250px; gap: 14px;
+  align-items: center; padding: 0 12px; border-radius: 14px; border: 1px solid var(--border);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pc) 9%, var(--surface-1)), var(--surface-1) 40%);
+  transition: top .7s cubic-bezier(.2,.8,.2,1), box-shadow .4s ease, border-color .4s ease; }
+.lane.lead { border-color: color-mix(in srgb, var(--pc) 70%, var(--border)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--pc) 30%, transparent), 0 10px 30px color-mix(in srgb, var(--pc) 22%, transparent); }
+.rank { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-display, inherit); font-weight: 800; font-size: 18px;
+  background: var(--surface-2); color: var(--text-secondary); transition: all .4s ease; }
+.rank.r1 { background: linear-gradient(135deg, #f6c445, #e39a12); color: #fff; box-shadow: 0 6px 16px rgba(227,154,18,.35); }
+.rank.r2 { background: linear-gradient(135deg, #cfd5dc, #9aa3ad); color: #fff; }
+.rank.r3 { background: linear-gradient(135deg, #e0a074, #b8693a); color: #fff; }
+.lane-name { display: flex; flex-direction: column; min-width: 0; }
+.lane-name b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lane-name span { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asphalt { position: relative; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--text-primary) 8%, var(--surface-2)); overflow: hidden; }
+.asphalt::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed color-mix(in srgb, var(--text-muted) 45%, transparent);
+  animation: lanedash 1s linear infinite; }
+.finish { position: absolute; right: 0; top: 0; bottom: 0; width: 12px;
+  background: repeating-conic-gradient(var(--text-primary) 0 25%, var(--surface-1) 0 50%) 0 0 / 6px 6px; opacity: .55; }
+.car-wrap { position: absolute; top: 8px; transition: left 1s cubic-bezier(.3,.7,.3,1); }
+.race-car { display: block; filter: drop-shadow(0 3px 4px rgba(0,0,0,.3)); }
+.lane.lead .race-car { animation: bounce .5s ease-in-out infinite; }
+.speed { position: absolute; right: 100%; top: 9px; width: 34px; height: 10px; margin-right: -4px;
+  background: repeating-linear-gradient(180deg, color-mix(in srgb, var(--pc) 70%, transparent) 0 2px, transparent 2px 4px); opacity: .7;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000); mask-image: linear-gradient(90deg, transparent, #000); animation: speed .35s linear infinite; }
+.lane-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lane-stats div { display: flex; flex-direction: column; }
+.lane-stats span { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.lane-stats b { font-family: var(--font-display, inherit); font-size: 17px; font-variant-numeric: tabular-nums; }
+.lane-stats b.bad { color: var(--status-critical); }
+.countdown { position: absolute; inset: 0; display: grid; place-items: center; z-index: 3; background: color-mix(in srgb, var(--surface-1) 55%, transparent);
+  backdrop-filter: blur(2px); border-radius: 14px; }
+.countdown span { font-family: var(--font-display, inherit); font-size: 96px; font-weight: 900; background: var(--grad); -webkit-background-clip: text; background-clip: text;
+  color: transparent; animation: countIn .7s cubic-bezier(.2,.9,.3,1.3); }
+.event.lead { background: color-mix(in srgb, var(--series-4) 16%, var(--surface-2)); }
+@media (max-width: 900px) {
+  .lane { grid-template-columns: 36px minmax(0, 1fr) 150px; height: 78px; }
+  .lane .asphalt { display: none; }
+}
+@keyframes lanedash { to { transform: translateX(-24px); } }
+@keyframes bounce { 50% { transform: translateY(-2px); } }
+@keyframes speed { to { transform: translateX(-6px); } }
+@keyframes countIn { from { transform: scale(2.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---------- race: podium ---------- */
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 14px; padding-top: 10px; }
+.podium > div { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 170px; animation: fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
+.podium .step-1 { animation-delay: .25s; }
+.podium .step-3 { animation-delay: .1s; }
+.pod-name { font-weight: 700; font-size: 14px; text-align: center; }
+.pod-cost { font-size: 12.5px; color: var(--text-muted); }
+.pod-block { width: 100%; display: grid; place-items: center; font-family: var(--font-display, inherit); font-size: 34px; font-weight: 900; color: #fff;
+  border-radius: 12px 12px 4px 4px; background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 85%, #fff), var(--pc)); }
+.step-1 .pod-block { height: 120px; box-shadow: 0 10px 30px color-mix(in srgb, var(--pc) 35%, transparent); }
+.step-2 .pod-block { height: 86px; }
+.step-3 .pod-block { height: 62px; }
+
+/* ---------- agent journey timeline ---------- */
+.journey { position: relative; display: grid; gap: 18px; max-width: 900px; margin: 0 auto; }
+.journey::before { content: ""; position: absolute; left: 21px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px;
+  background: linear-gradient(var(--series-1), var(--status-critical), var(--status-good), var(--violet)); opacity: .55; }
+.journey-step { display: grid; grid-template-columns: 44px 1fr; gap: 16px; align-items: start; }
+.journey-dot { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--series-1);
+  box-shadow: 0 0 0 6px var(--page); position: relative; z-index: 1; }
+.journey-step.bad .journey-dot { background: var(--status-critical); }
+.journey-step.good .journey-dot { background: var(--status-good); }
+.journey-step.win .journey-dot { background: var(--grad); box-shadow: 0 0 0 6px var(--page), 0 8px 24px color-mix(in srgb, var(--violet) 45%, transparent); }
+.journey-step .card { padding: 16px 18px; }
+.journey-tag { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+.journey-step h3 { margin: 2px 0 6px; font-size: 17px; }
+.journey-step p { margin: 0; color: var(--text-secondary); font-size: 14px; }
+.journey-result { margin-top: 10px; display: inline-block; font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 8px;
+  background: var(--surface-2); color: var(--text-primary); }
+.journey-step.win .journey-result { background: color-mix(in srgb, var(--violet) 16%, var(--surface-2)); }
+.journey-step.bad .journey-result { background: color-mix(in srgb, var(--status-critical) 12%, var(--surface-2)); }
+.journey-step.good .journey-result { background: color-mix(in srgb, var(--status-good) 12%, var(--surface-2)); }

@@ -78,6 +78,7 @@ I treat diversions as a constraint: at most 3 per 100 arrivals. A single policy 
 No. It is a research simulation with assumed parameters, not validated on real data, and not a medical device. A real study would need real data, calibration, clinical input and governance.
 
 ## 4. Demo checklist
+0. Race page: RL agent v2 vs balance-the-wards vs most-urgent-first vs first-come-first-served, normal day, run 3, 3 days. Point out that all four get identical patients and that every number comes from the server live; then say one race is one sample and show the Results page for the 50-run verdict.
 1. Open the hosted Hugging Face Space, or run `docker run -p 7860:7860 neurotwin` locally (verified: health, pages, sessions, what-if, explanations). Open `/simulation/?demo=1` for a pre-warmed run.
 2. Simulation page: scenario A, policy `ppo`, seed 3. Step one week (warm-up), then one more week.
 3. Open a few decisions and explain them. Point out facts vs generated text, and the reliability indicator.
