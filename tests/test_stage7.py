@@ -208,3 +208,17 @@ def test_shielded_agent_never_holds_while_ed_full():
     run_episode(sim, policy)
     assert policy.shield_activations > 0  # the overload actually triggered the shield
     assert violations == []
+
+
+def test_v3_training_range_covers_every_stress_scenario():
+    from neurotwin.experiments.v3 import RANGE, sample_wide
+
+    for key in "BCDE":
+        sc = SCENARIOS[key]
+        assert RANGE["arrival"][0] <= sc.arrival_multiplier <= RANGE["arrival"][1]
+        assert RANGE["staff"][0] <= sc.staff_multiplier <= RANGE["staff"][1]
+        assert RANGE["capacity"][0] <= sc.capacity_multiplier <= RANGE["capacity"][1]
+    rng = np.random.default_rng(0)
+    draws = [sample_wide(rng) for _ in range(500)]
+    assert min(d.arrival_multiplier for d in draws) >= 0.95 and max(d.arrival_multiplier for d in draws) <= 1.15
+    assert min(d.staff_multiplier for d in draws) < 0.87  # actually reaches crisis staffing
