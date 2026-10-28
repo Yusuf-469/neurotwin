@@ -154,7 +154,10 @@ export function HospitalBackdrop() {
   const ecg = "M0 50 L180 50 L200 50 L210 30 L222 72 L236 10 L250 88 L262 50 L300 50 L420 50 L432 42 L446 58 L460 50 L600 50";
   return (
     <div className="backdrop" aria-hidden="true">
+      <div className="aurora a1" /><div className="aurora a2" /><div className="aurora a3" />
+      <div className="floor" />
       <div className="bp-grid" />
+      <div className="vignette" />
       {crosses.map((c, i) => (
         <svg key={i} className="bp-cross" viewBox="0 0 24 24" width={c.s} height={c.s}
           style={{ left: `${c.x}%`, top: `${c.y}%`, animationDelay: `${c.d}s` }}>

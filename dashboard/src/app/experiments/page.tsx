@@ -230,10 +230,8 @@ export default function ExperimentsPage() {
         <Reveal><span className="pill"><span className="badge">Results</span> {ver === "v3" ? "latest agent (v3) · 50 brand-new runs per situation" : ver === "v2" ? "agent v2 · 50 fresh runs per situation" : "development agent (v1) · 50 sealed test runs per situation"}</span></Reveal>
         <Reveal delay={80}><h1 style={{ fontSize: "clamp(30px, 4.4vw, 52px)" }}>What happened when the agent <span className="gradient-text">met the rules</span></h1></Reveal>
         <Reveal delay={160}><p className="lead">
-          Seven short chapters, each answering one question. Every chart says what you are looking at and what
-          it means. The full statistics are under &quot;Technical detail&quot;. Lower is better everywhere.
-         These are the study's fixed results, computed once from 2,500 sealed test runs, so they do not change.
-          To run your own experiment live, use <Link href="/race/">the Race</Link>.</p></Reveal>
+          The study&apos;s fixed results, one question per chapter. Lower is better everywhere; full statistics sit under
+          &quot;Technical detail&quot;. For a live experiment, try <Link href="/race/">the Race</Link>.</p></Reveal>
         <Reveal delay={200}>
           <div className="row" style={{ marginBottom: 4 }}>
             <Segmented options={[{ value: "v3", label: "Latest agent (v3)" }, { value: "v2", label: "v2" }, { value: "v1", label: "Development (v1)" }]}
@@ -258,7 +256,7 @@ export default function ExperimentsPage() {
       {/* ------------------------------------------------------------------ 1 overall */}
       <Scene id="overall">
         <Reveal><SectionHeader num="1" kicker="Overall" title="Who does best in each situation?"
-          lead="Pick what to measure. Each group of bars is one situation; each bar is one decision-maker." /></Reveal>
+          lead="One group per situation, one bar per decision-maker." /></Reveal>
         <Reveal>
           <div className="row" style={{ justifyContent: "center", marginBottom: 16 }}>
             <Segmented options={METRICS.map((m) => ({ value: m.key, label: m.label }))} value={metric} onChange={setMetric} />
@@ -382,7 +380,7 @@ export default function ExperimentsPage() {
       {/* ------------------------------------------------------------------ 3 crisis */}
       <Scene id="crisis">
         <Reveal><SectionHeader num="3" kicker="Robustness" title="How much worse does each one get in a crisis?"
-          lead="Compared with its own normal-day performance, how much does each decision-maker deteriorate across the four crises?" /></Reveal>
+          lead="How much worse each decision-maker gets in the four crises, relative to its own normal day." /></Reveal>
         <div className="grid grid-2">
           <Reveal kind="left">
             <Card title="Deterioration under crisis" subtitle="average % increase from normal day to crises (shorter bar = steadier)"
@@ -468,7 +466,7 @@ export default function ExperimentsPage() {
       {ablA.length > 0 && (
         <Scene id="ingredients">
           <Reveal><SectionHeader num="5" kicker="Ablation study" title="Which ingredients make the agent work?"
-            lead="We retrained the development agent (v1) eight times, each time taking one ingredient away, and measured how much worse it got on a normal day." /></Reveal>
+            lead="The development agent (v1) retrained eight times, each time without one ingredient." /></Reveal>
           <Reveal>
             <Card title="Cost increase when one ingredient is removed" subtitle="% change in overall cost vs the full agent (normal day) · faded bars = not a confident difference"
               explain="Longer red bar = that ingredient matters more. A bar near zero means the agent copes fine without it.">
@@ -495,7 +493,7 @@ export default function ExperimentsPage() {
       {(dr.length > 0 || data.constrained) && (
         <Scene id="tougher">
           <Reveal><SectionHeader num="6" kicker="Follow-up experiments" title="Three attempts to make the agent tougher"
-            lead="All three were planned and written down before running them, and all are reported exactly as they came out." /></Reveal>
+            lead="Planned in writing before running, reported as they came out." /></Reveal>
           <div className="grid grid-2">
             {dr.length > 0 && (
               <Reveal kind="left">
@@ -663,7 +661,7 @@ export default function ExperimentsPage() {
       {/* ------------------------------------------------------------------ 8 trust */}
       <Scene id="trust">
         <Reveal><SectionHeader num="8" kicker="Methodology" title="Why you can trust these numbers"
-          lead="A simulation study is only as good as its fairness. Here is how we kept it honest." /></Reveal>
+          lead="How the comparison was kept fair." /></Reveal>
         <div className="grid grid-2">
           <Reveal kind="left">
             <Card title="Same patients for everyone" subtitle="how many times more precise each comparison becomes"

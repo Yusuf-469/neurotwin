@@ -15,6 +15,20 @@ import { LIVE_POLICIES, POLICY_GROUPS, SCENARIO_INFO, policyMeta } from "@/lib/p
 // back from the server as it computes; the car positions are a visual of the running cost.
 
 const LANE_H = 86;
+const LANE_H_PHONE = 142;
+
+/** Lane pitch in px: lanes stack their track and stats on narrow screens. */
+function useLaneHeight(): number {
+  const [h, setH] = useState(LANE_H);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 760px)");
+    const set = () => setH(mq.matches ? LANE_H_PHONE : LANE_H);
+    set();
+    mq.addEventListener("change", set);
+    return () => mq.removeEventListener("change", set);
+  }, []);
+  return h;
+}
 const TICK_MS = 1100;
 const DEFAULT_COMPETITORS = ["ppo_v3", "load_balancing", "priority", "fcfs"];
 
@@ -38,6 +52,7 @@ function RaceCar({ color, n }: { color: string; n: number }) {
 }
 
 export default function RacePage() {
+  const laneH = useLaneHeight();
   const [available, setAvailable] = useState<string[]>([]);
   const [scenario, setScenario] = useState("A");
   const [custom, setCustom] = useState<Conditions>({ arrival_multiplier: 1.3, staff_multiplier: 0.9, capacity_multiplier: 1.0 });
@@ -218,8 +233,7 @@ export default function RacePage() {
           <span className="pill"><span className="badge">Live</span> computed on the server as you watch</span>
           <h1 style={{ fontSize: "clamp(28px, 4vw, 48px)", margin: "12px 0 8px" }}>The decision-maker <span className="gradient-text">race</span></h1>
           <p className="lead" style={{ marginBottom: 0 }}>
-            Pick a situation and the competitors. The server copies one hospital for each of them, so every competitor faces exactly the
-            same patients, then runs them side by side. Lowest cost wins.
+            Identical copies of one hospital, one per competitor, run side by side on the server. Lowest cost wins.
           </p>
         </section>
       </Reveal>
@@ -294,14 +308,14 @@ export default function RacePage() {
             {error && <p className="error">{error}</p>}
             <div className="episode-bar" style={{ margin: "10px 0 16px" }}><div className="fill" style={{ width: `${100 * progress}%` }} /></div>
 
-            <div className="track" style={{ height: lanes.length * LANE_H }}>
+            <div className="track" style={{ height: lanes.length * laneH }}>
               {lanes.map((l, i) => {
                 const m = policyMeta(l.name);
                 const eff = l.cost > 0 ? best / l.cost : 1;
                 const x = Math.min(1, progress * eff);
                 return (
                   <div key={l.name} className={`lane${l.rank === 1 && race.elapsed_hours > 0 ? " lead" : ""}`}
-                    style={{ top: (l.rank - 1) * LANE_H, ["--pc" as string]: m.color }}>
+                    style={{ top: (l.rank - 1) * laneH, height: laneH - 8, ["--pc" as string]: m.color }}>
                     <div className={`rank r${l.rank}`}>{l.rank}</div>
                     <div className="lane-name"><b>{m.label}</b><span>{m.tech}</span></div>
                     <div className="asphalt">
