@@ -214,11 +214,37 @@ export interface RaceStartBody {
   horizon_hours: number;
 }
 
+/** The free API host sleeps when idle and restarts on each deployment; for up to a minute requests
+ *  then fail without any response ("Failed to fetch") or with a 502/503 from the proxy. Such
+ *  failures are retried with backoff; other errors are returned at once. */
+const RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
+
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if ((res.status === 502 || res.status === 503) && attempt < RETRY_DELAYS_MS.length) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+        continue;
+      }
+      return res;
+    } catch {
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        throw new Error("Could not reach the simulation server. It may be waking up or restarting; please try again in a minute.");
+      }
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithRetry(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
+  if (res.status === 404 && /^\/api\/(simulation|race)\/[^/]+\/./.test(path)) {
+    throw new Error("This run is no longer on the server (the server restarts after updates and when it wakes from sleep). Press Start to begin a new run.");
+  }
   if (!res.ok) {
     // FastAPI errors: {"detail": "..."} or {"detail": [{"msg": "..."}]}; show the message only.
     let message = res.statusText;
