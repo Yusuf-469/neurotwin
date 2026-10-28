@@ -4,7 +4,7 @@
 // study's own episode function and compares it with the stored result, digit by digit.
 // The comparison is computed server-side; this component only displays it.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type ReproduceResult } from "@/lib/api";
 import { SCENARIO_LABELS, policyMeta } from "@/lib/policies";
 import { Icon } from "./icons";
@@ -32,6 +32,16 @@ export default function ReproduceCard() {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<ReproduceResult | null>(null);
   const [error, setError] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+
+  // seconds counter while the server works (the free server needs up to ~40 s for agent runs)
+  useEffect(() => {
+    if (!busy) return;
+    setElapsed(0);
+    const t0 = Date.now();
+    const id = window.setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 250);
+    return () => window.clearInterval(id);
+  }, [busy]);
 
   const go = async (p = policy, s = scenario, r = run) => {
     setBusy(true); setError(""); setRes(null);
@@ -83,7 +93,11 @@ export default function ReproduceCard() {
 
       {busy && (
         <div className="repro-busy">
-          <span className="live-dot wait" /> Simulating 49 days of this hospital on the server, decision by decision...
+          <span className="live-dot wait" /> Simulating 49 days of this hospital on the server, decision by decision
+          <span className="mono"> · {elapsed} s</span>
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            On the free server this takes a few seconds for a rule, and up to about 40 seconds for the RL agent or the optimiser.
+          </div>
           <div className="skel skel-line" style={{ marginTop: 10 }} />
         </div>
       )}
