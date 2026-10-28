@@ -98,12 +98,12 @@ const JOURNEY: { tag: string; title: string; text: string; result: string; icon:
   { tag: "Version 1", title: "Learning from scratch", icon: "cpu", tone: "",
     text: "A neural network trained with PPO, written from scratch, on normal days only. It beat four of the five hand-designed rules.",
     result: "Tied the best rule (balance-the-wards); no significant difference" },
-  { tag: "Finding", title: "A failure no rule has", icon: "alert", tone: "bad",
-    text: "Under crises one of the five trained copies sometimes froze: it kept beds empty while ambulances were turned away.",
-    result: "5 collapsed runs out of 1,250; the rules had none" },
-  { tag: "Fix", title: "A one-line safety guard", icon: "shield", tone: "good",
-    text: "Never keep a bed empty while the emergency department is full. No retraining, no tuned number.",
-    result: "Collapses 5 → 0, at a small cost in one crisis" },
+  { tag: "Finding", title: "An out-of-distribution failure mode", icon: "alert", tone: "bad",
+    text: "Under crisis conditions, one of the five trained agents occasionally held beds empty while the emergency department was diverting arrivals.",
+    result: "5 of 1,250 test runs collapsed; 0 for every rule-based policy" },
+  { tag: "Fix", title: "A parameter-free safety constraint", icon: "shield", tone: "good",
+    text: "Bed holding is prohibited while the emergency department is at capacity. No retraining and no tuned parameters.",
+    result: "Collapses reduced from 5 to 0, at a 4.4% cost in one crisis scenario" },
   { tag: "Version 2", title: "Learn from the best, then beat it", icon: "trend", tone: "win",
     text: "The agent first copied the best rule, then improved on it with reinforcement learning; five copies vote. Tested once on 50 runs never used before.",
     result: "8.5% lower cost than the best rule on normal days; ties in crises" },
@@ -313,10 +313,10 @@ export default function Overview() {
           </div></Reveal>
           <Reveal delay={0}><div className="card lift finding">
             <span className="big" style={{ color: "var(--status-good)" }}>5 → 0</span>
-            <h3>It found a new way to fail, then a guard fixed it</h3>
-            <p>One of five trained agents occasionally froze in a crisis, keeping beds empty while ambulances were turned away. A one-line safety guard (never hold a bed while the ED is full) removed every collapse.</p>
-            <TechDetails><p>Without the guard: 5 of 1,250 test episodes collapsed (diversion above 50%), all from one agent, against 0 of 1,250 for the rules.
-              With it: 0 of 1,250. No retraining. Cost: +4.4% in the staff-shortage scenario (significant); elsewhere no significant change. Pre-registered as RESEARCH.md v2.7.</p></TechDetails>
+            <h3>Failure mode identified and eliminated</h3>
+            <p>Under crisis conditions, one of the five trained agents occasionally held beds empty while the emergency department was diverting arrivals, a failure not seen in any rule-based policy. A parameter-free safety constraint, prohibiting bed holding while the emergency department is at capacity, eliminated all such collapses without retraining.</p>
+            <TechDetails><p>Unconstrained: 5 of 1,250 test episodes collapsed (diversion above 50%), all attributable to a single agent, against 0 of 1,250 for the rule-based policies.
+              Constrained: 0 of 1,250. Trade-off: +4.4% cost in the staff-shortage scenario (significant after Holm correction); no significant change elsewhere. Pre-registered as RESEARCH.md v2.7.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-2)" }}><CountUp value={crnMax} digits={1} suffix="×" /></span>
