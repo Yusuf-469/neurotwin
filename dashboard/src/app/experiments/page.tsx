@@ -7,8 +7,8 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { Icon, type IconName } from "@/components/icons";
-import { CountUp, Reveal, Scene, WhenVisible } from "@/components/motion";
-import { Card, Legend, SectionHeader, Segmented, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
+import { CountUp, Reveal, Scene, SplitWords, WhenVisible } from "@/components/motion";
+import { Card, Legend, SectionHeader, Segmented, Skeleton, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
 import { ENSEMBLE, V3, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, scenNum, type PolicyMeta } from "@/lib/policies";
 
@@ -133,7 +133,12 @@ export default function ExperimentsPage() {
       <p className="muted">{error}</p>
     </div>
   );
-  if (!data?.summary) return <p className="muted" style={{ marginTop: 24 }}>Loading study results… (the server may take up to a minute to wake up)</p>;
+  if (!data?.summary) return (
+    <div style={{ marginTop: 24 }}>
+      <p className="muted">Loading study results… (the server may take up to a minute to wake up)</p>
+      <Skeleton lines={3} chart={300} />
+    </div>
+  );
 
   const meta = METRICS.find((m) => m.key === metric)!;
   // The final agent (v2) is compared with every rule on the fresh block (RESEARCH.md v2.9); the
@@ -228,7 +233,7 @@ export default function ExperimentsPage() {
       <section className="hero2" style={{ marginBottom: 8 }}>
         <span className="blob b1" /><span className="blob b2" />
         <Reveal><span className="pill"><span className="badge">Results</span> {ver === "v3" ? "latest agent (v3) · 50 brand-new runs per situation" : ver === "v2" ? "agent v2 · 50 fresh runs per situation" : "development agent (v1) · 50 sealed test runs per situation"}</span></Reveal>
-        <Reveal delay={80}><h1 style={{ fontSize: "clamp(30px, 4.4vw, 52px)" }}>What happened when the agent <span className="gradient-text">met the rules</span></h1></Reveal>
+        <Reveal delay={80}><h1 style={{ fontSize: "clamp(30px, 4.4vw, 52px)" }}><SplitWords text="What happened when the agent" /> <SplitWords text="met the rules" delay={300} wordClass="gradient-text" /></h1></Reveal>
         <Reveal delay={160}><p className="lead">
           The study&apos;s fixed results, one question per chapter. Lower is better everywhere; full statistics sit under
           &quot;Technical detail&quot;. For a live experiment, try <Link href="/race/">the Race</Link>.</p></Reveal>

@@ -6,6 +6,7 @@ import {
 import type { HistoryPoint } from "@/lib/api";
 import { UNIT_COLORS, UNIT_LABELS } from "@/lib/policies";
 import { Card, Legend, useViewToggle } from "./ui";
+import { liveDot } from "./motion";
 
 interface Props {
   history: HistoryPoint[];
@@ -73,7 +74,8 @@ export default function LiveCharts({ history, warmupHours }: Props) {
                   formatter={(v, n) => [v === undefined ? "–" : `${v}%`, UNIT_LABELS[String(n)] ?? String(n)]}
                   labelFormatter={(d) => `day ${d} (fullest first)`} />
                 {(["MED", "SURG", "ICU"] as const).map((u) => (
-                  <Line key={u} type="monotone" dataKey={u} stroke={UNIT_COLORS[u]} strokeWidth={2} dot={false}
+                  <Line key={u} type="monotone" dataKey={u} stroke={UNIT_COLORS[u]} strokeWidth={2}
+                    dot={liveDot(data.length - 1, UNIT_COLORS[u])}
                     isAnimationActive={false} />
                 ))}
               </LineChart>
@@ -106,7 +108,7 @@ export default function LiveCharts({ history, warmupHours }: Props) {
                 <YAxis allowDecimals={false} {...axisProps} />
                 <Tooltip {...tooltipStyle} labelFormatter={(d) => `day ${d}`} />
                 <Area type="monotone" dataKey="waiting" name="waiting" stroke="var(--series-1)" strokeWidth={2}
-                  fill="url(#qfill)" isAnimationActive={false} />
+                  fill="url(#qfill)" isAnimationActive={false} dot={liveDot(data.length - 1, "var(--series-1)")} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

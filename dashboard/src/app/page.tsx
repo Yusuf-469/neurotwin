@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import HeroScene from "@/components/HeroScene";
 import { Icon, type IconName } from "@/components/icons";
-import { CountUp, Reveal, Scene } from "@/components/motion";
+import { CountUp, Reveal, Rotator, Scene, SplitWords } from "@/components/motion";
 import { SectionHeader, TechDetails } from "@/components/ui";
 import { api, type StudyResults } from "@/lib/api";
 import { POLICIES, SCENARIO_INFO, scenNum } from "@/lib/policies";
@@ -141,13 +141,15 @@ export default function Overview() {
             <div>
               <Reveal><span className="pill"><span className="badge">Research</span> Reinforcement learning × hospital operations</span></Reveal>
               <Reveal delay={80}>
-                <h1>Who gets the next hospital bed?<br /><span className="gradient-text">Can a learning agent decide better?</span></h1>
+                <h1><SplitWords text="Who gets the next hospital bed?" /><br /><SplitWords text="Can a learning agent decide better?" delay={330} wordClass="gradient-text" /></h1>
               </Reveal>
               <Reveal delay={160}>
                 <p className="lead">
                   A virtual hospital where a reinforcement-learning agent, built from scratch, competes with hand-tuned
                   rules and an optimiser to place every patient. Identical patients, normal days and crises.
                 </p>
+                <p className="hero-ticker"><span className="mono">TESTED ON</span>
+                  <Rotator items={["A normal day", "A demand surge", "A staff shortage", "Bed loss", "Everything at once"]} /></p>
               </Reveal>
               <Reveal delay={240}>
                 <div className="row">

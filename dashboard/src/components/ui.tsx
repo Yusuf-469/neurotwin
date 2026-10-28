@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
+import { Scramble, SplitWords } from "./motion";
 
 interface CardProps {
   title: string;
@@ -58,6 +59,16 @@ export function Takeaway({ children, tone = "info" }: { children: ReactNode; ton
   );
 }
 
+/** Shimmering placeholder blocks shown while data loads (keeps the layout from jumping). */
+export function Skeleton({ lines = 3, chart = 0 }: { lines?: number; chart?: number }) {
+  return (
+    <div className="skel-wrap" aria-hidden="true">
+      {Array.from({ length: lines }, (_, i) => <div key={i} className="skel skel-line" style={{ width: `${92 - i * 14}%` }} />)}
+      {chart > 0 && <div className="skel skel-chart" style={{ height: chart }} />}
+    </div>
+  );
+}
+
 /** Collapsible technical detail: the full statistics stay one click away. */
 export function TechDetails({ children, label = "Technical detail" }: { children: ReactNode; label?: string }) {
   return (
@@ -75,9 +86,9 @@ export function SectionHeader({ id, num, kicker, title, lead }: {
   return (
     <header className="section-head" id={id}>
       {(num || kicker) && (
-        <span className="kicker">{num && <span className="kicker-num">{num}</span>}{kicker}</span>
+        <span className="kicker">{num && <span className="kicker-num">{num}</span>}{kicker && <Scramble text={kicker} />}</span>
       )}
-      <h2>{title}</h2>
+      <h2><SplitWords text={title} /></h2>
       {lead && <p>{lead}</p>}
     </header>
   );

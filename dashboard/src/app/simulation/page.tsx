@@ -6,7 +6,7 @@ import FloorPlan from "@/components/FloorPlan";
 import { Icon, type IconName } from "@/components/icons";
 import LiveCharts from "@/components/LiveCharts";
 import RunVerdict from "@/components/RunVerdict";
-import { Reveal } from "@/components/motion";
+import { Reveal, SplitWords } from "@/components/motion";
 import { Segmented, TechDetails } from "@/components/ui";
 import Link from "next/link";
 import { ConditionsSliders, PolicySelect, SituationSelect, describe } from "@/components/setup";
@@ -284,7 +284,7 @@ export default function SimulationPage() {
                 <span className="pill"><i className={phaseDot} />{phaseLabel}</span>
                 <span className="pill"><i className={server === "online" ? "live-dot" : server === "offline" ? "live-dot off" : "live-dot amber"} />{serverLabel}</span>
               </div>
-              <h1 style={{ fontSize: "clamp(26px, 3.4vw, 40px)", margin: "10px 0 6px" }}>The live hospital</h1>
+              <h1 style={{ fontSize: "clamp(26px, 3.4vw, 40px)", margin: "10px 0 6px" }}><SplitWords text="The live hospital" /></h1>
               <p className="secondary" style={{ margin: 0, maxWidth: 640 }}>
                 Computed live on the server. Every bed decision is made by the decision-maker you choose.
               </p>
