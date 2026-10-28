@@ -12,6 +12,9 @@ import { Icon } from "./icons";
 import { Legend, Segmented, TechDetails, useViewToggle } from "./ui";
 
 const axisProps = { stroke: "var(--axis)", tick: { fill: "var(--text-muted)", fontSize: 11 }, tickLine: false } as const;
+/** Futures per request: sized so 24 h ahead stays under a minute on the free server (about
+ *  60 s measured for 20 futures there; requests are cut off at about 100 s). */
+const N_FUTURES = 16;
 const RIVALS = ["load_balancing", "priority", "trunk_reservation", "mip", "fcfs"];
 type Metric = "cost" | "waiting";
 
@@ -74,7 +77,7 @@ export default function FuturesFan({ sessionId, policy, onStart }: Props) {
     onStart?.();
     setBusy(true); setError(""); setRes(null);
     try {
-      setRes(await api.futures(sessionId, [own, rival], Number(hours), 20));
+      setRes(await api.futures(sessionId, [own, rival], Number(hours), N_FUTURES));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -101,7 +104,7 @@ export default function FuturesFan({ sessionId, policy, onStart }: Props) {
   return (
     <div className="stack" style={{ gap: 14 }}>
       <p className="explain-line"><Icon name="split" size={16} /><span>
-        Freeze this moment and play out 20 different futures (new arrivals, new lengths of stay) twice: once with each
+        Freeze this moment and play out {N_FUTURES} different futures (new arrivals, new lengths of stay) twice: once with each
         decision-maker, on exactly the same futures. The bands show the spread of what could happen.</span></p>
       <div className="fan-controls">
         <div className="fan-vs">
@@ -112,16 +115,16 @@ export default function FuturesFan({ sessionId, policy, onStart }: Props) {
               <option key={k} value={k}>{policyMeta(k).label}</option>)}
           </select>
         </div>
-        <Segmented options={[{ value: "24", label: "Next 24 h" }, { value: "48", label: "48 h" }, { value: "72", label: "72 h" }]}
+        <Segmented options={[{ value: "12", label: "Next 12 h" }, { value: "24", label: "24 h" }]}
           value={hours} onChange={setHours} />
-        <button className="btn lg glow" onClick={run} disabled={busy}><Icon name="split" size={16} /> Play out 20 futures</button>
+        <button className="btn lg glow" onClick={run} disabled={busy}><Icon name="split" size={16} /> Play out {N_FUTURES} futures</button>
       </div>
 
       {busy && (
         <div className="repro-busy">
-          <span className="live-dot wait" /> Simulating {Number(hours) * 2 * 20 / 24} days of hospital time on the server
+          <span className="live-dot wait" /> Simulating {Number(hours) * 2 * N_FUTURES / 24} days of hospital time on the server
           <span className="mono"> · {elapsed} s</span>
-          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>Playback is paused. On the free server this can take 20 to 60 seconds.</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>Playback is paused. On the free server this takes up to about a minute.</div>
           <div className="skel skel-chart" style={{ height: 220, marginTop: 10 }} />
         </div>
       )}
