@@ -300,7 +300,7 @@ export default function Overview() {
             <span className="big" style={{ color: "var(--series-1)" }}><CountUp value={winPct} digits={1} suffix="%" /> lower</span>
             <h3>Beats the best hand-tuned rule</h3>
             <p>Significantly lower cost than the balance-the-wards rule on normal days and in staff shortages. Never significantly worse.</p>
-            <TechDetails><p>Crisis-trained v3 (RESEARCH.md v2.10), second fresh seed block: situation 1 −5.1% (Holm p = 0.024), situation 3 −5.3% (p = 0.0005),
+            <TechDetails><p>Crisis-trained v3, tested once on 50 never-used runs per situation: situation 1 −5.1% (Holm p = 0.024), situation 3 −5.3% (p = 0.0005),
               situations 2, 4 and 5 within the uncertainty. v2 won on normal days (−8.5%); v1 tied the rule ({Number.isFinite(vsLB) ? `${vsLB > 0 ? "+" : ""}${vsLB.toFixed(1)}%` : "–"} on average).</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
@@ -320,7 +320,7 @@ export default function Overview() {
             <h3>Failure mode identified and eliminated</h3>
             <p>Under crisis conditions, one of the five trained agents occasionally held beds empty while the emergency department was diverting arrivals, a failure not seen in any rule-based policy. A parameter-free safety constraint, prohibiting bed holding while the emergency department is at capacity, eliminated all such collapses without retraining.</p>
             <TechDetails><p>Unconstrained: 5 of 1,250 test episodes collapsed (diversion above 50%), all attributable to a single agent, against 0 of 1,250 for the rule-based policies.
-              Constrained: 0 of 1,250. Trade-off: +4.4% cost in the staff-shortage scenario (significant after Holm correction); no significant change elsewhere. Pre-registered as RESEARCH.md v2.7.</p></TechDetails>
+              Constrained: 0 of 1,250. Trade-off: +4.4% cost in the staff-shortage scenario (significant after Holm correction); no significant change elsewhere. Planned in writing before it was run.</p></TechDetails>
           </div></Reveal>
           <Reveal delay={120}><div className="card lift finding">
             <span className="big" style={{ color: "var(--series-2)" }}><CountUp value={crnMax} digits={1} suffix="×" /></span>
