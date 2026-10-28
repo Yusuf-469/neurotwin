@@ -1,6 +1,6 @@
 # NeuroTwin V2 - Research Specification
 
-**Version:** 2.8 (2026-10-27). See [Changelog](#changelog) at the end for every change from v1 and its justification.
+**Version:** 2.9 (2026-10-28). See [Changelog](#changelog) at the end for every change from v1 and its justification.
 
 ## 1. Research Problem
 
@@ -746,6 +746,14 @@ results are unchanged.
 **Outcome rule:** "beats Load-Balancing" is claimed only for scenarios where the Holm-adjusted comparison is
 significant in its favour. A tie or a loss is reported as such.
 
+**v2.9 addendum (2026-10-28, before running): full comparison of the final agent.** To compare the final agent
+(ENS(BC+PPO), "RL agent v2") with every baseline under one protocol, the remaining baselines (Priority,
+Trunk-Reservation, MIP, FCFS) are run on the same fresh block (400,000-400,049, A-E). No candidate is selected or
+changed: the agent is frozen and was chosen in §6.26. The Stage 6 analysis is repeated unchanged on this block (100
+primary comparisons with Holm, secondary J comparisons, summary table, robustness index). The §6.26 primary result
+(vs Load-Balancing, Holm over 5) remains the pre-registered claim; the full table is secondary. Earlier agents are
+reported as development versions.
+
 ## 6.22 Experiment Matrix
 
 ### Primary
@@ -924,6 +932,9 @@ Defaults live in `config/simulation_default.json`.
 ---
 
 ## Changelog
+
+### v2.9 — 2026-10-28 (full comparison of the final agent; §6.26 addendum)
+- Remaining baselines run on the fresh block so the frozen final agent can be compared with all of them under the Stage 6 analysis. Secondary to the §6.26 claim; no selection involved.
 
 ### v2.8 — 2026-10-27 (imitation-initialised PPO and ensembles; §6.26)
 - **Pre-registered before any run.** Adds BC, BC+PPO and soft-vote ensembles, selected on validation seeds only and tested once on a fresh seed block (400,000-400,049), because the Stage 6 test seeds are already used. Stage 6 results are unchanged.
