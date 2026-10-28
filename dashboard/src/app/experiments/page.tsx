@@ -241,7 +241,7 @@ export default function ExperimentsPage() {
           <div className="row" style={{ marginBottom: 4 }}>
             <Segmented options={[{ value: "v3", label: "Latest agent (v3)" }, { value: "v2", label: "v2" }, { value: "v1", label: "Development (v1)" }]}
               value={version} onChange={(v) => setVersion(v as "v3" | "v2" | "v1")} />
-            <span className="muted">{ver === "v3" ? "Chapters 1–3 show the latest agent against every rule." : ver === "v2" ? "Chapters 1–3 show agent v2, before crisis training." : "Chapters 1–3 show where the agent started."}</span>
+            <span className="muted">{ver === "v3" ? "The comparisons below show the latest agent against every rule." : ver === "v2" ? "The comparisons below show agent v2, before it practised crises." : "The comparisons below show the first agent, where it all started."}</span>
           </div>
         </Reveal>
         <Reveal delay={240}>
@@ -418,7 +418,7 @@ export default function ExperimentsPage() {
               <TechDetails>
                 <p>Robustness index = mean relative degradation (crisis − normal day)/normal day over situations 2–5 and four metrics (cost, mean and 90th-percentile boarding,
                   off-service). Bootstrap over seeds jointly across scenarios and over agents. Diversion is excluded (≈0 on a normal day makes ratios meaningless) and
-                  reported as an absolute change in the Stage 7 report.</p>
+                  reported separately as an absolute change.</p>
               </TechDetails>
             </Card>
           </Reveal>
@@ -482,12 +482,12 @@ export default function ExperimentsPage() {
               </Takeaway>
               <Takeaway tone="warn">
                 Removing the penalty for turning ambulances away changes <b>nothing</b>. On normal days this almost never happens, so the agent never learned from it.
-                This motivated chapter 6.
+                That is why the next experiment gives the agent an explicit limit on how many ambulances may be turned away.
               </Takeaway>
               <TechDetails>
                 <p>8 variants × 3 agents (a disclosed reduction from 5, for compute), same seeds and hyperparameters, evaluated on the 50 test seeds in situations 1 and 5.
                   Paired hierarchical bootstrap, Holm over 80 comparisons. Only &quot;all patients weighted equally&quot; is significant after correction.
-                  Full table in docs/stage7_analysis_report.md §4.</p>
+                  The other seven differences are within the uncertainty.</p>
               </TechDetails>
             </Card>
           </Reveal>
@@ -542,7 +542,8 @@ export default function ExperimentsPage() {
                   </Takeaway>
                   <TechDetails>
                     <p>λ-conditioned PPO with online projected dual ascent (λ ~ U[0,100] in training; at deployment λ ← clip(λ + 5·(d − 3), 0, 100) every 24 h),
-                      pre-registered as RESEARCH.md v2.6. No comparison significant after Holm (25). Lowest diversion of any policy in Stage 6: 7.9 (C) and 12.0 (E) per 100.</p>
+                      planned in writing before it was run. No comparison significant after Holm correction (25 comparisons). For reference, the lowest diversion
+                      of any rule: 7.9 (situation 3) and 12.0 (situation 5) per 100 emergency arrivals.</p>
                   </TechDetails>
                 </Card>
               </Reveal>
@@ -574,9 +575,9 @@ export default function ExperimentsPage() {
                 </Takeaway>
                 <TechDetails>
                   <p>Rule: if the ED is at capacity and any placement is feasible, HOLD is masked; the agent takes its best remaining action. No tunable
-                    parameter. Five final agents, 50 test seeds × 5 scenarios, compared with the Stage 6 rows (deterministic simulator, same seeds).
-                    Cost vs unshielded PPO: significant only in situation 3 (+4.4%), Holm over 10. Pre-registered as RESEARCH.md v2.7 before running; motivated by
-                    the Stage 6 finding, which stays in the record.</p>
+                    parameter. Five agents, 50 test runs × 5 situations, compared with the same agents without the guard on identical patients.
+                    Cost vs unguarded agent: significant only in situation 3 (+4.4%), Holm correction over 10 comparisons. Planned in writing before running;
+                    the original failure stays reported above.</p>
                 </TechDetails>
               </Card>
             </Reveal>
@@ -652,10 +653,10 @@ export default function ExperimentsPage() {
                 </Takeaway>
                 <TechDetails>
                   <p>Behaviour cloning of Load-Balancing (96% held-out agreement), then PPO fine-tuning (lr 1e-4, frozen observation normaliser,
-                    30 critic-only warm-up updates, 3M steps), K = 5; soft-vote ensemble of the five. Pre-registered as RESEARCH.md v2.8; selection
-                    committed before the one-time test on seeds 400,000–400,049 (situations 1–5). v3: further PPO fine-tuning with per-episode arrivals ×0.95–1.15,
-                    staff and beds ×0.85–1.00 (covers situations 2–5, disclosed), selected over v2 on validation (−2.0% vs −1.2%), tested once on seeds
-                    500,000–500,049 (RESEARCH.md v2.10). Holm over 5 situations. Collapses: 0 of 1,500.</p>
+                    30 critic-only warm-up updates, 3M steps), K = 5; soft-vote ensemble of the five. Planned in writing and the final choice fixed
+                    before a one-time test on 50 never-used runs per situation. v3: further PPO fine-tuning with per-episode arrivals ×0.95–1.15,
+                    staff and beds ×0.85–1.00 (covers situations 2–5, disclosed), selected over v2 on validation (−2.0% vs −1.2%), tested once on another
+                    50 never-used runs per situation. Holm correction over 5 situations. Collapses: 0 of 1,500.</p>
                 </TechDetails>
               </Card>
             </Reveal>
