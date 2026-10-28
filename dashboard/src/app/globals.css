@@ -787,3 +787,25 @@ main, .footer, .banner { position: relative; z-index: 1; }
 .journey-step.win .journey-result { background: color-mix(in srgb, var(--violet) 16%, var(--surface-2)); }
 .journey-step.bad .journey-result { background: color-mix(in srgb, var(--status-critical) 12%, var(--surface-2)); }
 .journey-step.good .journey-result { background: color-mix(in srgb, var(--status-good) 12%, var(--surface-2)); }
+
+/* chapter bar wraps so every chapter stays reachable */
+.chapters { flex-wrap: wrap; overflow: visible; }
+
+/* ---------- live run reading and verdict ---------- */
+.reading { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; font-size: 14.5px; line-height: 1.5;
+  background: var(--accent-soft); color: var(--text-primary); }
+.reading .icon { flex: none; margin-top: 2px; color: var(--accent); }
+.reading.good { background: color-mix(in srgb, var(--status-good) 13%, transparent); }
+.reading.good .icon { color: var(--status-good); }
+.reading.warn { background: color-mix(in srgb, var(--status-warning) 18%, transparent); }
+.reading.warn .icon { color: var(--status-serious); }
+.reading.bad { background: color-mix(in srgb, var(--status-critical) 13%, transparent); }
+.reading.bad .icon { color: var(--status-critical); }
+.verdict-bars { display: grid; gap: 8px; }
+.vb { display: grid; grid-template-columns: 210px 1fr 74px; gap: 10px; align-items: center; font-size: 13px; color: var(--text-secondary); }
+.vb.mine { color: var(--text-primary); font-weight: 600; }
+.vb-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vb-track { height: 12px; border-radius: 6px; background: var(--grid); overflow: hidden; }
+.vb-track i { display: block; height: 100%; border-radius: 6px; background: var(--pc); transition: width .9s cubic-bezier(.2,.8,.2,1); }
+.vb b { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+@media (max-width: 640px) { .vb { grid-template-columns: 1fr 60px; } .vb-track { display: none; } }

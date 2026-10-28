@@ -10,7 +10,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene, WhenVisible } from "@/components/motion";
 import { Card, Legend, SectionHeader, Segmented, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
-import { METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta } from "@/lib/policies";
+import { ENSEMBLE, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, type PolicyMeta } from "@/lib/policies";
 
 // Study results as a guided story: each chapter asks one plain question, shows one chart, states
 // the takeaway, and keeps the full statistics in a collapsible "Technical detail". All values are
@@ -22,10 +22,11 @@ const BASELINES = ["load_balancing", "priority", "trunk_reservation", "mip", "fc
 const axis = { stroke: "var(--axis)", tick: { fill: "var(--text-muted)", fontSize: 11 }, tickLine: false } as const;
 const tip = {
   contentStyle: { background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" },
-  itemStyle: { color: "var(--text-primary)" },
   labelStyle: { color: "var(--text-muted)", fontWeight: 600 },
   cursor: { fill: "var(--surface-2)" },
 };
+/** Single-series charts: no series colour to inherit, so use the text colour. */
+const tipOne = { ...tip, itemStyle: { color: "var(--text-primary)" } };
 /** Tooltip rows sorted by value: ascending (best first) where lower is better, else descending. */
 const ascending = (item: { value?: unknown }) => Number(item.value ?? 0);
 const descending = (item: { value?: unknown }) => -Number(item.value ?? 0);
@@ -95,7 +96,7 @@ function DiffBars({ rows, unit, height, digits = 1 }: {
             <XAxis type="number" {...axis} />
             <YAxis type="category" dataKey="label" width={210} {...axis} tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
             <ReferenceLine x={0} stroke="var(--text-muted)" />
-            <Tooltip {...tip} formatter={(v, _n, item) => {
+            <Tooltip {...tipOne} formatter={(v, _n, item) => {
               const p = item.payload as { lo: number; hi: number; sig: boolean };
               const val = typeof v === "number" ? v.toFixed(digits) : "–";
               return [`${val} ${unit}  (95% CI ${p.lo.toFixed(digits)} to ${p.hi.toFixed(digits)})${p.sig ? " · significant" : ""}`, "difference"];
@@ -116,6 +117,7 @@ export default function ExperimentsPage() {
   const [data, setData] = useState<StudyResults | null>(null);
   const [error, setError] = useState("");
   const [metric, setMetric] = useState("J_per_day");
+  const [version, setVersion] = useState<"v2" | "v1">("v2");
   const [barTable, barToggle] = useViewToggle();
   const [heatTable, heatToggle] = useViewToggle();
   const active = useActiveChapter();
@@ -134,13 +136,24 @@ export default function ExperimentsPage() {
   if (!data?.summary) return <p className="muted" style={{ marginTop: 24 }}>Loading study results… (the server may take up to a minute to wake up)</p>;
 
   const meta = METRICS.find((m) => m.key === metric)!;
+  // The final agent (v2) is compared with every rule on the fresh block (RESEARCH.md v2.9); the
+  // development version (v1) on the original Stage 6 test block. Same analysis for both.
+  const V2 = version === "v2" && !!data.final_summary;
+  const src = V2
+    ? { summary: data.final_summary, J: data.final_J_comparisons, comps: data.final_comparisons, rob: data.final_robustness }
+    : { summary: data.summary, J: data.J_comparisons, comps: data.comparisons, rob: data.robustness };
+  const pm = (k: string): PolicyMeta => (k === "ppo"
+    ? (V2 ? { ...ENSEMBLE, key: "ppo", label: "RL agent v2 (final)" } : { ...policyMeta("ppo"), label: "RL agent v1 (development)" })
+    : policyMeta(k));
+  const STUDY = POLICIES.map((x) => pm(x.key));
+  const agentName = V2 ? "the final agent (v2)" : "the development agent (v1)";
   const value = (s: string, p: string): [number, number, number] | null => {
-    const e = data.summary!.find((x) => x.scenario === s && x.policy === p)?.[metric];
+    const e = src.summary!.find((x) => x.scenario === s && x.policy === p)?.[metric];
     return Array.isArray(e) ? e : null;
   };
   const barData = SCENARIOS.map((s) => {
     const row: Record<string, number | string | [number, number]> = { scenario: s };
-    for (const p of POLICIES) {
+    for (const p of STUDY) {
       const v = value(s, p.key);
       if (v) { row[p.key] = v[0]; row[`${p.key}_err`] = [v[0] - v[1], v[2] - v[0]]; }
     }
@@ -154,11 +167,11 @@ export default function ExperimentsPage() {
     heat[b] = {};
     for (const s of SCENARIOS) {
       if (metric === "J_per_day") {
-        const c = data.J_comparisons?.find((x) => x.scenario === s && x.baseline === b);
+        const c = src.J?.find((x) => x.scenario === s && x.baseline === b);
         if (c) heat[b][s] = { diff: c.diff, lo: c.ci_low, hi: c.ci_high, sig: c.ci_low > 0 || c.ci_high < 0,
           effect: c.rel_diff_pct / 20, note: `${c.rel_diff_pct > 0 ? "+" : ""}${c.rel_diff_pct.toFixed(1)}%` };
       } else {
-        const c = data.comparisons?.find((x) => x.scenario === s && x.baseline === b && x.metric === metric);
+        const c = src.comps?.find((x) => x.scenario === s && x.baseline === b && x.metric === metric);
         if (c) heat[b][s] = { diff: c.diff_mean, lo: c.ci_low, hi: c.ci_high, sig: c.significant_holm,
           effect: c.d_z, note: `d_z ${c.d_z.toFixed(2)}` };
       }
@@ -169,12 +182,16 @@ export default function ExperimentsPage() {
   const wins = matchups.filter((c) => c.sig && c.diff < 0).length;
   const losses = matchups.filter((c) => c.sig && c.diff > 0).length;
 
-  const ri = Object.entries(data.robustness?.robustness_index ?? {})
-    .map(([p, v]) => ({ policy: p, label: policyMeta(p).label, value: v.estimate,
+  const ri = Object.entries(src.rob?.robustness_index ?? {})
+    .map(([p, v]) => ({ policy: p, label: pm(p).label, value: v.estimate,
       err: [v.estimate - v.ci[0], v.ci[1] - v.estimate] as [number, number] }))
     .sort((a, b) => a.value - b.value);
+  const riDiff = (src.rob as { ppo_minus_baseline_RI?: Record<string, { estimate: number; ci: [number, number] }> } | null)?.ppo_minus_baseline_RI ?? {};
+  const steadier = Object.entries(riDiff).filter(([b, v]) => b !== "trunk_reservation" && v.ci[1] < 0).map(([b]) => pm(b).label.toLowerCase());
+  const shakier = Object.entries(riDiff).filter(([b, v]) => b !== "trunk_reservation" && v.ci[0] > 0).map(([b]) => pm(b).label.toLowerCase());
+  const robustSummary = `${agentName[0].toUpperCase()}${agentName.slice(1)} deteriorates significantly less than ${steadier.length ? steadier.join(", ") : "no rule"}${shakier.length ? `, and more than ${shakier.join(", ")}` : ""}; elsewhere the difference is within the uncertainty.`;
   const crn = (data.crn_check ?? []).filter((c) => c.metric === "J_per_day" && c.baseline !== "trunk_reservation")
-    .map((c) => ({ label: policyMeta(c.baseline).label, policy: c.baseline, ratio: c.width_ratio_independent_over_paired,
+    .map((c) => ({ label: pm(c.baseline).label, policy: c.baseline, ratio: c.width_ratio_independent_over_paired,
       reduction: c.variance_reduction }));
   const crnMax = Math.max(...crn.map((c) => c.ratio));
   const structure = data.structure
@@ -207,13 +224,20 @@ export default function ExperimentsPage() {
       {/* ------------------------------------------------------------------ intro */}
       <section className="hero2" style={{ marginBottom: 8 }}>
         <span className="blob b1" /><span className="blob b2" />
-        <Reveal><span className="pill"><span className="badge">Results</span> 2,500 test episodes · 50 fresh runs per situation</span></Reveal>
+        <Reveal><span className="pill"><span className="badge">Results</span> {V2 ? "final agent · 50 fresh runs per situation, never used before" : "development agent · 50 sealed test runs per situation"}</span></Reveal>
         <Reveal delay={80}><h1 style={{ fontSize: "clamp(30px, 4.4vw, 52px)" }}>What happened when the agent <span className="gradient-text">met the rules</span></h1></Reveal>
         <Reveal delay={160}><p className="lead">
           Seven short chapters, each answering one question. Every chart says what you are looking at and what
           it means. The full statistics are under &quot;Technical detail&quot;. Lower is better everywhere.
          These are the study's fixed results, computed once from 2,500 sealed test runs, so they do not change.
           To run your own experiment live, use <Link href="/race/">the Race</Link>.</p></Reveal>
+        <Reveal delay={200}>
+          <div className="row" style={{ marginBottom: 4 }}>
+            <Segmented options={[{ value: "v2", label: "Final agent (v2)" }, { value: "v1", label: "Development version (v1)" }]}
+              value={version} onChange={(v) => setVersion(v as "v2" | "v1")} />
+            <span className="muted">{V2 ? "Chapters 1–3 show the final agent against every rule." : "Chapters 1–3 show where the agent started."}</span>
+          </div>
+        </Reveal>
         <Reveal delay={240}>
           <div className="ribbon">
             <div><div className="num"><CountUp value={wins} /></div><div className="lbl">confident agent wins out of {matchups.length} match-ups ({meta.label.toLowerCase()})</div></div>
@@ -240,13 +264,13 @@ export default function ExperimentsPage() {
         <Reveal>
           <Card title={meta.label} subtitle={`${meta.unit} · average of 50 test runs · thin whiskers show the uncertainty range`} actions={barToggle}
             explain={meta.desc}>
-            <Legend items={POLICIES.map((p) => ({ label: p.label, color: p.color }))} />
+            <Legend items={STUDY.map((p) => ({ label: p.label, color: p.color }))} />
             {barTable ? (
               <div className="scroll" style={{ marginTop: 10 }}>
                 <table>
-                  <thead><tr><th>situation</th>{POLICIES.map((p) => <th key={p.key}>{p.label}</th>)}</tr></thead>
+                  <thead><tr><th>situation</th>{STUDY.map((p) => <th key={p.key}>{p.label}</th>)}</tr></thead>
                   <tbody>{SCENARIOS.map((s) => (
-                    <tr key={s}><td>{SCENARIO_LABELS[s]}</td>{POLICIES.map((p) => {
+                    <tr key={s}><td>{SCENARIO_LABELS[s]}</td>{STUDY.map((p) => {
                       const v = value(s, p.key);
                       return <td key={p.key}>{v ? `${v[0].toFixed(meta.digits)} ± ${((v[2] - v[1]) / 2).toFixed(meta.digits)}` : "–"}</td>;
                     })}</tr>))}
@@ -262,8 +286,8 @@ export default function ExperimentsPage() {
                       <XAxis dataKey="scenario" {...axis} tickFormatter={(s) => scenShort(s)} />
                       <YAxis {...axis} />
                       <Tooltip {...tip} itemSorter={ascending} labelFormatter={(s) => `${SCENARIO_LABELS[String(s)] ?? String(s)} (best first)`}
-                        formatter={(v, name) => [typeof v === "number" ? `${v.toFixed(meta.digits)} ${meta.unit}` : "–", policyMeta(String(name)).label]} />
-                      {POLICIES.map((p, i) => (
+                        formatter={(v, name) => [typeof v === "number" ? `${v.toFixed(meta.digits)} ${meta.unit}` : "–", pm(String(name)).label]} />
+                      {STUDY.map((p, i) => (
                         <Bar key={p.key} dataKey={p.key} fill={p.color} radius={[4, 4, 0, 0]} animationDuration={900} animationBegin={i * 80}>
                           <ErrorBar dataKey={`${p.key}_err`} width={3} strokeWidth={1.2} stroke="var(--text-secondary)" />
                         </Bar>
@@ -299,7 +323,7 @@ export default function ExperimentsPage() {
                 <table>
                   <thead><tr><th>Agent vs</th>{SCENARIOS.map((s) => <th key={s}>{scenShort(s)}</th>)}</tr></thead>
                   <tbody>{BASELINES.map((b) => (
-                    <tr key={b}><td>{policyMeta(b).label}</td>{SCENARIOS.map((s) => {
+                    <tr key={b}><td>{pm(b).label}</td>{SCENARIOS.map((s) => {
                       const c = heat[b][s];
                       return <td key={s}>{c ? `${c.diff.toFixed(meta.digits)} [${c.lo.toFixed(meta.digits)}, ${c.hi.toFixed(meta.digits)}]${c.sig ? " *" : ""}` : "–"}</td>;
                     })}</tr>))}
@@ -313,7 +337,7 @@ export default function ExperimentsPage() {
                   {SCENARIOS.map((s) => <div key={s} className="hdr"><Icon name={SCENARIO_INFO[s].icon} size={14} /> {scenShort(s)}</div>)}
                   {BASELINES.map((b, bi) => (
                     <div key={b} style={{ display: "contents" }}>
-                      <div className="rowhdr"><i className="dot" style={{ background: policyMeta(b).color, marginRight: 6 }} />{policyMeta(b).label}</div>
+                      <div className="rowhdr"><i className="dot" style={{ background: pm(b).color, marginRight: 6 }} />{pm(b).label}</div>
                       {SCENARIOS.map((s, si) => {
                         const c = heat[b][s];
                         return (
@@ -338,8 +362,9 @@ export default function ExperimentsPage() {
               </>
             )}
             <Takeaway tone="good">
-              Against the classic rules (most-urgent-first, the instant optimiser, first-come-first-served) the agent is mostly blue.
-              Against the <b>balance-the-wards rule</b> the squares are grey: it is a genuine tie.
+              {V2
+                ? <>The final agent is blue against nearly every rule in nearly every situation, including the <b>balance-the-wards rule on normal days</b>. The exception is the combined crisis, where it is level with the two strongest rules.</>
+                : <>Against the classic rules (most-urgent-first, the instant optimiser, first-come-first-served) the development agent is mostly blue. Against the <b>balance-the-wards rule</b> the squares are grey: a genuine tie, which is what version 2 set out to beat.</>}
             </Takeaway>
             <TechDetails>
               <p>{metric === "J_per_day"
@@ -366,9 +391,9 @@ export default function ExperimentsPage() {
                       <CartesianGrid stroke="var(--grid)" horizontal={false} />
                       <XAxis type="number" unit="%" {...axis} />
                       <YAxis type="category" dataKey="label" width={170} {...axis} tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                      <Tooltip {...tip} formatter={(v) => [typeof v === "number" ? `${v.toFixed(0)}% worse` : "–", "deterioration"]} />
+                      <Tooltip {...tipOne} formatter={(v) => [typeof v === "number" ? `${v.toFixed(0)}% worse` : "–", "deterioration"]} />
                       <Bar dataKey="value" barSize={16} radius={4} animationDuration={1000}>
-                        {ri.map((r) => <Cell key={r.policy} fill={policyMeta(r.policy).color} />)}
+                        {ri.map((r) => <Cell key={r.policy} fill={pm(r.policy).color} />)}
                         <ErrorBar dataKey="err" width={5} strokeWidth={1.2} stroke="var(--text-secondary)" direction="x" />
                       </Bar>
                     </BarChart>
@@ -379,7 +404,7 @@ export default function ExperimentsPage() {
           </Reveal>
           <Reveal kind="right">
             <Card title="How to read this" subtitle="steady is not the same as good">
-              <Takeaway tone="good">The agent deteriorates <b>clearly less</b> than the most-urgent-first rule, and about as much as the best rules.</Takeaway>
+              <Takeaway tone="good">{robustSummary}</Takeaway>
               <Takeaway tone="warn">
                 First-come-first-served looks &quot;steady&quot; only because it is already bad on a normal day: there is less room to get worse.
                 Always read this together with the overall results in &quot;Who does best?&quot; at the top of this page.
@@ -398,7 +423,7 @@ export default function ExperimentsPage() {
       {structure.length > 0 && (
         <Scene id="clever">
           <Reveal><SectionHeader num="4" kicker="Inside the agent" title="Did the agent discover something on its own?"
-            lead="Hospitals sometimes keep a bed empty for the next emergency. Nobody told the agent about this idea. Did it find it anyway?" /></Reveal>
+            lead="Hospitals sometimes keep a bed empty for the next emergency. Nobody told the agent about this idea. Did it find it anyway? (Analysed on the development version, v1, which learned purely by itself.)" /></Reveal>
           <Reveal>
             <Card title="How often the agent keeps a free bed empty"
               subtitle="when only non-urgent patients are waiting, by number of free beds"
@@ -440,7 +465,7 @@ export default function ExperimentsPage() {
       {ablA.length > 0 && (
         <Scene id="ingredients">
           <Reveal><SectionHeader num="5" kicker="Ablation study" title="Which ingredients make the agent work?"
-            lead="We retrained the agent eight times, each time taking one ingredient away, and measured how much worse it got on a normal day." /></Reveal>
+            lead="We retrained the development agent (v1) eight times, each time taking one ingredient away, and measured how much worse it got on a normal day." /></Reveal>
           <Reveal>
             <Card title="Cost increase when one ingredient is removed" subtitle="% change in overall cost vs the full agent (normal day) · faded bars = not a confident difference"
               explain="Longer red bar = that ingredient matters more. A bar near zero means the agent copes fine without it.">
@@ -629,10 +654,10 @@ export default function ExperimentsPage() {
                       <CartesianGrid stroke="var(--grid)" horizontal={false} />
                       <XAxis type="number" {...axis} tickFormatter={(v) => `${v}×`} />
                       <YAxis type="category" dataKey="label" width={170} {...axis} tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                      <Tooltip {...tip} formatter={(v, _n, item) => [`${typeof v === "number" ? v.toFixed(1) : "–"}× narrower · variance −${(100 * (item.payload as { reduction: number }).reduction).toFixed(1)}%`, "Agent vs this rule"]} />
+                      <Tooltip {...tipOne} formatter={(v, _n, item) => [`${typeof v === "number" ? v.toFixed(1) : "–"}× narrower · variance −${(100 * (item.payload as { reduction: number }).reduction).toFixed(1)}%`, "Agent vs this rule"]} />
                       <Bar dataKey="ratio" barSize={16} radius={4} animationDuration={1000}
                         label={{ position: "right", fill: "var(--text-secondary)", fontSize: 11, formatter: (v: unknown) => `${Number(v).toFixed(1)}×` }}>
-                        {crn.map((r) => <Cell key={r.policy} fill={policyMeta(r.policy).color} />)}
+                        {crn.map((r) => <Cell key={r.policy} fill={pm(r.policy).color} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>

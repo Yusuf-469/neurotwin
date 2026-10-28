@@ -273,3 +273,25 @@ The selection was committed (14d3a99) before the fresh test.
 2. **Under unseen stress it ties Load-Balancing in B, C and D.** In E it is nominally 3.5% worse, which is not significant after correction. Compared with the original PPO it gives up some robustness under combined stress (significantly worse in E) in exchange for the gain in A.
 3. **Pure imitation fails.** BC alone agrees with the rule on 96% of decisions but costs 58% more than the rule on validation, because small errors compound into states the rule never visited. This is the known distribution-shift problem of behaviour cloning. The RL fine-tuning is what turns the clone into a policy better than its teacher.
 4. **The claim is limited to what was tested:** a significant win in normal conditions, and no significant loss under stress. It does not say that RL beats the rule everywhere.
+
+### 8.1 Full comparison of the final agent (v2.9 addendum)
+**Command:** `python -m neurotwin.experiments.final_eval`. The output is in `docs/data/final/`, in the same formats as Stage 6.
+
+The remaining baselines were run on the same fresh block, and the Stage 6 analysis was repeated unchanged. Nothing was selected or tuned: the agent is the frozen §6.26 selection. 63 of the 100 primary comparisons are significant after Holm.
+
+Cost J relative to each baseline (final agent − baseline, %; descriptive; negative = agent cheaper):
+
+| Baseline | A | B | C | D | E |
+|---|---|---|---|---|---|
+| Load-Balancing | −8.5 | −1.7 | +0.5 | +0.2 | +3.5 |
+| Priority (= Trunk-Reservation) | −14.4 | −8.5 | −0.9 | −10.1 | +1.9 |
+| MIP | −17.4 | −14.7 | −15.0 | −16.0 | −18.1 |
+| FCFS | −45.3 | −38.0 | −33.6 | −42.0 | −33.1 |
+
+The 95% CI excludes 0 in every cell except:
+- B, C and D against Load-Balancing;
+- C and E against Priority.
+
+The E difference against Load-Balancing is not significant in the pre-registered Holm test (§8).
+
+The dashboard's Results page now shows this final agent by default in chapters 1–3, with the development version (v1, Stage 6) available for comparison.

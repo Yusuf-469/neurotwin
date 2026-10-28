@@ -204,3 +204,21 @@ def test_race_is_reproducible_and_can_start_from_a_session():
         json={"competitors": ["priority", "fcfs"], "start": "session", "session_id": sid},
     )
     assert r.status_code == 200 and r.json()["start_time"] == 24
+
+
+def test_state_reports_so_far_and_benchmark_reproduces_the_run():
+    sid = _start(policy="priority", scenario="A")
+    client.post(f"/api/simulation/{sid}/step", json={"hours": 336})
+    client.post(f"/api/simulation/{sid}/step", json={"hours": 336})
+    s = client.get(f"/api/simulation/{sid}/state").json()
+    assert s["so_far"] is None  # still in warm-up
+    while not client.post(f"/api/simulation/{sid}/step", json={"hours": 336}).json()["finished"]:
+        pass
+    s = client.get(f"/api/simulation/{sid}/state").json()
+    assert s["so_far"]["measured_hours"] == 14 * 24
+    own = client.post(f"/api/simulation/{sid}/benchmark", json={"policy": "priority"}).json()
+    assert own["metrics"]["J_per_day"] == s["episode_metrics"]["J_per_day"]  # identical patients
+    other = client.post(f"/api/simulation/{sid}/benchmark", json={"policy": "fcfs"}).json()
+    assert other["metrics"]["J_per_day"] != own["metrics"]["J_per_day"]
+    body = client.get("/api/experiments/results").json()
+    assert len(body["final_comparisons"]) == 100 and body["final_robustness"] is not None
