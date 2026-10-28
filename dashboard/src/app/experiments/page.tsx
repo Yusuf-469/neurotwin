@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene, SplitWords, WhenVisible } from "@/components/motion";
+import ReproduceCard from "@/components/ReproduceCard";
 import { Card, Legend, SectionHeader, Segmented, Skeleton, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
 import { ENSEMBLE, V3, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, scenNum, type PolicyMeta } from "@/lib/policies";
@@ -709,6 +710,7 @@ export default function ExperimentsPage() {
             </Card>
           </Reveal>
         </div>
+        <Reveal><div style={{ marginTop: 20 }}><ReproduceCard /></div></Reveal>
       </Scene>
 
       {/* ------------------------------------------------------------------ glossary */}

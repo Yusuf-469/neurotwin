@@ -250,3 +250,23 @@ def test_unexpected_errors_keep_cors_headers(monkeypatch):
     r = client.get(f"/api/simulation/{sid}/state", headers={"Origin": "http://localhost:3000"})
     assert r.status_code == 500 and "synthetic failure" in r.json()["detail"]
     assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_reproduce_a_stored_test_run_exactly():
+    r = client.post("/api/reproduce", json={"policy": "load_balancing", "scenario": "A", "seed": 500_000})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["run_number"] == 1 and j["all_exact"]
+    assert {m["metric"] for m in j["metrics"]} >= {"J_per_day", "diversion_per_100"}
+    assert all(m["stored"] == m["reproduced"] and m["difference"] == 0 for m in j["metrics"])
+
+
+def test_reproduce_rejects_runs_outside_the_sealed_test():
+    bad = [
+        {"policy": "load_balancing", "scenario": "A", "seed": 499_999},  # not a test seed
+        {"policy": "load_balancing", "scenario": "F", "seed": 500_000},  # unknown situation
+    ]
+    for body in bad:
+        assert client.post("/api/reproduce", json=body).status_code == 422
+    r = client.post("/api/reproduce", json={"policy": "ppo_shielded", "scenario": "A", "seed": 500_000})
+    assert r.status_code == 404  # not part of the final test

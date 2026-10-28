@@ -23,12 +23,14 @@ Run: uvicorn neurotwin.api.app:app --port 8000
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import threading
 import time
 import uuid
 from collections import OrderedDict, deque
+from functools import lru_cache
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -59,7 +61,9 @@ def _make_llm_client():
     return AnthropicLLMClient()
 
 
+from ..experiments.evaluate import run_job
 from ..experiments.metrics import episode_metrics
+from ..experiments.seeds import FRESH_TEST_2
 from ..experiments.objective import CostWeights
 from ..policies import POLICY_CLASSES, DecisionLog, LoggingPolicy, load_baseline_params, make_policy
 from ..policies.ensemble_ppo import EnsemblePPOPolicy
@@ -632,6 +636,64 @@ def whatif(sid: str, body: WhatIfBody) -> dict[str, Any]:
         session.sim, WhatIfRequest(body.horizon_hours, body.n_futures, scenario)
     )
     return result.as_dict()
+
+
+# ---------------------------------------------------------------------- reproduce a result
+
+#: The sealed one-time test of the latest agent: every decision-maker x situation x seed.
+TEST_EPISODES = ROOT / "docs" / "data" / "v3" / "episodes.csv"
+#: Dashboard policy key -> (row label in the file, run_job arguments) for the test above.
+REPRODUCIBLE = {
+    "ppo_v3": ("ppo", ("ppo_ensemble", 0, str(ROOT / "results" / "ppo" / "v3"))),
+    **{b: (b, (b, -1, "")) for b in ("load_balancing", "priority", "trunk_reservation", "mip", "fcfs")},
+}
+REPRODUCED_METRICS = ("J_per_day", "mean_boarding_h", "diversion_per_100", "off_service_per_100")
+
+
+@lru_cache(maxsize=1)
+def _test_rows() -> dict[tuple[str, str, int], dict[str, str]]:
+    with open(TEST_EPISODES, encoding="utf-8", newline="") as fh:
+        return {(r["policy"], r["scenario"], int(r["seed"])): r for r in csv.DictReader(fh)}
+
+
+class ReproduceBody(BaseModel):
+    policy: str
+    scenario: str = Field(pattern="^[A-E]$")
+    seed: int = Field(ge=FRESH_TEST_2.start, lt=FRESH_TEST_2.stop)
+
+
+@app.post("/api/reproduce")
+def reproduce(body: ReproduceBody) -> dict[str, Any]:
+    """Re-run one episode of the sealed final test with the study's own episode function
+    (experiments.evaluate.run_job, same arguments as experiments/v3.py) and compare it with the
+    stored result. The simulator and the agents are deterministic given the seed, so the numbers
+    should match exactly; any difference is reported as it is, never hidden."""
+    if body.policy not in REPRODUCIBLE:
+        raise HTTPException(404, f"{body.policy!r} was not part of the final test")
+    if not TEST_EPISODES.exists():
+        raise HTTPException(404, "stored test results not available")
+    row_label, (job_policy, agent, agent_dir) = REPRODUCIBLE[body.policy]
+    stored = _test_rows().get((row_label, body.scenario, body.seed))
+    if stored is None:
+        raise HTTPException(404, "no stored result for this run")
+    t0 = time.perf_counter()
+    fresh = run_job((job_policy, agent, body.scenario, body.seed, agent_dir, {}))
+    compute_ms = round(1000 * (time.perf_counter() - t0), 1)
+    metrics = []
+    for m in REPRODUCED_METRICS:
+        a, b = float(stored[m]), float(fresh[m])
+        metrics.append({"metric": m, "stored": a, "reproduced": b, "exact": a == b, "difference": b - a})
+    return {
+        "label": SIMULATION_LABEL,
+        "policy": body.policy,
+        "scenario": body.scenario,
+        "seed": body.seed,
+        "run_number": body.seed - FRESH_TEST_2.start + 1,
+        "source": "docs/data/v3/episodes.csv (one-time final test, 50 runs per situation)",
+        "compute_ms": compute_ms,
+        "all_exact": all(x["exact"] for x in metrics),
+        "metrics": metrics,
+    }
 
 
 @app.get("/api/experiments/results")
