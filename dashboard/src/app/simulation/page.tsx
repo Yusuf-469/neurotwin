@@ -10,7 +10,7 @@ import { Reveal } from "@/components/motion";
 import { Segmented, TechDetails } from "@/components/ui";
 import Link from "next/link";
 import { ConditionsSliders, PolicySelect, SituationSelect, describe } from "@/components/setup";
-import { api, type Conditions, type DecisionRecord, type HistoryPoint, type HospitalState, type StateResponse } from "@/lib/api";
+import { RunLost, ServerUnavailable, api, type Conditions, type DecisionRecord, type HistoryPoint, type HospitalState, type StateResponse } from "@/lib/api";
 import { PRIORITY_COLORS, PRIORITY_NAMES, SCENARIO_INFO, SCENARIO_LABELS, UNIT_LABELS, policyMeta } from "@/lib/policies";
 
 // Live "control room": the animated floor plan is driven by the real simulation state; every
@@ -57,6 +57,10 @@ export default function SimulationPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
   const [server, setServer] = useState<Server>("checking");
+  const [reconnecting, setReconnecting] = useState("");
+  const recovering = useRef(false);
+  const statusRef = useRef<StateResponse | null>(null);
+  const sidRef = useRef("");
   const [ping, setPing] = useState<number | null>(null);
   const [work, setWork] = useState({ steps: 0, decisions: 0, lastMs: 0, roundTripMs: 0 });
   const [warmMode, setWarmMode] = useState<"skip" | "empty">("skip");
@@ -86,6 +90,9 @@ export default function SimulationPage() {
     const t = setInterval(check, 30000);
     return () => { alive = false; clearInterval(t); };
   }, []);
+
+  useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => { sidRef.current = sid; }, [sid]);
 
   const record = (r: Awaited<ReturnType<typeof api.step>>, t0: number) => {
     if (!r.step) return;
@@ -131,12 +138,62 @@ export default function SimulationPage() {
       const s = await refresh(sid, true);
       if (s.finished) setPlaying(false);
     } catch (e) {
-      setError(String(e));
       setPlaying(false);
+      if (e instanceof ServerUnavailable || e instanceof RunLost) recoverRef.current?.();
+      else setError(String(e));
     } finally {
       busy.current = false;
     }
   }, [sid, refresh]);
+
+  // Reconnect after the server sleeps or restarts. If the run was lost with the restart, recreate
+  // it: runs are deterministic (same situation and run number = same patients and decisions), so
+  // replaying to the same simulated time restores exactly the same hospital state.
+  const recoverRef = useRef<(() => void) | null>(null);
+  recoverRef.current = async () => {
+    if (recovering.current) return;
+    recovering.current = true;
+    setServer("waking");
+    setReconnecting("Lost contact with the simulation server (it is waking up or restarting). Reconnecting…");
+    try {
+      const deadline = Date.now() + 180_000;
+      let up = false;
+      while (!up && Date.now() < deadline) {
+        try { await api.health(); up = true; } catch { await new Promise((r) => setTimeout(r, 3000)); }
+      }
+      if (!up) {
+        setReconnecting("");
+        setServer("offline");
+        setError("The simulation server did not come back within 3 minutes. Please refresh the page later.");
+        return;
+      }
+      setServer("online");
+      const old = statusRef.current;
+      try {
+        await api.state(sidRef.current);
+      } catch (e) {
+        if (!(e instanceof RunLost) || !old) throw e;
+        const target = old.time;
+        setReconnecting(`The server restarted, so your run is being restored at day ${(target / 24).toFixed(1)}…`);
+        const r = await api.start(old.scenario, old.seed, old.policy, old.scenario === "custom" ? old.conditions : undefined);
+        for (let h = 0; h < target; h += 336) await api.step(r.session_id, Math.min(336, target - h));
+        lastId.current = -1;
+        lastDiv.current = 0;
+        setSid(r.session_id);
+        sidRef.current = r.session_id;
+        await refresh(r.session_id, false);
+        setEvents((ev) => [{ id: `restore${Date.now()}`, time: target, color: "var(--accent)", text: "Server restarted: run restored at the same moment" }, ...ev].slice(0, 14));
+      }
+      setReconnecting("");
+      setError("");
+      setPlaying(true);
+    } catch (e) {
+      setReconnecting("");
+      setError(String(e));
+    } finally {
+      recovering.current = false;
+    }
+  };
 
   const begin = useCallback(async (sc: string, sd: number, pol: string, warm: boolean, cond?: Conditions) => {
     setError("");
@@ -200,11 +257,11 @@ export default function SimulationPage() {
   const urgent = st.waiting_requests.filter((r) => r.priority <= 2).length;
   const longest = st.waiting_requests.reduce((m, r) => Math.max(m, now - r.created_at), 0);
 
-  const phase = loading ? "busy" : !sid ? "idle" : status?.finished ? "finished" : playing ? "running" : "paused";
-  const phaseLabel = { busy: loading.startsWith("Connecting") ? "Connecting to the server" : "Simulating warm-up on the server",
+  const phase = reconnecting ? "reconnecting" : loading ? "busy" : !sid ? "idle" : status?.finished ? "finished" : playing ? "running" : "paused";
+  const phaseLabel = { reconnecting: "Reconnecting", busy: loading.startsWith("Connecting") ? "Connecting to the server" : "Simulating warm-up on the server",
     idle: "Not started", finished: "Run finished", running: "Running live", paused: "Paused" }[phase];
   const phaseDot = phase === "running" || phase === "busy" ? "live-dot" : phase === "paused" ? "live-dot amber" : "live-dot wait";
-  const serverLabel = server === "online" ? `Server online${ping !== null ? ` · ${ping} ms` : ""}`
+  const serverLabel = reconnecting ? "Reconnecting to the server…" : server === "online" ? `Server online${ping !== null ? ` · ${ping} ms` : ""}`
     : server === "waking" ? "Server waking up (free tier, up to a minute)" : server === "offline" ? "Server unreachable" : "Checking server…";
 
   const kpis: { k: string; v: string; icon: IconName; color?: string }[] = [
@@ -283,6 +340,7 @@ export default function SimulationPage() {
             )}
           </div>
           {scenario === "custom" && <ConditionsSliders value={custom} onChange={setCustom} />}
+          {reconnecting && <div className="reading warn" style={{ marginTop: 12 }}><span className="live-dot amber" style={{ marginTop: 6 }} /><span>{reconnecting}</span></div>}
           {error && <p className="error" style={{ marginBottom: 0 }}>{error}</p>}
           {status && (
             <p className="muted" style={{ margin: "10px 0 0" }}>

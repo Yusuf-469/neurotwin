@@ -7,7 +7,7 @@ import { Icon } from "@/components/icons";
 import { Reveal } from "@/components/motion";
 import { ConditionsSliders, SituationSelect, describe } from "@/components/setup";
 import { Legend, TechDetails } from "@/components/ui";
-import { api, type Conditions, type RaceLane, type RaceState } from "@/lib/api";
+import { RunLost, ServerUnavailable, api, type Conditions, type RaceLane, type RaceStartBody, type RaceState } from "@/lib/api";
 import { LIVE_POLICIES, POLICY_GROUPS, SCENARIO_INFO, policyMeta } from "@/lib/policies";
 
 // Live race: the server branches one hospital state into identical copies (same future
@@ -54,6 +54,10 @@ export default function RacePage() {
   const [notes, setNotes] = useState<Commentary[]>([]);
   const [error, setError] = useState("");
   const busy = useRef(false);
+  const [reconnecting, setReconnecting] = useState("");
+  const startBody = useRef<RaceStartBody | null>(null);
+  const raceRef = useRef<RaceState | null>(null);
+  const recovering = useRef(false);
   const leader = useRef("");
   const turned = useRef<Record<string, number>>({});
   const noteId = useRef(0);
@@ -92,10 +96,12 @@ export default function RacePage() {
     turned.current = {};
     setPhase("loading");
     try {
-      const r = await api.raceStart({
+      const body: RaceStartBody = {
         competitors: picked, scenario, seed, start: startMode, horizon_hours: days * 24,
         ...(scenario === "custom" ? { custom } : {}), ...(startMode === "session" ? { session_id: fromSid } : {}),
-      });
+      };
+      startBody.current = body;
+      const r = await api.raceStart(body);
       setRid(r.race_id);
       setRace(r);
       setMeta({ label: r.start_label, setupMs: r.setup_ms, lastMs: 0 });
@@ -133,12 +139,51 @@ export default function RacePage() {
         setPhase("finished");
       }
     } catch (e) {
-      setError(String(e));
       setPhase("paused");
+      if (e instanceof ServerUnavailable || e instanceof RunLost) recover();
+      else setError(String(e));
     } finally {
       busy.current = false;
     }
   }, [rid, stepHours, absorb]);
+
+  useEffect(() => { raceRef.current = race; }, [race]);
+
+  // Reconnect after the server sleeps or restarts; a lost race is recreated with the same settings
+  // (identical patients) and replayed to the same point, then continues.
+  const recover = async () => {
+    if (recovering.current) return;
+    recovering.current = true;
+    setReconnecting("Lost contact with the simulation server (it is waking up or restarting). Reconnecting…");
+    try {
+      const deadline = Date.now() + 180_000;
+      let up = false;
+      while (!up && Date.now() < deadline) {
+        try { await api.health(); up = true; } catch { await new Promise((r) => setTimeout(r, 3000)); }
+      }
+      if (!up) throw new Error("The simulation server did not come back within 3 minutes. Please refresh the page later.");
+      const done = raceRef.current?.elapsed_hours ?? 0;
+      try {
+        await api.raceState(rid);
+      } catch (e) {
+        if (!(e instanceof RunLost) || !startBody.current || startBody.current.start === "session") throw e;
+        setReconnecting(`The server restarted, so the race is being restored at ${dayLabel(done)}…`);
+        const r = await api.raceStart(startBody.current);
+        let st: RaceState = r;
+        while (st.elapsed_hours < done - 1e-6) st = await api.raceStep(r.race_id, Math.min(48, done - st.elapsed_hours));
+        setRid(r.race_id);
+        setRace(st);
+        say(done, "Server restarted: race restored at the same point", "info");
+      }
+      setReconnecting("");
+      setPhase("racing");
+    } catch (e) {
+      setReconnecting("");
+      setError(String(e));
+    } finally {
+      recovering.current = false;
+    }
+  };
 
   useEffect(() => {
     if (phase !== "racing") return;
@@ -245,6 +290,8 @@ export default function RacePage() {
                 <button className="btn ghost" onClick={() => { setPhase("setup"); setRace(null); }}><Icon name="reset" size={15} /> New race</button>
               </div>
             </div>
+            {reconnecting && <div className="reading warn" style={{ marginTop: 10 }}><span className="live-dot amber" style={{ marginTop: 6 }} /><span>{reconnecting}</span></div>}
+            {error && <p className="error">{error}</p>}
             <div className="episode-bar" style={{ margin: "10px 0 16px" }}><div className="fill" style={{ width: `${100 * progress}%` }} /></div>
 
             <div className="track" style={{ height: lanes.length * LANE_H }}>

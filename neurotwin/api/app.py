@@ -35,6 +35,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -256,6 +257,20 @@ app = FastAPI(
     version="0.2.0",
     description="Research simulation of hospital bed allocation. " + SIMULATION_LABEL,
 )
+
+
+@app.middleware("http")
+async def _errors_as_json(request, call_next):
+    """Turn unexpected server errors into JSON 500 responses *inside* the CORS layer, so the
+    browser receives the error (with CORS headers) instead of an opaque network failure."""
+    try:
+        return await call_next(request)
+    except Exception as exc:  # noqa: BLE001 - last-resort handler, the error is reported
+        return JSONResponse(
+            status_code=500, content={"detail": f"server error: {type(exc).__name__}: {exc}"}
+        )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -367,7 +382,7 @@ def _so_far(sim: HospitalSimulation) -> dict[str, Any] | None:
     if hours <= 0:
         return None
     m = sim.measured
-    arrivals = sim.result().emergency_arrivals
+    arrivals = sim.measured_emergency_arrivals
     return {
         "measured_hours": hours,
         "cost_per_day": CostWeights.load().cost(m) / (hours / 24.0),
@@ -509,6 +524,15 @@ def race_start(body: RaceStart) -> dict[str, Any]:
         "setup_ms": round(1000 * (time.perf_counter() - t0), 1),
         **race.standings(),
     }
+
+
+@app.get("/api/race/{rid}")
+def race_state(rid: str) -> dict[str, Any]:
+    """Current standings of a race (read-only)."""
+    if rid not in RACES:
+        raise HTTPException(404, "unknown race (it may have expired)")
+    RACES.move_to_end(rid)
+    return RACES[rid].standings()
 
 
 @app.post("/api/race/{rid}/step")

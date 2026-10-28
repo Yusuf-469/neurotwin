@@ -181,6 +181,8 @@ def test_race_runs_competitors_on_identical_futures():
     costs = {lane["name"]: lane["cost"] for lane in last["lanes"]}
     assert costs["fcfs"] >= min(costs.values())
     assert all(len(lane["trace"]) == 5 for lane in last["lanes"])  # start + 4 steps
+    assert client.get(f"/api/race/{race['race_id']}").json()["elapsed_hours"] == 48
+    assert client.get("/api/race/doesnotexist").status_code == 404
     over = client.post(f"/api/race/{race['race_id']}/step", json={"hours": 12})
     assert over.status_code == 409
 
@@ -222,3 +224,27 @@ def test_state_reports_so_far_and_benchmark_reproduces_the_run():
     assert other["metrics"]["J_per_day"] != own["metrics"]["J_per_day"]
     body = client.get("/api/experiments/results").json()
     assert len(body["final_comparisons"]) == 100 and body["final_robustness"] is not None
+
+
+def test_state_in_the_middle_of_the_measured_period():
+    """Regression: state requests between the warm-up and the horizon must not fail."""
+    sid = _start(policy="priority", scenario="A")
+    for _ in range(3):
+        client.post(f"/api/simulation/{sid}/step", json={"hours": 288})  # 36 days
+    r = client.get(f"/api/simulation/{sid}/state")
+    assert r.status_code == 200
+    so_far = r.json()["so_far"]
+    assert so_far["measured_hours"] == 24 and so_far["turned_away_per_100"] >= 0
+
+
+def test_unexpected_errors_keep_cors_headers(monkeypatch):
+    import neurotwin.api.app as app_module
+
+    def boom(_sim):
+        raise RuntimeError("synthetic failure")
+
+    monkeypatch.setattr(app_module, "_so_far", boom)
+    sid = _start(policy="priority", scenario="A")
+    r = client.get(f"/api/simulation/{sid}/state", headers={"Origin": "http://localhost:3000"})
+    assert r.status_code == 500 and "synthetic failure" in r.json()["detail"]
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
