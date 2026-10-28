@@ -43,6 +43,9 @@ It did on validation seeds (151 vs 164), but not on fresh test seeds, where the 
 **"Can RL beat the best rule at all?"**
 Yes, on normal days. The first agent tied Load-Balancing, so I let the agent learn by copying that rule first (behaviour cloning) and then improve it with PPO, with five agents voting. Tested once on 50 runs never used before, it costs 8.5% less than the rule in the normal scenario, which is significant after Holm correction. In the crises it ties, and under combined stress it is 3.5% behind, which isn't significant. The interesting part: copying alone was 58% worse than the rule, because small imitation errors compound into states the rule never showed it. RL fine-tuning is what makes the student beat the teacher. Everything was pre-registered and the candidate was chosen on validation runs before the fresh test.
 
+**"Why did v2 only tie in the crises, and what did you do?"**
+v2 had only ever practised normal days. v3 continues its training on randomly varied days that include crisis conditions, chosen against v2 on validation runs and tested once on a second brand-new block of 50 runs. It significantly beats the best rule on normal days (−5.1%) and under staff shortage (−5.3%), and is not significantly worse anywhere. I state clearly that crises are in v3's training, so this shows a crisis-trained agent can beat the rules in crises; the generalisation question is answered by v1 and v2.
+
 **"Then what is the value of RL here?"**
 1. It beats the exactly solved one-step optimiser, which supports the value of look-ahead (RQ1).
 2. It found a different trade-off: much better tail waits than Priority (13–23 h lower 90th percentile under stress).

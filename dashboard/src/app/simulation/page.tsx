@@ -44,7 +44,7 @@ export default function SimulationPage() {
   const [policies, setPolicies] = useState<string[]>([]);
   const [scenario, setScenario] = useState("A");
   const [seed, setSeed] = useState(3);
-  const [policy, setPolicy] = useState("ppo_ensemble");
+  const [policy, setPolicy] = useState("ppo_v3");
   const [sid, setSid] = useState("");
   const [status, setStatus] = useState<StateResponse | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
@@ -103,7 +103,7 @@ export default function SimulationPage() {
   useEffect(() => {
     api.policies().then((p) => {
       setPolicies(p.policies);
-      setPolicy(["ppo_ensemble", "ppo", "priority"].find((k) => p.policies.includes(k)) ?? "priority");
+      setPolicy(["ppo_v3", "ppo_ensemble", "ppo", "priority"].find((k) => p.policies.includes(k)) ?? "priority");
     }).catch((e) => setError(`Simulator not reachable yet (the free server may be waking up): ${e}`));
   }, []);
 
@@ -233,7 +233,7 @@ export default function SimulationPage() {
     if (typeof window === "undefined" || !new URLSearchParams(window.location.search).has("demo")) return;
     if (policies.length === 0 || demoStarted.current) return;
     demoStarted.current = true;
-    const best = ["ppo_ensemble", "ppo", "priority"].find((k) => policies.includes(k)) ?? "priority";
+    const best = ["ppo_v3", "ppo_ensemble", "ppo", "priority"].find((k) => policies.includes(k)) ?? "priority";
     setPolicy(best);
     begin("A", 3, best, true).then((id) => id && setPlaying(true));
   }, [policies, begin]);

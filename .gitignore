@@ -17,6 +17,9 @@ results/ppo/final_A/*
 !results/ppo/bc_ppo/
 results/ppo/bc_ppo/*
 !results/ppo/bc_ppo/agent_*.pt
+!results/ppo/v3/
+results/ppo/v3/*
+!results/ppo/v3/agent_*.pt
 
 # Local instructions for coding assistants (not part of the project)
 AGENTS.md

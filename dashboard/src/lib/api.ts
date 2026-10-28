@@ -178,6 +178,14 @@ export interface StudyResults {
   final_comparisons: Comparison[] | null;
   final_J_comparisons: JComparison[] | null;
   final_robustness: { robustness_index: Record<string, { estimate: number; ci: [number, number] }> } | null;
+  /** Crisis-trained v3 (RESEARCH.md §6.27): one-time test on the second fresh block, validation, and
+   *  the full Stage 6-style analysis. */
+  v3_test: { selected: string; primary_vs_load_balancing: Comparison[]; collapses: Record<string, number> } | null;
+  v3_validation: { score_vs_lb: Record<string, number>; selected: string; mean_J: Record<string, number> } | null;
+  v3_summary: SummaryEntry[] | null;
+  v3_comparisons: Comparison[] | null;
+  v3_J_comparisons: JComparison[] | null;
+  v3_robustness: { robustness_index: Record<string, { estimate: number; ci: [number, number] }> } | null;
   /** Stage 7 §6.26: selected candidate vs Load-Balancing on the fresh seed block. */
   beat_rule: { selected: string; primary_vs_load_balancing: Comparison[]; secondary_vs_ppo: Comparison[]; collapses: Record<string, number> } | null;
   beat_rule_validation: { validation_J: Record<string, { mean_J: number }>; selected: string } | null;
