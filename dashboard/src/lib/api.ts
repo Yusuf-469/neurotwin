@@ -55,9 +55,21 @@ export interface HospitalState {
   cumulative_off_service: number;
 }
 
+export interface SoFar {
+  measured_hours: number;
+  cost_per_day: number;
+  turned_away: number;
+  turned_away_per_100: number;
+  wrong_ward: number;
+  placements: number;
+  mean_wait_h: number;
+}
+
 export interface StateResponse extends Status {
   state: HospitalState;
   episode_metrics?: Record<string, number>;
+  /** Running results of the measured period; null during the warm-up. */
+  so_far?: SoFar | null;
 }
 
 export interface HistoryPoint {
@@ -161,6 +173,11 @@ export interface StudyResults {
   constrained: { comparisons: Comparison[]; budget: Record<string, number> } | null;
   /** Stage 7: safety shield (RESEARCH.md §6.25); collapses out of 1,250 test episodes. */
   shield: { collapses: Record<string, number>; n_episodes: number; comparisons: Comparison[] } | null;
+  /** Final agent (v2) vs every rule on the fresh block (RESEARCH.md v2.9); same formats as Stage 6. */
+  final_summary: SummaryEntry[] | null;
+  final_comparisons: Comparison[] | null;
+  final_J_comparisons: JComparison[] | null;
+  final_robustness: { robustness_index: Record<string, { estimate: number; ci: [number, number] }> } | null;
   /** Stage 7 §6.26: selected candidate vs Load-Balancing on the fresh seed block. */
   beat_rule: { selected: string; primary_vs_load_balancing: Comparison[]; secondary_vs_ppo: Comparison[]; collapses: Record<string, number> } | null;
   beat_rule_validation: { validation_J: Record<string, { mean_J: number }>; selected: string } | null;
@@ -237,6 +254,10 @@ export const api = {
   whatif: (sid: string, body: WhatIfRequestBody) =>
     request<WhatIfResult>(`/api/simulation/${sid}/whatif`, { method: "POST", body: JSON.stringify(body) }),
   results: () => request<StudyResults>("/api/experiments/results"),
+  benchmark: (sid: string, policy: string) =>
+    request<{ policy: string; compute_ms: number; metrics: Record<string, number> }>(`/api/simulation/${sid}/benchmark`, {
+      method: "POST", body: JSON.stringify({ policy }),
+    }),
   raceStart: (body: RaceStartBody) =>
     request<RaceState & { race_id: string; start_label: string; start_time: number; setup_ms: number }>("/api/race/start", {
       method: "POST", body: JSON.stringify(body),

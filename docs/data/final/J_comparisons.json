@@ -1,0 +1,252 @@
+[
+ {
+  "scenario": "A",
+  "baseline": "fcfs",
+  "ppo_mean": 195.28512714650935,
+  "baseline_mean": 357.1165327851623,
+  "diff": -161.83140563865297,
+  "ci_low": -219.30223203765863,
+  "ci_high": -111.84899562052999,
+  "rel_diff_pct": -45.31613374954251
+ },
+ {
+  "scenario": "A",
+  "baseline": "priority",
+  "ppo_mean": 195.28512714650935,
+  "baseline_mean": 228.15801184647106,
+  "diff": -32.87288469996174,
+  "ci_low": -42.43877510345456,
+  "ci_high": -24.154494125678035,
+  "rel_diff_pct": -14.4079466830567
+ },
+ {
+  "scenario": "A",
+  "baseline": "load_balancing",
+  "ppo_mean": 195.28512714650935,
+  "baseline_mean": 213.40373181613575,
+  "diff": -18.11860466962641,
+  "ci_low": -24.11940308629934,
+  "ci_high": -12.892535362357236,
+  "rel_diff_pct": -8.490294202182476
+ },
+ {
+  "scenario": "A",
+  "baseline": "trunk_reservation",
+  "ppo_mean": 195.28512714650935,
+  "baseline_mean": 228.15801184647106,
+  "diff": -32.87288469996174,
+  "ci_low": -42.43877510345456,
+  "ci_high": -24.154494125678035,
+  "rel_diff_pct": -14.4079466830567
+ },
+ {
+  "scenario": "A",
+  "baseline": "mip",
+  "ppo_mean": 195.28512714650935,
+  "baseline_mean": 236.55566955334587,
+  "diff": -41.27054240683654,
+  "ci_low": -70.68062436779233,
+  "ci_high": -20.96647482323848,
+  "rel_diff_pct": -17.44643976817879
+ },
+ {
+  "scenario": "B",
+  "baseline": "fcfs",
+  "ppo_mean": 839.0002161187182,
+  "baseline_mean": 1352.9353070608215,
+  "diff": -513.9350909421029,
+  "ci_low": -605.9139700121722,
+  "ci_high": -420.7388130731353,
+  "rel_diff_pct": -37.98667151784212
+ },
+ {
+  "scenario": "B",
+  "baseline": "priority",
+  "ppo_mean": 839.0002161187182,
+  "baseline_mean": 917.4402563433105,
+  "diff": -78.44004022459195,
+  "ci_low": -110.0417664179315,
+  "ci_high": -48.796406126783914,
+  "rel_diff_pct": -8.549879916675394
+ },
+ {
+  "scenario": "B",
+  "baseline": "load_balancing",
+  "ppo_mean": 839.0002161187182,
+  "baseline_mean": 853.5984166754756,
+  "diff": -14.598200556757183,
+  "ci_low": -35.13601557850691,
+  "ci_high": 6.775658144409542,
+  "rel_diff_pct": -1.710195364889856
+ },
+ {
+  "scenario": "B",
+  "baseline": "trunk_reservation",
+  "ppo_mean": 839.0002161187182,
+  "baseline_mean": 917.4402563433105,
+  "diff": -78.44004022459195,
+  "ci_low": -110.0417664179315,
+  "ci_high": -48.796406126783914,
+  "rel_diff_pct": -8.549879916675394
+ },
+ {
+  "scenario": "B",
+  "baseline": "mip",
+  "ppo_mean": 839.0002161187182,
+  "baseline_mean": 983.7301646541907,
+  "diff": -144.7299485354722,
+  "ci_low": -219.98456746831178,
+  "ci_high": -69.83536368482932,
+  "rel_diff_pct": -14.712362570110772
+ },
+ {
+  "scenario": "C",
+  "baseline": "fcfs",
+  "ppo_mean": 1223.3685073264867,
+  "baseline_mean": 1842.2706264284666,
+  "diff": -618.9021191019799,
+  "ci_low": -719.4554333914957,
+  "ci_high": -519.0662691021724,
+  "rel_diff_pct": -33.59452787356327
+ },
+ {
+  "scenario": "C",
+  "baseline": "priority",
+  "ppo_mean": 1223.3685073264867,
+  "baseline_mean": 1233.907383185756,
+  "diff": -10.538875859269575,
+  "ci_low": -46.78789002845964,
+  "ci_high": 25.4697648358717,
+  "rel_diff_pct": -0.8541059080187887
+ },
+ {
+  "scenario": "C",
+  "baseline": "load_balancing",
+  "ppo_mean": 1223.3685073264867,
+  "baseline_mean": 1217.8107595861027,
+  "diff": 5.557747740384085,
+  "ci_low": -26.32045781934999,
+  "ci_high": 40.536761245840374,
+  "rel_diff_pct": 0.45637203454114633
+ },
+ {
+  "scenario": "C",
+  "baseline": "trunk_reservation",
+  "ppo_mean": 1223.3685073264867,
+  "baseline_mean": 1233.907383185756,
+  "diff": -10.538875859269575,
+  "ci_low": -46.78789002845964,
+  "ci_high": 25.4697648358717,
+  "rel_diff_pct": -0.8541059080187887
+ },
+ {
+  "scenario": "C",
+  "baseline": "mip",
+  "ppo_mean": 1223.3685073264867,
+  "baseline_mean": 1438.7161327979952,
+  "diff": -215.34762547150865,
+  "ci_low": -299.4408583547711,
+  "ci_high": -130.1934688419569,
+  "rel_diff_pct": -14.968041336459025
+ },
+ {
+  "scenario": "D",
+  "baseline": "fcfs",
+  "ppo_mean": 877.8472298385756,
+  "baseline_mean": 1513.89417571508,
+  "diff": -636.0469458765047,
+  "ci_low": -724.245246246482,
+  "ci_high": -548.3526079874853,
+  "rel_diff_pct": -42.01396346452493
+ },
+ {
+  "scenario": "D",
+  "baseline": "priority",
+  "ppo_mean": 877.8472298385756,
+  "baseline_mean": 976.2791071548556,
+  "diff": -98.43187731628001,
+  "ci_low": -136.03806848084304,
+  "ci_high": -62.68217693502919,
+  "rel_diff_pct": -10.082350077442241
+ },
+ {
+  "scenario": "D",
+  "baseline": "load_balancing",
+  "ppo_mean": 877.8472298385756,
+  "baseline_mean": 876.2438543963004,
+  "diff": 1.603375442274919,
+  "ci_low": -22.883537936046487,
+  "ci_high": 27.120848063394998,
+  "rel_diff_pct": 0.18298278889266337
+ },
+ {
+  "scenario": "D",
+  "baseline": "trunk_reservation",
+  "ppo_mean": 877.8472298385756,
+  "baseline_mean": 976.2791071548556,
+  "diff": -98.43187731628001,
+  "ci_low": -136.03806848084304,
+  "ci_high": -62.68217693502919,
+  "rel_diff_pct": -10.082350077442241
+ },
+ {
+  "scenario": "D",
+  "baseline": "mip",
+  "ppo_mean": 877.8472298385756,
+  "baseline_mean": 1045.1650434156616,
+  "diff": -167.31781357708624,
+  "ci_low": -237.94688750223523,
+  "ci_high": -97.60823098680972,
+  "rel_diff_pct": -16.008745664730775
+ },
+ {
+  "scenario": "E",
+  "baseline": "fcfs",
+  "ppo_mean": 1493.3265966507847,
+  "baseline_mean": 2232.4576528041835,
+  "diff": -739.1310561533984,
+  "ci_low": -858.8557566148517,
+  "ci_high": -621.5129654510521,
+  "rel_diff_pct": -33.10840208883595
+ },
+ {
+  "scenario": "E",
+  "baseline": "priority",
+  "ppo_mean": 1493.3265966507847,
+  "baseline_mean": 1466.1578510845338,
+  "diff": 27.168745566251168,
+  "ci_low": -28.445049485400315,
+  "ci_high": 81.17603275579421,
+  "rel_diff_pct": 1.8530573325480701
+ },
+ {
+  "scenario": "E",
+  "baseline": "load_balancing",
+  "ppo_mean": 1493.3265966507847,
+  "baseline_mean": 1442.1522569035803,
+  "diff": 51.174339747204186,
+  "ci_low": 6.130330975317293,
+  "ci_high": 96.94122899785319,
+  "rel_diff_pct": 3.548469969258288
+ },
+ {
+  "scenario": "E",
+  "baseline": "trunk_reservation",
+  "ppo_mean": 1493.3265966507847,
+  "baseline_mean": 1466.1578510845338,
+  "diff": 27.168745566251168,
+  "ci_low": -28.445049485400315,
+  "ci_high": 81.17603275579421,
+  "rel_diff_pct": 1.8530573325480701
+ },
+ {
+  "scenario": "E",
+  "baseline": "mip",
+  "ppo_mean": 1493.3265966507847,
+  "baseline_mean": 1823.5832004424371,
+  "diff": -330.2566037916521,
+  "ci_low": -435.8579336903261,
+  "ci_high": -228.5904072821279,
+  "rel_diff_pct": -18.110311814208714
+ }
+]

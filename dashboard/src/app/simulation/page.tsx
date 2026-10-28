@@ -5,6 +5,7 @@ import DecisionLog from "@/components/DecisionLog";
 import FloorPlan from "@/components/FloorPlan";
 import { Icon, type IconName } from "@/components/icons";
 import LiveCharts from "@/components/LiveCharts";
+import RunVerdict from "@/components/RunVerdict";
 import { Reveal } from "@/components/motion";
 import { Segmented, TechDetails } from "@/components/ui";
 import Link from "next/link";
@@ -367,6 +368,13 @@ export default function SimulationPage() {
           </Reveal>
         </div>
       </div>
+
+      {status && sid && (
+        <Reveal>
+          <RunVerdict sessionId={sid} policy={status.policy} state={st} soFar={status.so_far} now={now}
+            warmupHours={warmup} available={policies} onCompare={() => setPlaying(false)} />
+        </Reveal>
+      )}
 
       <Reveal>
         <section className="card">

@@ -355,9 +355,49 @@ def state(sid: str) -> dict[str, Any]:
     """Observable hospital state (and episode metrics once finished)."""
     session = _get(sid)
     out = {"label": SIMULATION_LABEL, **_status(session), "state": observe(session.sim).to_dict()}
+    out["so_far"] = _so_far(session.sim)
     if session.sim.finished:
         out["episode_metrics"] = episode_metrics(session.sim, CostWeights.load())
     return out
+
+
+def _so_far(sim: HospitalSimulation) -> dict[str, Any] | None:
+    """Running results of the measured period (after the warm-up), for live interpretation."""
+    hours = min(sim.now, sim.config.horizon_hours) - sim.config.warmup_hours
+    if hours <= 0:
+        return None
+    m = sim.measured
+    arrivals = sim.result().emergency_arrivals
+    return {
+        "measured_hours": hours,
+        "cost_per_day": CostWeights.load().cost(m) / (hours / 24.0),
+        "turned_away": m.diversions,
+        "turned_away_per_100": 100.0 * m.diversions / arrivals if arrivals else 0.0,
+        "wrong_ward": m.off_service_placements,
+        "placements": m.placements,
+        "mean_wait_h": m.request_hours / max(1, m.placements),
+    }
+
+
+class BenchmarkBody(BaseModel):
+    policy: str
+
+
+@app.post("/api/simulation/{sid}/benchmark")
+def benchmark(sid: str, body: BenchmarkBody) -> dict[str, Any]:
+    """Run the session's exact run (same conditions and seed, so identical patients) to the end
+    with ``policy``, from an empty hospital under the full study protocol, and report its
+    measured-period results. Deterministic: the session's own policy reproduces its own run."""
+    session = _get(sid)
+    t0 = time.perf_counter()
+    sim = HospitalSimulation(load_default_config(), session.sim.scenario, seed=session.seed)
+    run_until(sim, build_policy(body.policy))
+    return {
+        "label": SIMULATION_LABEL,
+        "policy": body.policy,
+        "compute_ms": round(1000 * (time.perf_counter() - t0), 1),
+        "metrics": episode_metrics(sim, CostWeights.load()),
+    }
 
 
 @app.get("/api/simulation/{sid}/history")
@@ -524,6 +564,10 @@ def experiment_results() -> dict[str, Any]:
         "summary": "docs/data/stage6/summary.json",
         "comparisons": "docs/data/stage6/comparisons.json",
         "J_comparisons": "docs/data/stage6/J_comparisons.json",
+        "final_summary": "docs/data/final/summary.json",
+        "final_comparisons": "docs/data/final/comparisons.json",
+        "final_J_comparisons": "docs/data/final/J_comparisons.json",
+        "final_robustness": "docs/data/final/robustness.json",
         "robustness": "docs/data/stage7/robustness.json",
         "crn_check": "docs/data/stage7/crn_check.json",
         "structure": "docs/data/stage7/structure.json",

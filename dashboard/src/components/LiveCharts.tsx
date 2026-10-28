@@ -24,7 +24,6 @@ const tooltipStyle = {
     fontSize: 12, color: "var(--text-primary)", boxShadow: "var(--shadow)",
   },
   labelStyle: { color: "var(--text-muted)" },
-  itemStyle: { color: "var(--text-primary)" },
   cursor: { stroke: "var(--axis)", strokeWidth: 1 },
 };
 

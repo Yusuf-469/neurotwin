@@ -42,7 +42,7 @@ export default function RacePage() {
   const [scenario, setScenario] = useState("A");
   const [custom, setCustom] = useState<Conditions>({ arrival_multiplier: 1.3, staff_multiplier: 0.9, capacity_multiplier: 1.0 });
   const [seed, setSeed] = useState(3);
-  const [startMode, setStartMode] = useState<"busy" | "empty" | "session">("busy");
+  const [startMode, setStartMode] = useState<"busy" | "session">("busy");
   const [fromSid, setFromSid] = useState("");
   const [days, setDays] = useState(3);
   const [picked, setPicked] = useState<string[]>(DEFAULT_COMPETITORS);
@@ -163,6 +163,7 @@ export default function RacePage() {
   const podium = race && phase === "finished" ? [...race.lanes].sort((a, b) => a.rank - b.rank) : [];
   const runnerUp = podium[1];
   const margin = podium[0] && runnerUp && runnerUp.cost > 0 ? (100 * (runnerUp.cost - podium[0].cost)) / runnerUp.cost : 0;
+  const deadHeat = podium.length >= 2 && Math.abs(podium[podium.length - 1].cost - podium[0].cost) < 0.5;
 
   return (
     <div className="stack" style={{ gap: 16 }}>
@@ -188,7 +189,6 @@ export default function RacePage() {
               <label className="field">Start from
                 <select value={startMode} onChange={(e) => setStartMode(e.target.value as typeof startMode)}>
                   <option value="busy">Busy hospital (after 35-day warm-up)</option>
-                  <option value="empty">Empty hospital (day 1)</option>
                   {fromSid && <option value="session">My live hospital run (this exact moment)</option>}
                 </select>
               </label>
@@ -282,7 +282,16 @@ export default function RacePage() {
             </div>
           </section>
 
-          {phase === "finished" && podium.length >= 2 && (
+          {phase === "finished" && deadHeat && (
+            <section className="card" style={{ textAlign: "center" }}>
+              <h2 className="card-title" style={{ fontSize: 20 }}>Dead heat</h2>
+              <p className="secondary" style={{ margin: "8px auto 0", maxWidth: 620 }}>
+                Every competitor finished with the same cost. That happens when the hospital has spare beds throughout, so no decision
+                ever forces a patient to wait. Try a crisis situation, custom conditions with more patients, or a longer race.
+              </p>
+            </section>
+          )}
+          {phase === "finished" && !deadHeat && podium.length >= 2 && (
             <Reveal kind="zoom">
               <section className="card podium-card">
                 <div className="podium">
@@ -321,7 +330,7 @@ export default function RacePage() {
                     <XAxis dataKey="day" type="number" domain={[0, race.horizon_hours / 24]} unit="d" stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} />
                     <YAxis stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} />
                     <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" }}
-                      itemStyle={{ color: "var(--text-primary)" }} labelStyle={{ color: "var(--text-muted)" }}
+                      labelStyle={{ color: "var(--text-muted)" }}
                       itemSorter={(i) => Number(i.value ?? 0)} labelFormatter={(d) => `day ${d} (best first)`}
                       formatter={(v, n) => [typeof v === "number" ? v.toLocaleString() : "–", label(String(n))]} />
                     {race.lanes.map((l) => (
