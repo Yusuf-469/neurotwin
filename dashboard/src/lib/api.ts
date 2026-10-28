@@ -219,6 +219,12 @@ export interface RaceStartBody {
  *  failures are retried with backoff; other errors are returned at once. */
 const RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
 
+/** The server could not be reached (sleeping, restarting or offline). Pages reconnect on this. */
+export class ServerUnavailable extends Error {}
+/** The run or race no longer exists on the server (lost in a restart). Runs are deterministic, so
+ *  pages can recreate them and fast-forward to the same moment. */
+export class RunLost extends Error {}
+
 async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -230,7 +236,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
       return res;
     } catch {
       if (attempt >= RETRY_DELAYS_MS.length) {
-        throw new Error("Could not reach the simulation server. It may be waking up or restarting; please try again in a minute.");
+        throw new ServerUnavailable("Could not reach the simulation server. It may be waking up or restarting.");
       }
       await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
     }
@@ -243,7 +249,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   if (res.status === 404 && /^\/api\/(simulation|race)\/[^/]+\/./.test(path)) {
-    throw new Error("This run is no longer on the server (the server restarts after updates and when it wakes from sleep). Press Start to begin a new run.");
+    throw new RunLost("This run is no longer on the server (it restarts after updates and when it wakes from sleep).");
   }
   if (!res.ok) {
     // FastAPI errors: {"detail": "..."} or {"detail": [{"msg": "..."}]}; show the message only.
@@ -288,6 +294,7 @@ export const api = {
     request<RaceState & { race_id: string; start_label: string; start_time: number; setup_ms: number }>("/api/race/start", {
       method: "POST", body: JSON.stringify(body),
     }),
+  raceState: (rid: string) => request<RaceState>(`/api/race/${rid}`),
   raceStep: (rid: string, hours: number) =>
     request<RaceState>(`/api/race/${rid}/step`, { method: "POST", body: JSON.stringify({ hours }) }),
 };

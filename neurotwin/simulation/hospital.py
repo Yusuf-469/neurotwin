@@ -228,6 +228,11 @@ class HospitalSimulation:
         return max(0, self.staffed_capacity(unit) - self._occupied[unit])
 
     @property
+    def measured_emergency_arrivals(self) -> int:
+        """Emergency arrivals (including diverted) since the start of the measurement window."""
+        return self._m_emergency_arrivals
+
+    @property
     def ed_count(self) -> int:
         """Patients in the ED: waiting for a doctor, in treatment, or boarding."""
         return len(self._doctor_queue) + self._doctors_busy + self._n_boarding
