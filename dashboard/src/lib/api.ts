@@ -99,6 +99,23 @@ export interface FuturesResult {
   };
 }
 
+/** One decision on the map of what the agent learned (neurotwin/experiments/policy_map.py). */
+export interface PolicyMapPoint {
+  x: number; y: number; action: string; confidence: number; scenario: string; agreement: string;
+  occ: number[]; waiting: number; day: number;
+}
+
+export interface PolicyMapData {
+  description: string;
+  agent: string;
+  seeds: number[];
+  seed_split: string;
+  n_decisions_with_choice: number;
+  max_points: number;
+  axes: { explained_variance: number; top_inputs: { label: string; correlation: number }[] }[];
+  points: PolicyMapPoint[];
+}
+
 /** One sealed test run, re-simulated on the server and compared with the stored result. */
 export interface ReproduceResult {
   policy: string;
@@ -361,6 +378,7 @@ export const api = {
     request<FuturesResult>(`/api/simulation/${sid}/futures`, {
       method: "POST", body: JSON.stringify({ policies, horizon_hours, n_futures }),
     }),
+  policyMap: () => request<PolicyMapData>("/api/experiments/policy-map"),
   reproduce: (policy: string, scenario: string, seed: number) =>
     request<ReproduceResult>("/api/reproduce", { method: "POST", body: JSON.stringify({ policy, scenario, seed }) }),
   whatif: (sid: string, body: WhatIfRequestBody) =>

@@ -728,6 +728,23 @@ def reproduce(body: ReproduceBody) -> dict[str, Any]:
     }
 
 
+POLICY_MAP = ROOT / "docs" / "data" / "v3" / "policy_map.json"
+
+
+@lru_cache(maxsize=1)
+def _policy_map_text() -> str:
+    return POLICY_MAP.read_text(encoding="utf-8")
+
+
+@app.get("/api/experiments/policy-map")
+def policy_map() -> JSONResponse:
+    """Descriptive map of the latest agent's internal representation (experiments/policy_map.py).
+    Served separately from the study results because it is large (about 0.5 MB)."""
+    if not POLICY_MAP.exists():
+        raise HTTPException(404, "policy map not generated")
+    return JSONResponse(content=json.loads(_policy_map_text()))
+
+
 @app.get("/api/experiments/results")
 def experiment_results() -> dict[str, Any]:
     """Pre-computed study results (Stages 6-7), served read-only with their provenance."""
