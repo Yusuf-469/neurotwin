@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene, SplitWords, WhenVisible } from "@/components/motion";
+import PolicyMap from "@/components/PolicyMap";
 import ReproduceCard from "@/components/ReproduceCard";
 import { Card, Legend, SectionHeader, Segmented, Skeleton, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
@@ -464,6 +465,15 @@ export default function ExperimentsPage() {
                   so this behaviour is not present in any human-designed baseline.</p>
               </TechDetails>
             </Card>
+          </Reveal>
+          <Reveal>
+            <div style={{ marginTop: 20 }}>
+              <Card title="A map of how the latest agent sees the hospital"
+                subtitle="every dot is one real decision, placed by the network's own internal picture of the situation"
+                explain="Dots close together are situations the network treats as similar. Hover a dot to see the situation and the move it chose.">
+                <PolicyMap />
+              </Card>
+            </div>
           </Reveal>
         </Scene>
       )}

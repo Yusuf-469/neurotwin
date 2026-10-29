@@ -270,3 +270,12 @@ def test_reproduce_rejects_runs_outside_the_sealed_test():
         assert client.post("/api/reproduce", json=body).status_code == 422
     r = client.post("/api/reproduce", json={"policy": "ppo_shielded", "scenario": "A", "seed": 500_000})
     assert r.status_code == 404  # not part of the final test
+
+
+def test_policy_map_is_served_with_its_provenance():
+    r = client.get("/api/experiments/policy-map")
+    assert r.status_code == 200
+    j = r.json()
+    assert j["seed_split"] == "train"  # descriptive data must not use evaluation seeds
+    assert len(j["axes"]) == 2 and 0 < len(j["points"]) <= j["max_points"]
+    assert {"x", "y", "action", "scenario", "agreement"} <= set(j["points"][0])

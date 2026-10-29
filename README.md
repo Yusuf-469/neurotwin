@@ -21,6 +21,7 @@ NeuroTwin simulates patient flow through an emergency department, medical and su
 | Platform | What-if engine and live decision-maker race (identical patients for every competitor), post-hoc explanation layer with fact-check guard, FastAPI backend, Next.js dashboard with an animated live hospital | [Stages 8–11](docs/stage8_11_platform_report.md) |
 | Inside the agent | For any live RL decision: each voting network's action probabilities, what Load-Balancing would have done in the same state (consulted, never obeyed), and integrated-gradients attributions of the chosen-vs-runner-up logit margin with a completeness check. The critic's value is deliberately not shown (not calibrated in absolute terms) | `neurotwin/rl/introspect.py` |
 | Possible futures and reproduction | From any live moment, 16 shared random futures per decision-maker as percentile bands with a paired comparison; and any of the 1,500 runs of the final test re-simulated on the server and compared digit by digit with the published file | `neurotwin/whatif/fan.py`, `POST /api/reproduce` |
+| Map of what the agent learned | 3,000 real decisions placed by PCA of the latest agent's last hidden layer (training seeds only; descriptive). The main axis tracks crowding (38% of variance) and the agent's "keep beds free" choices sit on the crowded side | `neurotwin/experiments/policy_map.py` |
 
 ## Main findings (simulation, test seeds)
 
