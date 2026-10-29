@@ -279,3 +279,17 @@ def test_policy_map_is_served_with_its_provenance():
     assert j["seed_split"] == "train"  # descriptive data must not use evaluation seeds
     assert len(j["axes"]) == 2 and 0 < len(j["points"]) <= j["max_points"]
     assert {"x", "y", "action", "scenario", "agreement"} <= set(j["points"][0])
+
+
+def test_training_curves_are_served_for_all_three_generations():
+    tc = client.get("/api/experiments/results").json()["training_curves"]
+    assert set(tc["versions"]) == {"v1", "v2", "v3"}
+    for v in tc["versions"].values():
+        assert len(v["step"]) == tc["bins"] and v["n_agents"] == 5
+        for curve in v["curves"].values():
+            assert len(curve["median"]) == tc["bins"]
+            ok = [(lo, m, hi) for lo, m, hi in zip(curve["low"], curve["median"], curve["high"]) if m is not None]
+            assert all(lo <= m + 1e-9 and m <= hi + 1e-9 for lo, m, hi in ok)
+    # v1 learned from scratch: starts near-random, ends far more decisive
+    ent = tc["versions"]["v1"]["curves"]["entropy"]["median"]
+    assert ent[0] > 1.0 and ent[-1] < 0.5

@@ -116,6 +116,17 @@ export interface PolicyMapData {
   points: PolicyMapPoint[];
 }
 
+type Curve = { median: (number | null)[]; low: (number | null)[]; high: (number | null)[] };
+
+export interface TrainingCurves {
+  bins: number;
+  note: string;
+  versions: Record<string, {
+    run: string; story: string; n_agents: number; total_steps: number; step: number[];
+    curves: Record<"episode_reward" | "entropy" | "explained_variance", Curve>;
+  }>;
+}
+
 /** One sealed test run, re-simulated on the server and compared with the stored result. */
 export interface ReproduceResult {
   policy: string;
@@ -271,6 +282,8 @@ export interface StudyResults {
   /** Stage 7 §6.26: selected candidate vs Load-Balancing on the fresh seed block. */
   beat_rule: { selected: string; primary_vs_load_balancing: Comparison[]; secondary_vs_ppo: Comparison[]; collapses: Record<string, number> } | null;
   beat_rule_validation: { validation_J: Record<string, { mean_J: number }>; selected: string } | null;
+  /** Logged learning curves of v1, v2 and v3 (neurotwin/experiments/training_curves.py). */
+  training_curves?: TrainingCurves | null;
 }
 
 export interface RaceLane {

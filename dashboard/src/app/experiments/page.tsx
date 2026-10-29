@@ -10,6 +10,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { CountUp, Reveal, Scene, SplitWords, WhenVisible } from "@/components/motion";
 import PolicyMap from "@/components/PolicyMap";
 import ReproduceCard from "@/components/ReproduceCard";
+import TrainingReplay from "@/components/TrainingReplay";
 import { Card, Legend, SectionHeader, Segmented, Skeleton, Takeaway, TechDetails, useViewToggle } from "@/components/ui";
 import { api, type Comparison, type StudyResults } from "@/lib/api";
 import { ENSEMBLE, V3, METRICS, POLICIES, SCENARIO_INFO, SCENARIO_LABELS, policyMeta, scenNum, type PolicyMeta } from "@/lib/policies";
@@ -672,6 +673,16 @@ export default function ExperimentsPage() {
               </Card>
             </Reveal>
           </div>
+          {data.training_curves && (
+            <Reveal>
+              <div style={{ marginTop: 20 }}>
+                <Card title="Watch the agents learn" subtitle="the recorded training of each generation, replayed over 3 million steps"
+                  explain="Press play, or drag the slider through training. Switch generations to see how differently each one learned.">
+                  <WhenVisible height={420}><TrainingReplay data={data.training_curves} /></WhenVisible>
+                </Card>
+              </div>
+            </Reveal>
+          )}
         </Scene>
       )}
 
