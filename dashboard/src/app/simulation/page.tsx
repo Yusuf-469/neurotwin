@@ -377,6 +377,7 @@ export default function SimulationPage() {
               <span><i className="dot" style={{ background: PRIORITY_COLORS[1] }} />critical / very urgent</span>
               <span><i className="dot" style={{ background: PRIORITY_COLORS[3] }} />urgent</span>
               <span><i className="dot" style={{ background: PRIORITY_COLORS[4] }} />standard / planned</span>
+              <span><i className="dot" style={{ background: "transparent", border: "2px dashed var(--violet)" }} />placed in the other ward</span>
             </div>
             {(!status || loading) && (
               <div className="plan-overlay">

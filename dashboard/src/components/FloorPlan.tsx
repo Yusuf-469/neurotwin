@@ -51,10 +51,13 @@ function mulberry(seed: number) {
   };
 }
 
-interface Mover { id: number; pts: [number, number][]; color: string; start: number; dur: number; label: string }
+interface Mover { id: number; pts: [number, number][]; color: string; start: number; dur: number; label: string; off: boolean }
 interface Ambulance { id: number; start: number; kind: "divert" | "arrive" }
 
 const MOVE_MS = 1500;
+/** After arriving, a mover stays briefly to show the arrival ping (and the wrong-ward tag). */
+const ARRIVE_MS = 700;
+const TRAIL = [0.035, 0.07, 0.105, 0.14];
 
 function along(pts: [number, number][], k: number): [number, number] {
   const segs = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
@@ -132,7 +135,7 @@ export default function FloorPlan({ state, newDecisions, newDiversions, playing,
           const delay = (placements.indexOf(d) / Math.max(1, placements.length)) * spread;
           const pts: [number, number][] = [start, [CORR_X, start[1]], [CORR_X, doorY(w)], [WX0 + 14, doorY(w)], dest];
           spawned.push({ id: nextId.current++, pts, color: PRIORITY_COLORS[d.priority ?? 5], start: now + delay, dur: MOVE_MS,
-            label: `${PRIORITY_NAMES[d.priority ?? 5]} → ${UNIT_LABELS[w.unit]}` });
+            label: `${PRIORITY_NAMES[d.priority ?? 5]} → ${UNIT_LABELS[w.unit]}`, off: !!d.off_service });
           if (j < arrivedBeds.length) arr[arrivedBeds[j]] = { state: "occ", arrive: delay + MOVE_MS };
         });
       }
@@ -154,7 +157,7 @@ export default function FloorPlan({ state, newDecisions, newDiversions, playing,
     let raf = 0;
     const loop = () => {
       const t = performance.now();
-      setMovers((m) => (m.some((x) => t > x.start + x.dur + 50) ? m.filter((x) => t <= x.start + x.dur + 50) : m));
+      setMovers((m) => (m.some((x) => t > x.start + x.dur + ARRIVE_MS) ? m.filter((x) => t <= x.start + x.dur + ARRIVE_MS) : m));
       setAmbulances((a) => (a.some((x) => t > x.start + 2600) ? a.filter((x) => t <= x.start + 2600) : a));
       setFrame((f) => (f + 1) % 1_000_000);
       raf = requestAnimationFrame(loop);
@@ -286,13 +289,34 @@ export default function FloorPlan({ state, newDecisions, newDiversions, playing,
 
       {/* moving patients */}
       {movers.map((m) => {
-        const k = Math.max(0, Math.min(1, (t - m.start) / m.dur));
         if (t < m.start) return null;
+        const k = Math.max(0, Math.min(1, (t - m.start) / m.dur));
         const [x, y] = along(m.pts, ease(k));
+        // after arrival: an expanding ping at the bed (0..1 over ARRIVE_MS)
+        const after = k >= 1 ? Math.min(1, (t - m.start - m.dur) / ARRIVE_MS) : 0;
         return (
-          <g key={m.id} transform={`translate(${x}, ${y})`} className="fp-mover">
-            <circle r="13" fill={m.color} opacity="0.25" filter="url(#glow)" />
-            <circle r="7.5" fill={m.color} stroke="var(--surface-1)" strokeWidth="2" />
+          <g key={m.id}>
+            {k < 1 && TRAIL.map((lag, i) => {
+              const [tx, ty] = along(m.pts, ease(Math.max(0, k - lag)));
+              return <circle key={i} cx={tx} cy={ty} r={6 - i * 1.2} fill={m.color} opacity={0.32 - i * 0.07} />;
+            })}
+            <g transform={`translate(${x}, ${y})`} className="fp-mover">
+              {k >= 1 && <circle r={8 + after * 16} fill="none" stroke={m.color} strokeWidth={2} opacity={1 - after} />}
+              {/* soft halo without a blur filter (no per-frame filter work) */}
+              <circle r="13" fill={m.color} opacity={0.18 * (1 - after)} />
+              <circle r="7.5" fill={m.color} stroke="var(--surface-1)" strokeWidth="2" opacity={1 - after} />
+              {m.off && (
+                <>
+                  <circle r="12" fill="none" stroke="var(--violet)" strokeWidth="2" strokeDasharray="3 3" opacity={1 - after * 0.6} />
+                  {k >= 1 && (
+                    <g transform="translate(14,-24)" opacity={1 - after}>
+                      <rect width="74" height="18" rx="5" fill="var(--violet)" />
+                      <text x="37" y="13" textAnchor="middle" className="fp-full-text">OTHER WARD</text>
+                    </g>
+                  )}
+                </>
+              )}
+            </g>
           </g>
         );
       })}
