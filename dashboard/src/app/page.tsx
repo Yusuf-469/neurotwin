@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import HeroScene from "@/components/HeroScene";
 import { Icon, type IconName } from "@/components/icons";
+import ArchitectureMap from "@/components/ArchitectureMap";
 import { CountUp, Reveal, Rotator, Scene, SplitWords } from "@/components/motion";
 import { SectionHeader, TechDetails } from "@/components/ui";
 import { api, type StudyResults } from "@/lib/api";
@@ -87,7 +88,7 @@ const STEPS: { title: string; icon: IconName; text: string; tech: string[] }[] =
 const SPEC: { k: string; v: string; d: string; icon: IconName }[] = [
   { k: "Algorithm", v: "PPO", d: "Proximal Policy Optimisation, implemented from scratch in PyTorch (networks, losses, training loop).", icon: "cpu" },
   { k: "Network", v: "2 × 64 neurons", d: "Separate actor (chooses) and critic (judges the situation) networks with tanh activations.", icon: "network" },
-  { k: "Training", v: "3 million decisions", d: "8 simulated hospitals in parallel, normal days only, trained on an ordinary CPU (no GPU needed).", icon: "repeat" },
+  { k: "Training", v: "3 million decisions", d: "8 simulated hospitals in parallel on an ordinary CPU (no GPU needed). v1 and v2 trained on normal days; v3 also on randomly varied crisis days.", icon: "repeat" },
   { k: "Time-aware", v: "γ = 0.95 / hour", d: "Rewards are discounted by real simulated time between decisions (semi-Markov GAE, λ = 0.9).", icon: "clock" },
   { k: "Safe by design", v: "Action masking", d: "It can only pick choices that are physically possible at that moment.", icon: "shield" },
   { k: "The model", v: "1 network, 5 copies", d: "One small neural network (about 11,700 learned numbers). The results use 5 copies of it trained from different random starts, so one lucky run can't decide the outcome.", icon: "layers" },
@@ -194,6 +195,13 @@ export default function Overview() {
             </Reveal>
           ))}
         </div>
+        <Reveal>
+          <div style={{ marginTop: 34 }}>
+            <SectionHeader kicker="Under the hood" title="How the parts fit together"
+              lead="Click any part to see what it does and where its code and tests live." />
+            <ArchitectureMap />
+          </div>
+        </Reveal>
       </Scene>
 
       {/* ------------------------------------------------------------------ how it works */}
