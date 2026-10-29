@@ -772,6 +772,7 @@ def experiment_results() -> dict[str, Any]:
         "v3_J_comparisons": "docs/data/v3/J_comparisons.json",
         "v3_robustness": "docs/data/v3/robustness.json",
         "beat_rule_validation": "docs/data/stage7/bc_ppo_validation.json",
+        "training_curves": "docs/data/training_curves.json",
     }.items():
         path = ROOT / rel
         out[key] = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None

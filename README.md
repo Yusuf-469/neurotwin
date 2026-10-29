@@ -22,6 +22,7 @@ NeuroTwin simulates patient flow through an emergency department, medical and su
 | Inside the agent | For any live RL decision: each voting network's action probabilities, what Load-Balancing would have done in the same state (consulted, never obeyed), and integrated-gradients attributions of the chosen-vs-runner-up logit margin with a completeness check. The critic's value is deliberately not shown (not calibrated in absolute terms) | `neurotwin/rl/introspect.py` |
 | Possible futures and reproduction | From any live moment, 16 shared random futures per decision-maker as percentile bands with a paired comparison; and any of the 1,500 runs of the final test re-simulated on the server and compared digit by digit with the published file | `neurotwin/whatif/fan.py`, `POST /api/reproduce` |
 | Map of what the agent learned | 3,000 real decisions placed by PCA of the latest agent's last hidden layer (training seeds only; descriptive). The main axis tracks crowding (38% of variance) and the agent's "keep beds free" choices sit on the crowded side | `neurotwin/experiments/policy_map.py` |
+| Training replay | The logged learning curves of v1, v2 and v3 (reward, policy entropy, critic explained variance; median and range over five agents) played back on the Results page. Mid-training network snapshots were not kept, so it replays curves, not behaviour | `neurotwin/experiments/training_curves.py` |
 
 ## Main findings (simulation, test seeds)
 
