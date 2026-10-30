@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
+import GuidedTour from "@/components/GuidedTour";
 import NavBar from "@/components/NavBar";
 import { AnimationGovernor, BackToTop, HospitalBackdrop, PointerFX, ScrollProgress } from "@/components/motion";
 import "./globals.css";
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </footer>
         <BackToTop />
         <AnimationGovernor />
+        <GuidedTour />
       </body>
     </html>
   );
