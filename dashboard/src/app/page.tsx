@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import HeroScene from "@/components/HeroScene";
 import { Icon, type IconName } from "@/components/icons";
+import { startTour } from "@/components/GuidedTour";
 import ArchitectureMap from "@/components/ArchitectureMap";
 import { CountUp, Reveal, Rotator, Scene, SplitWords } from "@/components/motion";
 import { SectionHeader, TechDetails } from "@/components/ui";
@@ -156,6 +157,7 @@ export default function Overview() {
                 <div className="row">
                   <Link href="/simulation/?demo=1" className="btn lg glow"><Icon name="play" size={16} /> Watch it live <span className="arrow"><Icon name="arrow" size={16} /></span></Link>
                   <Link href="/experiments/" className="btn lg ghost"><Icon name="chart" size={16} /> See the results</Link>
+                  <button type="button" className="btn lg ghost" onClick={startTour}><Icon name="flag" size={16} /> 90-second tour</button>
                   <span className="pill" title="Backend status">
                     <i className={`live-dot${online === false ? " off" : online === null ? " wait" : ""}`} />
                     {online ? "Simulator online" : online === false ? "Simulator waking up / offline" : "Connecting…"}

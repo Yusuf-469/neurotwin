@@ -1,5 +1,6 @@
 "use client";
 
+import { startTour } from "./GuidedTour";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -59,6 +60,9 @@ export default function NavBar() {
 
   const controls = (
     <>
+      <button type="button" className="tour-btn" onClick={() => { setOpen(false); startTour(); }} title="A guided walk through the project">
+        <Icon name="play" size={13} /> Tour
+      </button>
       <button type="button" className="icon-btn" onClick={() => setTheme(THEME_NEXT[theme])} aria-label={THEME_LABEL[theme]} title={THEME_LABEL[theme]}>
         <Icon name={THEME_ICON[theme]} size={17} />
       </button>
